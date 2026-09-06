@@ -1,0 +1,41 @@
+# Segreti e config di engagement — creati a partire da *.example.json / template
+auth.json
+c2.json
+scope.json
+wifi-scope.json
+mobile-scope.json
+mcp.json
+
+# Report, loot, findings e stato runtime (tutto generato)
+# Evidenze/PII dei client non vanno nel repo; loot.jsonl e sessions.json
+# contengono segreti in chiaro e NON devono mai essere committati.
+reports/
+!reports/.gitkeep
+
+# Dati di engagement: inventario, indici evidenza, matrici, stato sessione
+artifacts/
+assets.md
+coverage-matrix.md
+evidence-index.md
+gate-log.md
+operation-state.json
+residue.md
+evidence/
+engagements/
+recon/
+scripts/probe-*.py
+
+# Tool vendored (binari grandi, obscura/frida) e mirror: mai nel repo
+vendor/
+
+# Runtime
+tools/.pace.json
+tools/.test-routes.txt
+node_modules/
+npm-debug.log*
+__pycache__/
+*.pyc
+
+# OS
+.DS_Store
+Thumbs.db

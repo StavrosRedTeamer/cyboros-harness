@@ -1,0 +1,23 @@
+{
+  "_comment": "Freebuff MCP nativo (v>=0.0.156). Ogni server MCP espone tool come <server>__<tool> (es. chrome-devtools__navigate_page, chrome-devtools__evaluate_script, kali__nmap_scan). Nota: chrome-devtools-mcp@latest espone navigate_page (pageId numerico) — il tool 'navigate' non esiste più. I server attivi sono dichiarati nel campo mcpServers della definizione di ogni agente (generato da build-agents.mjs, costante MCP_SERVERS). Questo file è documentazione operatore: per attivare un server, aggiungi/rimuovi la voce in freebuff-edition/build-agents.mjs e rigenera (node freebuff-edition/build-agents.mjs), oppure aggiungi il campo mcpServers direttamente nel .ts dell'agente.",
+  "servers": {
+    "chrome-devtools": {
+      "command": "npx",
+      "args": ["-y", "chrome-devtools-mcp@latest", "--headless", "--isolated", "--executablePath", "/usr/bin/chromium"],
+      "_comment": "Browser MCP ufficiale (stdio). Chrome headless; richiede Chrome installato (auto-detect). Su macchine con solo Chromium il server non parte senza --executablePath (es. /usr/bin/chromium): il generatore build-agents.mjs lo aggiunge da solo (detectBrowserPath) — se installi Chrome vero, rigenera o aggiorna l'arg. Attivo per default nella edition."
+    },
+    "kali": {
+      "url": "http://127.0.0.1:8765/mcp",
+      "_comment": "kali-mcp-server dal vendor (260+ tool Kali: nmap/nuclei/sqlmap/ffuf/httpx/netexec/impacket/msf...). Avvio: unzip vendor/dsh-redteam-model/deploy/assets/kali-mcp-server.zip -d ~/kali-mcp && cd ~/kali-mcp && pip install -r requirements.txt && python3 mcp_server.py --transport streamable-http --host 127.0.0.1 --port 8765. Disattivo per default: togli il commento in build-agents.mjs."
+    },
+    "burp": {
+      "url": "http://127.0.0.1:9876/mcp",
+      "_comment": "Burp Suite MCP (richiede il server MCP di Burp attivo). Disattivo per default."
+    },
+    "yakit": {
+      "url": "http://127.0.0.1:8080/mcp",
+      "_comment": "Yakit MCP (richiede yakit attivo). Disattivo per default."
+    }
+  },
+  "_scope_note": "ATTENZIONE: i tool MCP (soprattutto kali/burp) eseguono azioni direttamente. La disciplina scope-guard resta procedurale per i tool MCP: l'agente deve comunque scope-checkare l'host con node tools/scope-guard.js check <url|host> PRIMA di chiamare un tool MCP che tocca un target. I guard hard (repeater.js/run.js) non coprono i tool MCP: per azioni che toccano il target preferisci sempre run.js/repeater.js quando possibile, usa MCP per la superficie (browser, tooling Kali) con scope-check manuale."
+}

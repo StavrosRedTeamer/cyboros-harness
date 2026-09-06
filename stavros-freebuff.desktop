@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Version=1.0
+Name=Stavros RedTeaming — Freebuff
+Comment=Avvia Stavros (orchestratore red-team) su Freebuff con la variante freebuff-edition (MCP incluso)
+Exec=/home/stavros/Scrivania/stavrosredteamer/open-freebuff-terminal.sh
+Icon=applications-development
+Terminal=false
+Categories=Development;Security;
+StartupNotify=true

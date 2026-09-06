@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Stavros Redteamer · Command Center</title>
+<link rel="stylesheet" href="vendor/xterm.css">
+<link rel="stylesheet" href="app.css">
+</head>
+<body>
+<header id="topbar">
+  <div class="brand">
+    <span class="logo" data-glyph="◈" tabindex="0" aria-label="Stavros Redteamer">◈</span>
+    <div class="brand-text">
+      <h1><span class="brand-name" data-text="STAVROS REDTEAMER">STAVROS REDTEAMER</span><span class="brand-tag">COMMAND CENTER</span></h1>
+      <div class="sub" id="server-sub">loading…</div>
+    </div>
+  </div>
+  <div class="badges">
+    <span id="badge-scope" class="badge badge-ok" title="scope.json">scope: …</span>
+    <span id="badge-rps" class="badge" title="max_requests_per_second">rps —</span>
+    <span id="badge-gate" class="badge" title="latest pipeline run">run —</span>
+    <span id="badge-sessions" class="badge" title="active C2 sessions">sessions 0</span>
+    <button id="btn-refresh" class="btn" title="refresh all">⟳ refresh</button>
+  </div>
+</header>
+
+<nav id="tabs" role="tablist" aria-label="Sezioni">
+  <button class="tab active" data-tab="overview" role="tab" id="tabbtn-overview" aria-controls="tab-overview" aria-selected="true" tabindex="0">Overview</button>
+  <button class="tab" data-tab="findings" role="tab" id="tabbtn-findings" aria-controls="tab-findings" aria-selected="false" tabindex="-1">Findings</button>
+  <button class="tab" data-tab="pipeline" role="tab" id="tabbtn-pipeline" aria-controls="tab-pipeline" aria-selected="false" tabindex="-1">Pipeline</button>
+  <button class="tab" data-tab="scope" role="tab" id="tabbtn-scope" aria-controls="tab-scope" aria-selected="false" tabindex="-1">Scope</button>
+  <button class="tab" data-tab="sessions" role="tab" id="tabbtn-sessions" aria-controls="tab-sessions" aria-selected="false" tabindex="-1">Sessions</button>
+  <button class="tab" data-tab="reports" role="tab" id="tabbtn-reports" aria-controls="tab-reports" aria-selected="false" tabindex="-1">Reports</button>
+  <button class="tab" data-tab="freebuff" role="tab" id="tabbtn-freebuff" aria-controls="tab-freebuff" aria-selected="false" tabindex="-1">Freebuff</button>
+</nav>
+
+<main id="view">
+  <section id="tab-overview" class="tabpane active" role="tabpanel" aria-labelledby="tabbtn-overview"></section>
+  <section id="tab-findings" class="tabpane" role="tabpanel" aria-labelledby="tabbtn-findings"></section>
+  <section id="tab-pipeline" class="tabpane" role="tabpanel" aria-labelledby="tabbtn-pipeline"></section>
+  <section id="tab-scope" class="tabpane" role="tabpanel" aria-labelledby="tabbtn-scope"></section>
+  <section id="tab-sessions" class="tabpane" role="tabpanel" aria-labelledby="tabbtn-sessions"></section>
+  <section id="tab-reports" class="tabpane" role="tabpanel" aria-labelledby="tabbtn-reports"></section>
+  <section id="tab-freebuff" class="tabpane" role="tabpanel" aria-labelledby="tabbtn-freebuff"></section>
+</main>
+
+<div id="toast-wrap"></div>
+
+<div id="job-modal" class="modal hidden">
+  <div class="modal-box">
+    <div class="modal-head">
+      <strong id="job-modal-title">Job</strong>
+      <span id="job-modal-state" class="chip">running</span>
+      <button class="btn btn-sm" data-action="job-close">✕</button>
+    </div>
+    <div id="job-modal-body">
+      <pre id="job-log"></pre>
+      <div id="job-modal-done"></div>
+    </div>
+  </div>
+</div>
+
+<script src="vendor/xterm.js"></script>
+<script src="vendor/addon-fit.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

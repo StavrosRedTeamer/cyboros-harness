@@ -1,0 +1,37 @@
+{
+  "name": "toy-graph",
+  "types": { "node": ["a", "b", "c"] },
+  "predicates": { "at": ["node"], "done": 0, "open": 0 },
+  "actions": [
+    {
+      "name": "move",
+      "params": ["from", "to"],
+      "param_types": ["node", "node"],
+      "pre": [["at", "?from"]],
+      "add": [["at", "?to"]],
+      "del": [["at", "?from"]],
+      "cost": 1,
+      "reason": "Move to {1}"
+    },
+    {
+      "name": "open_door",
+      "params": [],
+      "param_types": [],
+      "pre": [["at", "b"]],
+      "add": [["open"]],
+      "del": [],
+      "cost": 2,
+      "reason": "Open the door at node b"
+    },
+    {
+      "name": "finish",
+      "params": [],
+      "param_types": [],
+      "pre": [["open"]],
+      "add": [["done"]],
+      "del": [],
+      "cost": 1,
+      "reason": "Finish the job"
+    }
+  ]
+}

@@ -1,0 +1,710 @@
+/* Stavros Console — frontend (vanilla, no deps) */
+'use strict';
+
+const $ = (s, r) => (r || document).querySelector(s);
+const $$ = (s, r) => Array.from((r || document).querySelectorAll(s));
+const byId = (id) => document.getElementById(id);
+
+const esc = (v) => String(v == null ? '' : v)
+  .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+  .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+
+const fmtBytes = (n) => (n > 1048576 ? (n / 1048576).toFixed(1) + ' MB' : n > 1024 ? Math.round(n / 1024) + ' KB' : n + ' B');
+const fmtTs = (iso) => (iso ? new Date(iso).toLocaleString() : '—');
+const shortTs = (iso) => (iso ? new Date(iso).toLocaleDateString() + ' ' + new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—');
+
+const SEV_CHIP = { Critical: 'crit', High: 'high', Medium: 'med', Low: 'low', Info: 'info' };
+
+async function api(path, opts) {
+  const res = await fetch(path, opts);
+  let body = null;
+  try { body = await res.json(); } catch { /* empty */ }
+  if (!res.ok) throw new Error((body && body.error) || ('HTTP ' + res.status));
+  return body;
+}
+
+// ── toast ───────────────────────────────────────────────────────────────────
+function toast(msg, type) {
+  const el = document.createElement('div');
+  el.className = 'toast ' + (type || '');
+  el.textContent = msg;
+  byId('toast-wrap').appendChild(el);
+  setTimeout(() => el.remove(), type === 'err' ? 6000 : 3500);
+}
+
+// ── tab routing ─────────────────────────────────────────────────────────────
+let activeTab = 'overview';
+function switchTab(tab) {
+  activeTab = tab;
+  $$('#tabs .tab').forEach((b) => b.classList.toggle('active', b.dataset.tab === tab));
+  $$('.tabpane').forEach((p) => p.classList.toggle('active', p.id === 'tab-' + tab));
+  renderTab(tab);
+}
+
+// ── header badges ───────────────────────────────────────────────────────────
+async function refreshBadges() {
+  try {
+    const o = await api('/api/overview');
+    const sc = o.scope;
+    const b = byId('badge-scope');
+    b.textContent = sc.failClosed ? '⚠ SCOPE FAIL-CLOSED' : 'scope: ' + sc.hosts + ' host · ' + sc.ips + ' ip';
+    b.className = 'badge ' + (sc.failClosed ? 'badge-bad' : 'badge-ok');
+    byId('badge-rps').textContent = 'rps ' + sc.rps;
+    const g = byId('badge-gate');
+    if (!o.pipeline.db || !o.pipeline.hasRun) { g.textContent = 'no run yet'; g.className = 'badge'; }
+    else {
+      const s = o.pipeline.lastRunStatus;
+      if (o.pipeline.unclosed) {
+        g.textContent = 'run: done (unclosed)';
+        g.className = 'badge badge-warn';
+        g.title = 'target: ' + (o.pipeline.runTarget || '') + ' — phases finished, run never closed (see Pipeline tab)';
+      } else {
+        g.textContent = 'run: ' + s;
+        g.className = 'badge ' + (s === 'running' ? 'badge-warn' : s === 'done' ? 'badge-ok' : 'badge-bad');
+        g.title = 'target: ' + (o.pipeline.runTarget || '');
+      }
+    }
+    const sb = byId('badge-sessions');
+    sb.textContent = 'sessions ' + o.sessions.active;
+    sb.className = 'badge ' + (o.sessions.active > 0 ? 'badge-warn' : '');
+    byId('server-sub').textContent = o.opstate
+      ? o.opstate.mode + ' · updated ' + shortTs(o.opstate.updated_at)
+      : 'no operation-state.json';
+    if (activeTab === 'overview') renderOverview(o);
+    return o;
+  } catch (e) {
+    byId('badge-scope').textContent = 'offline?';
+    byId('server-sub').textContent = 'server unreachable — start: node tools/gui-server.js';
+  }
+}
+
+// ── Overview ────────────────────────────────────────────────────────────────
+function renderOverview(o) {
+  const pane = byId('tab-overview');
+  const op = o.opstate;
+  const f = o.findings;
+  const pipe = o.pipeline;
+  const phases = pipe.phases || [];
+  const sevTotal = Object.values(f.bySeverity || {}).reduce((a, b) => a + b, 0) || 0;
+  const sevBars = ['Critical', 'High', 'Medium', 'Low', 'Info'].map((s) => {
+    const n = (f.bySeverity || {})[s] || 0;
+    return n ? '<div class="s-' + s.toLowerCase() + '" style="width:' + (sevTotal ? (n / sevTotal) * 100 : 0) + '%" title="' + s + ': ' + n + '"></div>' : '';
+  }).join('');
+  const gateHtml = Object.keys(op && op.gates || {}).map((k) => {
+    const g = op.gates[k];
+    const cls = g.pass === true ? 'gate-pass' : g.pass === false ? 'gate-fail' : 'gate-pending';
+    const txt = g.pass === true ? '✓' : g.pass === false ? '✗' : '…';
+    return '<span class="gate-pill ' + cls + '">' + txt + ' ' + esc(k) + (g.at ? ' <span class="muted">' + shortTs(g.at) + '</span>' : '') + '</span>';
+  }).join('') || '<span class="muted">no stage gates yet</span>';
+  const phaseDots = phases.map((p) => '<span class="phase"><span class="dot ' + esc(p.status) + '"></span>' + esc(p.name) + '</span>').join('');
+  const donePhases = phases.filter((p) => p.status === 'done').length;
+  const goalPct = op && op.criteriaTotal ? Math.round((op.criteriaMet / op.criteriaTotal) * 100) : 0;
+
+  pane.innerHTML =
+    '<div class="grid cols-3">' +
+      '<div class="card"><h2>Engagement</h2>' +
+        '<div class="kpi">' + esc(op ? op.mode : '—') + '</div>' +
+        (op && op.goal ? '<p class="goal">' + esc(op.goal) + '</p>' : '') +
+        '<div>' + gateHtml + '</div>' +
+      '</div>' +
+      '<div class="card"><h2>Findings</h2>' +
+        '<div class="kpi">' + f.total + '</div><div class="kpi-label">total in findings.jsonl</div>' +
+        '<div class="sevbar">' + sevBars + '</div>' +
+        '<div class="row">' + ['Critical', 'High', 'Medium', 'Low', 'Info'].map((s) =>
+          '<span class="chip ' + (SEV_CHIP[s] || '') + '">' + s + ' ' + ((f.bySeverity || {})[s] || 0) + '</span>').join('') +
+        '</div>' +
+        '<div class="hint" style="margin-top:8px">' + Object.keys(f.byStatus || {}).map((s) => esc(s) + ': ' + f.byStatus[s]).join(' · ') + '</div>' +
+      '</div>' +
+      '<div class="card"><h2>Criteria / Gates</h2>' +
+        (op ? '<div class="kpi">' + op.criteriaMet + '/' + op.criteriaTotal + '</div>' +
+          '<div class="kpi-label">goals met (' + goalPct + '%)</div>' +
+          '<div class="progress-track" style="margin-top:8px"><div class="progress-fill" style="width:' + goalPct + '%"></div></div>' : '<div class="muted">no operation-state.json</div>') +
+      '</div>' +
+    '</div>' +
+    '<div class="grid cols-2" style="margin-top:12px">' +
+      '<div class="card"><h2>Pipeline (state.db)</h2>' +
+        (!pipe.db ? '<div class="muted">no state.db yet — run <code>node tools/stavros.js recon &lt;host&gt;</code> first</div>' :
+          '<div class="kpi">' + donePhases + '/' + phases.length + '</div><div class="kpi-label">phases done · last run: ' + esc(pipe.lastRunStatus || '—') + '</div>' +
+          '<div style="margin-top:8px">' + phaseDots + '</div>' +
+          (pipe.runTarget ? '<div class="hint" style="margin-top:6px">last target: ' + esc(pipe.runTarget) + '</div>' : '')) +
+      '</div>' +
+      '<div class="card"><h2>Infrastructure</h2>' +
+        '<div class="row" style="margin-bottom:6px">' +
+          '<div style="flex:1"><div class="kpi" style="font-size:17px">' + o.sessions.active + '</div><div class="kpi-label">active C2 sessions</div></div>' +
+          '<div style="flex:1"><div class="kpi" style="font-size:17px">' + o.sessions.artifactsTotal + '</div><div class="kpi-label">artifacts in ledger</div></div>' +
+          '<div style="flex:1"><div class="kpi" style="font-size:17px">' + o.lootCount + '</div><div class="kpi-label">loot rows (never shown)</div></div>' +
+        '</div>' +
+        '<div class="hint">sessions tracked in <span class="mono">reports/sessions.json</span> (teardown ledger). Loot contents stay out of the GUI.</div>' +
+      '</div>' +
+    '</div>' +
+    '<div class="card" style="margin-top:12px"><h2>Recent reports</h2>' +
+      (o.reportsRecent && o.reportsRecent.length
+        ? '<ul class="list-plain">' + o.reportsRecent.map((r) =>
+            '<li><a href="/reports/' + encodeURIComponent(r.name) + '" target="_blank" rel="noopener" class="mono" style="color:var(--accent)">' + esc(r.name) + '</a> <span class="muted">· ' + shortTs(r.mtime) + ' · ' + fmtBytes(r.size) + '</span></li>').join('') + '</ul>'
+        : '<div class="muted">no HTML reports yet — use the Reports tab to generate one.</div>') +
+    '</div>';
+}
+
+// ── Findings ────────────────────────────────────────────────────────────────
+const findingsState = { host: '', severity: '', status: '', q: '', rows: [], detailOpen: null };
+
+function renderFindings(data) {
+  findingsState.rows = data.rows || [];
+  const pane = byId('tab-findings');
+  const sevCounts = ['Critical', 'High', 'Medium', 'Low', 'Info'].map((s) => {
+    const n = (data.bySeverity || {})[s] || 0;
+    return n ? '<span class="chip ' + (SEV_CHIP[s] || '') + '">' + s + ': ' + n + '</span>' : '';
+  }).filter(Boolean).join('');
+  const hostOpts = (data.hosts || []).map((h) => '<option value="' + esc(h) + '"' + (h === findingsState.host ? ' selected' : '') + '>' + esc(h) + '</option>').join('');
+
+  const rows = findingsState.rows.map((f, i) => {
+    const conf = f.confidence ? f.confidence.score.toFixed(2) + ' ' + f.confidence.label : '—';
+    const cwes = Array.isArray(f.cwe) ? f.cwe : (f.cwe ? [f.cwe] : []);
+    const row =
+      '<tr class="clickable" data-idx="' + i + '">' +
+      '<td><span class="chip ' + (SEV_CHIP[f.severity] || '') + '">' + esc(f.severity || '—') + '</span></td>' +
+      '<td>' + esc(f.title || '') + '</td>' +
+      '<td class="mono" style="font-size:12px">' + esc(f.host || '') + '</td>' +
+      '<td class="mono" style="font-size:12px;max-width:220px;overflow-wrap:anywhere">' + esc(f.endpoint || '') + '</td>' +
+      '<td>' + cwes.map((c) => '<span class="chip">' + esc(c) + '</span>').join(' ') + '</td>' +
+      '<td class="mono">' + (f.cvss != null ? Number(f.cvss).toFixed(1) : '—') + '</td>' +
+      '<td class="mono muted">' + conf + '</td>' +
+      '<td><span class="chip">' + esc(f.status || '—') + '</span></td>' +
+      '<td class="muted mono" style="font-size:11px">' + shortTs(f.ts) + '</td>' +
+      '</tr>';
+    const detail = findingsState.detailOpen === i ? detailRow(f, i) : '';
+    return row + detail;
+  }).join('');
+
+  pane.innerHTML =
+    '<div class="filters">' +
+      '<div class="f wide"><input type="search" id="f-q" placeholder="search title / endpoint / host / cwe…" value="' + esc(findingsState.q) + '"></div>' +
+      '<div class="f"><select id="f-sev">' + '<option value="">all severities</option>' + ['Critical', 'High', 'Medium', 'Low', 'Info'].map((s) => '<option' + (s === findingsState.severity ? ' selected' : '') + '>' + s + '</option>').join('') + '</select></div>' +
+      '<div class="f"><select id="f-status">' + '<option value="">all statuses</option>' + Object.keys(data.byStatus || {}).map((s) => '<option' + (s === findingsState.status ? ' selected' : '') + '>' + esc(s) + '</option>').join('') + '</select></div>' +
+      '<div class="f"><select id="f-host">' + '<option value="">all hosts</option>' + hostOpts + '</select></div>' +
+      '<div class="f" style="flex:0 0 auto"><button class="btn" id="f-reset">reset</button></div>' +
+    '</div>' +
+    '<div class="card" style="margin-bottom:12px"><div class="row" style="align-items:center;gap:8px"><span class="chip">' + data.total + ' findings</span>' + sevCounts + '</div></div>' +
+    '<div class="card" style="padding:0;overflow-x:auto"><table><thead><tr>' +
+      '<th>Severity</th><th>Title</th><th>Host</th><th>Endpoint</th><th>CWE</th><th>CVSS</th><th>Conf</th><th>Status</th><th>Detected</th>' +
+      '</tr></thead><tbody>' + (rows || '<tr><td colspan="9" class="muted">no findings match</td></tr>') + '</tbody></table></div>';
+
+  byId('f-q').addEventListener('input', debounce(() => { findingsState.q = byId('f-q').value.trim(); fetchFindings(); }, 350));
+  byId('f-sev').addEventListener('change', (e) => { findingsState.severity = e.target.value; fetchFindings(); });
+  byId('f-status').addEventListener('change', (e) => { findingsState.status = e.target.value; fetchFindings(); });
+  byId('f-host').addEventListener('change', (e) => { findingsState.host = e.target.value; fetchFindings(); });
+  byId('f-reset').addEventListener('click', () => {
+    Object.assign(findingsState, { host: '', severity: '', status: '', q: '', detailOpen: null });
+    fetchFindings();
+  });
+  $$('#tab-findings tbody tr.clickable').forEach((tr) => {
+    tr.addEventListener('click', () => {
+      const i = parseInt(tr.dataset.idx, 10);
+      findingsState.detailOpen = findingsState.detailOpen === i ? null : i;
+      renderFindings(findingsState.lastData);
+    });
+  });
+}
+
+function detailRow(f, i) {
+  const fields = [
+    ['Class', f.class], ['Verify level', f.verify_level], ['CVE', f.cve || (f.cves ? f.cves.join(', ') : '')],
+    ['EPSS', f.epss != null ? (Number(f.epss) * 100).toFixed(1) + '%' : ''],
+    ['Impact', f.impact], ['PoC', f.poc], ['Remediation', f.remediation],
+    ['Oracle', f.oracle ? (f.oracle.type || '') + (f.oracle.ref ? ' · ' + f.oracle.ref : '') : ''],
+  ].filter(([, v]) => v != null && v !== '');
+  return '<tr class="detail-row"><td colspan="9"><div class="detail" data-idx="' + i + '">' +
+    fields.map(([k, v]) => '<h4>' + esc(k) + '</h4><p>' + esc(v) + '</p>').join('') +
+    '</div></td></tr>';
+}
+
+function fetchFindings() {
+  const p = new URLSearchParams();
+  if (findingsState.host) p.set('host', findingsState.host);
+  if (findingsState.severity) p.set('severity', findingsState.severity);
+  if (findingsState.status) p.set('status', findingsState.status);
+  if (findingsState.q) p.set('q', findingsState.q);
+  api('/api/findings?' + p.toString()).then((d) => { findingsState.lastData = d; renderFindings(d); }).catch((e) => toast(String(e.message || e), 'err'));
+}
+
+// ── Pipeline ────────────────────────────────────────────────────────────────
+function renderPipeline(data) {
+  const pane = byId('tab-pipeline');
+  const lastRun = data.lastRun;
+  const phases = data.phases || [];
+  const phaseChips = phases.map((p) => '<span class="phase"><span class="dot ' + esc(p.status) + '"></span>' + esc(p.name) + '</span>').join('');
+  const doneN = phases.filter((p) => p.status === 'done').length;
+  const targetsRows = (data.targets || []).map((t) =>
+    '<tr><td class="mono">' + esc(t.host) + '</td><td>' + t.hosts + '</td><td>' + t.ports + '</td><td>' + t.endpoints + '</td><td class="muted">' + shortTs(t.last_seen) + '</td></tr>').join('');
+
+  const resumeBtn = data.resumePossible
+    ? '<button class="btn btn-primary" id="btn-resume">▶ Resume incomplete run</button>'
+    : '<button class="btn" id="btn-resume" disabled title="no genuinely incomplete phase to resume (a done scan-only run is not incomplete)">▶ Resume (nothing to resume)</button>';
+
+  const unclosedHint = (data.unclosed && lastRun)
+    ? '<div class="hint" style="color:var(--yellow);margin:4px 0 8px">⚠ run finished its phases but was never closed — mark it done or remove it</div>'
+    : '';
+  const lastRunCtl = (lastRun && lastRun.status !== 'done')
+    ? '<button class="btn btn-sm" id="btn-close-last" title="mark run #' + lastRun.id + ' as done">✓ mark done</button>' +
+      '<button class="btn btn-sm" id="btn-remove-last" title="delete run #' + lastRun.id + ' + its phases" style="margin-left:6px">✕ remove run</button>'
+    : '';
+
+  const runsRows = (data.runs || []).map((r) =>
+    '<tr>' +
+      '<td class="mono muted">#' + r.id + '</td>' +
+      '<td>' + esc(r.command || '') + '</td>' +
+      '<td class="mono">' + esc(r.target || '') + '</td>' +
+      '<td><span class="dot ' + esc(r.status) + '"></span> ' + esc(r.status) + '</td>' +
+      '<td class="muted">' + shortTs(r.started_at) + '</td>' +
+      '<td>' +
+        (r.status !== 'done' ? '<button class="btn btn-sm" data-run-act="close" data-run="' + r.id + '" title="mark run #' + r.id + ' as done">✓</button> ' : '') +
+        '<button class="btn btn-sm" data-run-act="remove" data-run="' + r.id + '" title="delete run #' + r.id + ' + its phases">✕</button>' +
+      '</td>' +
+    '</tr>').join('');
+
+  pane.innerHTML =
+    (!data.db
+      ? '<div class="card"><h2>Pipeline</h2><div class="muted">no <span class="mono">reports/state.db</span> yet — run <code>node tools/stavros.js recon &lt;host&gt;</code> first.</div></div>'
+      :
+      '<div class="grid cols-2">' +
+        '<div class="card"><h2>Last run' + (lastRun ? ' #' + lastRun.id : '') + '</h2>' +
+          (lastRun
+            ? '<div class="row" style="align-items:center;gap:10px"><span class="chip">status: ' + esc(lastRun.status) + '</span><span class="mono muted">' + esc(lastRun.target || '') + '</span></div>' +
+              '<div style="margin:10px 0">' + phaseChips + '</div>' +
+              '<div class="kpi" style="font-size:16px">' + doneN + '/' + phases.length + ' phases done</div>' +
+              '<div class="hint" style="margin-bottom:8px">' + esc(lastRun.command || '') + ' · started ' + shortTs(lastRun.started_at) + '</div>' +
+              unclosedHint +
+              resumeBtn +
+              lastRunCtl +
+              '<button class="btn" id="btn-reopen-log" style="margin-left:8px" title="last job log">log</button>'
+            : '<div class="muted">no runs recorded yet</div>') +
+        '</div>' +
+        '<div class="card"><h2>Targets (' + (data.targets || []).length + ')</h2>' +
+          '<table><thead><tr><th>Host</th><th>Hosts</th><th>Ports</th><th>Endpoints</th><th>Last seen</th></tr></thead>' +
+          '<tbody>' + (targetsRows || '<tr><td colspan="5" class="muted">—</td></tr>') + '</tbody></table>' +
+        '</div>' +
+      '</div>' +
+      '<div class="card" style="margin-top:12px"><h2>Recent runs</h2>' +
+        '<table><thead><tr><th>#</th><th>Command</th><th>Target</th><th>Status</th><th>Started</th><th>Actions</th></tr></thead>' +
+        '<tbody>' + (runsRows || '<tr><td colspan="6" class="muted">—</td></tr>') + '</tbody></table>' +
+        '<div class="hint" style="margin-top:6px">✓ = close a stale run (status stuck at running), ✕ = delete run + phases (targets/ports data is kept).</div>' +
+      '</div>');
+
+  const rb = byId('btn-resume');
+  if (rb && !rb.disabled) rb.addEventListener('click', () => startJob('resume', '/api/pipeline/resume', 'stavros.js resume'));
+  const logBtn = byId('btn-reopen-log');
+  if (logBtn) logBtn.addEventListener('click', () => toast('no persistent job log for past runs — new runs stream live here', ''));
+
+  // re-render with fresh data after a run mutation
+  const refetchPipeline = () => api('/api/pipeline').then((d) => { renderPipeline(d); refreshBadges(); }).catch((e) => toast(String(e.message || e), 'err'));
+  const runAction = (id, act) => {
+    if (act === 'close') {
+      if (!confirm('Mark run #' + id + ' as done?')) return;
+      api('/api/pipeline/runs/' + id + '/close', { method: 'POST' })
+        .then(() => { toast('run #' + id + ' marked done'); refetchPipeline(); })
+        .catch((e) => toast(String(e.message || e), 'err'));
+    } else {
+      if (!confirm('Delete run #' + id + ' and its phases? Targets/hosts/ports data is kept.')) return;
+      api('/api/pipeline/runs/' + id, { method: 'DELETE' })
+        .then(() => { toast('run #' + id + ' removed'); refetchPipeline(); })
+        .catch((e) => toast(String(e.message || e), 'err'));
+    }
+  };
+  const closeLast = byId('btn-close-last');
+  if (closeLast) closeLast.addEventListener('click', () => runAction(lastRun.id, 'close'));
+  const removeLast = byId('btn-remove-last');
+  if (removeLast) removeLast.addEventListener('click', () => runAction(lastRun.id, 'remove'));
+  $$('#tab-pipeline [data-run-act]').forEach((b) => {
+    b.addEventListener('click', () => runAction(parseInt(b.dataset.run, 10), b.dataset.runAct));
+  });
+}
+
+// ── Scope ───────────────────────────────────────────────────────────────────
+let scopeData = null;
+function renderScope(data) {
+  scopeData = data;
+  const pane = byId('tab-scope');
+  const banner = data.failClosed
+    ? '<div class="card" style="border-color:#7c2530;background:#2a1216"><b style="color:#ff5d6c">⚠ FAIL-CLOSED</b> — no hosts, prefixes or IPs allowed: scope-guard blocks everything until you add targets.</div>'
+    : '<div class="card" style="border-color:#1e5c3d;background:#10251a"><b style="color:#3ddc84">✓ Scope active</b> — ' + data.allowed_hosts.length + ' host(s), ' + data.allowed_url_prefixes.length + ' prefix(es), ' + data.allowed_ips.length + ' IP/CIDR.</div>';
+  pane.innerHTML = banner +
+    '<div class="grid cols-2" style="margin-top:12px">' +
+      '<div class="card"><h2>scope.json editor</h2>' +
+        '<label for="sc-hosts">allowed_hosts (one per line — covers host + subdomains)</label>' +
+        '<textarea id="sc-hosts">' + esc(data.allowed_hosts.join('\n')) + '</textarea>' +
+        '<label for="sc-prefixes">allowed_url_prefixes (one per line, must end with /)</label>' +
+        '<textarea id="sc-prefixes">' + esc(data.allowed_url_prefixes.join('\n')) + '</textarea>' +
+        '<label for="sc-ips">allowed_ips / CIDR (internal, SSRF, lab)</label>' +
+        '<textarea id="sc-ips">' + esc(data.allowed_ips.join('\n')) + '</textarea>' +
+        '<label for="sc-rps">max_requests_per_second (global pacing)</label>' +
+        '<input type="number" id="sc-rps" min="1" max="600" value="' + esc(data.max_requests_per_second) + '">' +
+        '<div class="row" style="margin-top:14px;align-items:center">' +
+          '<button class="btn btn-primary" id="sc-save">💾 Save scope.json</button>' +
+          '<span id="sc-save-hint" class="hint"></span>' +
+        '</div>' +
+        '<div class="hint" style="margin-top:8px">Host/IP/CIDR entries are validated server-side before writing. The runtime truth stays <span class="mono">tools/scope-guard.js</span> — the GUI never bypasses it. Every save appends a timestamped note.</div>' +
+      '</div>' +
+      '<div class="stack">' +
+        '<div class="card"><h2>Verify a URL against the guard</h2>' +
+          '<input type="text" id="sc-url" placeholder="https://target.example/path?x=1">' +
+          '<div class="row" style="margin-top:8px;align-items:center"><button class="btn" id="sc-check">Check scope</button><span id="sc-check-out" class="hint"></span></div>' +
+        '</div>' +
+        '<div class="card"><h2>Notes (history)</h2>' +
+          '<pre style="max-height:220px;overflow:auto;font:11px/1.5 var(--mono);color:var(--muted);white-space:pre-wrap">' + esc(data.notes || '') + '</pre>' +
+        '</div>' +
+      '</div>' +
+    '</div>';
+
+  byId('sc-save').addEventListener('click', saveScope);
+  byId('sc-check').addEventListener('click', checkScope);
+  byId('sc-url').addEventListener('keydown', (e) => { if (e.key === 'Enter') checkScope(); });
+}
+
+function parseList(textarea) {
+  return textarea.value.split(/[\n,]/).map((s) => s.trim()).filter(Boolean);
+}
+async function saveScope() {
+  const hosts = parseList(byId('sc-hosts'));
+  const prefixes = parseList(byId('sc-prefixes'));
+  const ips = parseList(byId('sc-ips'));
+  const rps = parseInt(byId('sc-rps').value, 10);
+  const willEmpty = hosts.length === 0 && prefixes.length === 0 && ips.length === 0;
+  if (willEmpty && !confirm('You are about to empty the scope → FAIL-CLOSED (everything blocked). Continue?')) return;
+  const out = byId('sc-save-hint');
+  out.textContent = 'saving…'; out.className = 'hint';
+  try {
+    const r = await api('/api/scope', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ allowed_hosts: hosts, allowed_url_prefixes: prefixes, allowed_ips: ips, max_requests_per_second: rps }) });
+    out.textContent = 'saved' + (r.added ? ' · +' + r.added + ' host(s)' : '') + (r.removed ? ' · -' + r.removed + ' host(s)' : '') + (r.failClosed ? ' · ⚠ FAIL-CLOSED' : '');
+    out.className = 'hint ' + (r.failClosed ? 'err' : 'ok');
+    toast(r.failClosed ? 'Scope saved — FAIL-CLOSED (empty scope!)' : 'Scope saved', r.failClosed ? 'err' : 'ok');
+    refreshBadges();
+    renderScope(await api('/api/scope'));
+  } catch (e) { out.textContent = String(e.message || e); out.className = 'hint err'; }
+}
+async function checkScope() {
+  const u = byId('sc-url').value.trim();
+  const out = byId('sc-check-out');
+  if (!u) { out.textContent = 'enter a URL first'; out.className = 'hint err'; return; }
+  out.textContent = 'checking…'; out.className = 'hint';
+  try {
+    const r = await api('/api/scope/check?url=' + encodeURIComponent(u));
+    if (r.ok) { out.textContent = '✓ IN SCOPE — allowed'; out.className = 'hint ok'; }
+    else out.textContent = '✗ OUT OF SCOPE' + (r.reason ? ' — ' + r.reason : ''); out.className = 'hint err';
+  } catch (e) { out.textContent = String(e.message || e); out.className = 'hint err'; }
+}
+
+// ── Sessions ────────────────────────────────────────────────────────────────
+function renderSessions(data) {
+  const pane = byId('tab-sessions');
+  const rows = (data.rows || []).map((s) => {
+    const metaBits = [];
+    for (const k of ['payload', 'luri', 'port', 'opened']) if (s.meta[k] != null) metaBits.push(k + '=' + s.meta[k]);
+    return '<tr>' +
+      '<td class="mono">' + esc(s.id) + '</td>' +
+      '<td><span class="chip">' + esc(s.status) + '</span></td>' +
+      '<td class="mono">' + esc(s.host || '') + '</td>' +
+      '<td style="font-size:12px">' + esc(s.obtained_via || '') + '</td>' +
+      '<td>' + (s.artifacts.length ? s.artifacts.map((a) => esc(typeof a === 'string' ? a : JSON.stringify(a))).join('<br>') : '<span class="muted">none</span>') + '</td>' +
+      '<td class="mono muted" style="font-size:11px">' + esc(metaBits.join(' · ')) + '</td>' +
+      '</tr>';
+  }).join('');
+  pane.innerHTML =
+    '<div class="grid cols-3">' +
+      '<div class="card"><div class="kpi">' + data.active + '</div><div class="kpi-label">active sessions</div></div>' +
+      '<div class="card"><div class="kpi">' + data.artifactsTotal + '</div><div class="kpi-label">artifacts (teardown)</div></div>' +
+      '<div class="card"><div class="kpi" id="loot-count">…</div><div class="kpi-label">loot rows</div><div class="hint">contents never shown</div></div>' +
+    '</div>' +
+    '<div class="card" style="margin-top:12px;padding:0;overflow-x:auto"><table><thead><tr>' +
+      '<th>Session</th><th>Status</th><th>Host</th><th>Obtained via</th><th>Artifacts</th><th>Meta</th>' +
+      '</tr></thead><tbody>' + (rows || '<tr><td colspan="6" class="muted">no sessions in reports/sessions.json</td></tr>') + '</tbody></table></div>' +
+    '<div class="hint" style="margin-top:8px">Teardown ledger — <span class="mono">stavros-cleanup</span> empties it at engagement end. GUI is read-only here: cleanup is a confirm-tier action run from the CLI.</div>';
+  api('/api/loot/count').then((r) => { byId('loot-count').textContent = r.count; }).catch(() => { byId('loot-count').textContent = '—'; });
+}
+
+// ── Reports ─────────────────────────────────────────────────────────────────
+function renderReports(data) {
+  const pane = byId('tab-reports');
+  const kinds = { report: 'report', finding: 'finding', overview: 'overview', doc: 'doc' };
+  const rows = data.map((r) =>
+    '<tr>' +
+    '<td class="mono" style="font-size:12px">' + esc(r.name) + '</td>' +
+    '<td><span class="chip">' + kinds[r.kind] + '</span></td>' +
+    '<td class="muted">' + fmtBytes(r.size) + '</td>' +
+    '<td class="muted">' + shortTs(r.mtime) + '</td>' +
+    '<td>' + (r.kind === 'report' || /\.html$/.test(r.name)
+      ? '<a class="btn btn-sm" href="/reports/' + encodeURIComponent(r.name) + '" target="_blank" rel="noopener">open ↗</a>'
+      : '<span class="muted mono" style="font-size:11px">reports/' + esc(r.name) + '</span>') + '</td>' +
+    '</tr>').join('');
+  pane.innerHTML =
+    '<div class="card" style="margin-bottom:12px">' +
+      '<div class="row" style="align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">' +
+        '<div><b>Standalone HTML report</b><div class="hint">consolidates findings.jsonl + state.db + attack chains via tools/report-html.js (severity · CVSS · CWE · EPSS · confidence)</div></div>' +
+        '<button class="btn btn-primary" id="btn-gen-report">⚙ Generate report.html</button>' +
+      '</div>' +
+    '</div>' +
+    '<div class="card" style="padding:0;overflow-x:auto"><table><thead><tr>' +
+      '<th>File</th><th>Kind</th><th>Size</th><th>Modified</th><th></th>' +
+      '</tr></thead><tbody>' + (rows || '<tr><td colspan="5" class="muted">reports/ is empty</td></tr>') + '</tbody></table></div>';
+  byId('btn-gen-report').addEventListener('click', () => startJob('report-html', '/api/reports/generate', 'tools/report-html.js'));
+}
+
+// ── jobs / live log modal ───────────────────────────────────────────────────
+function startJob(name, path, title) {
+  api(path, { method: 'POST' }).then((r) => {
+    toast('started: ' + title, '');
+    openJobModal(r.jobId, title);
+  }).catch((e) => toast('failed to start job: ' + String(e.message || e), 'err'));
+}
+
+function openJobModal(jobId, title) {
+  const modal = byId('job-modal');
+  const logEl = byId('job-log');
+  const doneEl = byId('job-modal-done');
+  byId('job-modal-title').textContent = title + ' — ' + jobId;
+  byId('job-modal-state').textContent = 'running';
+  logEl.textContent = '';
+  doneEl.style.display = 'none';
+  doneEl.innerHTML = '';
+  modal.classList.remove('hidden');
+  const es = new EventSource('/api/jobs/' + jobId + '/events');
+  es.onmessage = (ev) => {
+    let msg;
+    try { msg = JSON.parse(ev.data); } catch { return; }
+    if (msg.type === 'line') {
+      logEl.textContent += msg.line + '\n';
+      logEl.scrollTop = logEl.scrollHeight;
+    } else if (msg.type === 'done') {
+      byId('job-modal-state').textContent = msg.exitCode === 0 ? 'done' : 'error (exit ' + msg.exitCode + ')';
+      byId('job-modal-state').style.color = msg.exitCode === 0 ? 'var(--green)' : 'var(--red)';
+      doneEl.style.display = 'block';
+      if (msg.out) doneEl.innerHTML = '<a class="btn btn-primary" href="' + esc(msg.out) + '" target="_blank" rel="noopener">Open generated report ↗</a>';
+      if (msg.error) doneEl.innerHTML += '<div class="hint err" style="margin-top:6px">' + esc(msg.error) + '</div>';
+      es.close();
+    }
+  };
+  es.onerror = () => { /* transient — EventSource retries */ };
+  modal._es = es;
+}
+
+function closeJobModal() {
+  const modal = byId('job-modal');
+  if (modal._es) modal._es.close();
+  modal.classList.add('hidden');
+}
+
+// ── wiring ──────────────────────────────────────────────────────────────────
+function debounce(fn, ms) {
+  let t;
+  return function () { clearTimeout(t); t = setTimeout(fn, ms); };
+}
+
+function renderTab(tab) {
+  if (tab === 'overview') refreshBadges();
+  else if (tab === 'findings') fetchFindings();
+  else if (tab === 'pipeline') api('/api/pipeline').then(renderPipeline).catch((e) => toast(String(e.message || e), 'err'));
+  else if (tab === 'scope') api('/api/scope').then(renderScope).catch((e) => toast(String(e.message || e), 'err'));
+  else if (tab === 'sessions') api('/api/sessions').then(renderSessions).catch((e) => toast(String(e.message || e), 'err'));
+  else if (tab === 'reports') api('/api/reports').then(renderReports).catch((e) => toast(String(e.message || e), 'err'));
+  else if (tab === 'freebuff') renderFreebuffTab();
+}
+
+$$('#tabs .tab').forEach((b) => b.addEventListener('click', () => switchTab(b.dataset.tab)));
+byId('btn-refresh').addEventListener('click', () => renderTab(activeTab));
+document.addEventListener('click', (e) => {
+  const a = e.target.closest('[data-action]');
+  if (a && a.dataset.action === 'job-close') closeJobModal();
+});
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !byId('job-modal').classList.contains('hidden')) closeJobModal(); });
+
+// ── Freebuff embedded terminal tab ─────────────────────────────────────────
+let fbBuilt = false;
+let fbPoll = null;
+let fbStatus = null;
+
+function fbFit() {
+  const stage = byId('term-stage');
+  const pre = byId('term-out');
+  if (!stage || !pre) return;
+  const charW = 7.35, charH = 17.4;
+  const cols = Math.max(40, Math.min(300, Math.floor((stage.clientWidth - 20) / charW)));
+  const rows = Math.max(10, Math.min(120, Math.floor((pre.clientHeight - 6) / charH)));
+  api('/api/term/resize', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ cols, rows }) })
+    .catch(() => {});
+}
+
+function renderFreebuffTab() {
+  if (!fbBuilt) {
+    fbBuilt = true;
+    byId('tab-freebuff').innerHTML =
+      '<div class="term-banner">Launches a real interactive Freebuff session (the CLI is a TUI) inside a detached ' +
+      '<code>tmux</code> session in this project, and embeds its terminal here. <b>Click the terminal and type directly</b> — ' +
+      'keystrokes are forwarded live and Enter sends, exactly like a normal terminal. The session keeps running even if you ' +
+      'close the browser — use <b>Stop</b> to terminate it.</div>' +
+      '<div id="term-toolbar">' +
+        '<span class="status" id="term-status"><span class="status-dot off"></span> <span id="term-status-txt">checking tmux…</span></span>' +
+        '<button class="btn btn-primary" id="term-start">▶ Start Freebuff</button>' +
+        '<button class="btn btn-danger" id="term-stop">■ Stop</button>' +
+        '<input type="text" id="term-cmd" value="freebuff" spellcheck="false" title="command to run in the tmux session">' +
+      '</div>' +
+      '<div id="term-stage" tabindex="0" role="textbox" aria-label="Freebuff terminal — click and type" title="click and type">' +
+        '<pre id="term-out"></pre>' +
+      '</div>' +
+      '<div id="term-keys">' +
+        '<span class="chip">keys:</span>' +
+        ['C-c', 'Escape', 'Tab', 'Up', 'Down', 'PgUp', 'PgDn', 'C-l', 'Enter'].map((k) =>
+          '<button class="btn" data-key="' + k + '">' + k + '</button>').join('') +
+      '</div>';
+    byId('term-start').addEventListener('click', fbStart);
+    byId('term-stop').addEventListener('click', fbStop);
+    const stage = byId('term-stage');
+    stage.addEventListener('click', () => stage.focus());
+    stage.addEventListener('keydown', fbKeydown);
+    stage.addEventListener('paste', fbPaste);
+    byId('term-cmd').addEventListener('keydown', (e) => { if (e.key === 'Enter') fbStart(); });
+    $$('#term-keys .btn[data-key]').forEach((b) => {
+      b.addEventListener('click', () => {
+        api('/api/term/keys', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ key: b.dataset.key }) })
+          .catch((e) => toast(String(e.message || e), 'err'));
+      });
+    });
+    window.addEventListener('resize', () => { if (activeTab === 'freebuff') fbFit(); });
+  }
+  fbPollNow();
+  if (!fbPoll) {
+    fbPoll = setInterval(() => { if (activeTab === 'freebuff' && !document.hidden) fbPollNow(); }, 900);
+  }
+}
+
+function fbSetStatus(running, text) {
+  const dot = $('#term-status .status-dot');
+  if (!dot) return;
+  dot.className = 'status-dot ' + (running ? 'on' : 'off');
+  byId('term-status-txt').textContent = text;
+  if (running) {
+    const stage = byId('term-stage');
+    if (stage && document.activeElement !== stage) stage.focus();
+  }
+}
+
+// ── direct keyboard input into the embedded terminal ─────────────────────
+const FB_SPECIAL = {
+  Enter: 'Enter', Backspace: 'Bspace', Delete: 'DC', Tab: 'Tab', Escape: 'Escape',
+  ArrowUp: 'Up', ArrowDown: 'Down', ArrowLeft: 'Left', ArrowRight: 'Right',
+  Home: 'Home', End: 'End', PageUp: 'PgUp', PageDown: 'PgDn',
+};
+for (let i = 1; i <= 12; i++) FB_SPECIAL['F' + i] = 'F' + i;
+const FB_MODIFIER_KEYS = new Set(['Shift', 'Control', 'Alt', 'Meta', 'CapsLock', 'NumLock', 'ScrollLock', 'ContextMenu', 'Dead', 'Unidentified']);
+
+let fbKeyChain = Promise.resolve();
+let fbRefreshT = null;
+
+function fbSend(body) {
+  // queue: tmux send-keys must arrive in the same order the user typed them
+  fbKeyChain = fbKeyChain
+    .then(() => api('/api/term/keys', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }))
+    .catch(() => { /* transient errors surfaced by the status poll */ });
+  fbRefreshSoon();
+}
+function fbSendKey(key) { fbSend({ key }); }
+function fbSendText(text) { fbSend({ text }); }
+function fbRefreshSoon() {
+  if (fbRefreshT) return;
+  fbRefreshT = setTimeout(() => {
+    fbRefreshT = null;
+    if (activeTab === 'freebuff' && fbStatus) fbPollNow();
+  }, 60);
+}
+
+function fbKeydown(e) {
+  if (!fbStatus) {
+    const st = byId('term-status-txt');
+    if (st) st.textContent = 'not running — press ▶ Start';
+    e.preventDefault();
+    return;
+  }
+  const k = e.key;
+  if (e.ctrlKey && e.altKey) {          // AltGr — send the literal character
+    if (k && k.length === 1) { fbSendText(k); e.preventDefault(); }
+    return;
+  }
+  if (e.ctrlKey) {
+    if (k === '[') { fbSendKey('Escape'); e.preventDefault(); }   // Ctrl+[ = ESC
+    else if (k && k.length === 1) { fbSendKey('C-' + k.toLowerCase()); e.preventDefault(); }
+    return;
+  }
+  if (e.altKey) {
+    if (k === 'Enter') fbSendKey('M-Enter');
+    else if (k && k.length === 1) fbSendKey('M-' + k.toLowerCase());
+    else if (FB_SPECIAL[k]) fbSendKey('M-' + FB_SPECIAL[k]);
+    e.preventDefault();
+    return;
+  }
+  if (FB_SPECIAL[k]) {
+    fbSendKey(k === 'Tab' && e.shiftKey ? 'BTab' : FB_SPECIAL[k]);
+    e.preventDefault();
+    return;
+  }
+  if (FB_MODIFIER_KEYS.has(k)) return;
+  if (k && k.length === 1) { fbSendText(k); e.preventDefault(); }
+}
+
+function fbPaste(e) {
+  if (!fbStatus) return;
+  const t = e.clipboardData && e.clipboardData.getData('text');
+  if (t) { fbSendText(t); e.preventDefault(); }
+}
+
+async function fbPollNow() {
+  let st;
+  try { st = await api('/api/term/status'); } catch (e) { fbSetStatus(false, 'GUI offline?'); return; }
+  if (!st.available) {
+    fbSetStatus(false, 'tmux unavailable');
+    return;
+  }
+  if (st.running !== fbStatus) {
+    fbStatus = st.running;
+    fbSetStatus(st.running, st.running ? 'freebuff running (tmux ' + st.session + ')' : 'stopped — press ▶ Start');
+    if (!st.running) byId('term-out').textContent = '';
+    if (st.running) setTimeout(fbFit, 60);
+  }
+  if (st.running) {
+    try {
+      const pane = await api('/api/term/pane');
+      const pre = byId('term-out');
+      const nearBottom = pre.scrollHeight - pre.scrollTop - pre.clientHeight < 40;
+      const txt = (pane.text || '').split('\n').map((l) => l.replace(/\s+$/, '')).join('\n');
+      pre.textContent = txt;
+      if (nearBottom) pre.scrollTop = pre.scrollHeight;
+    } catch { /* transient */ }
+  }
+}
+
+async function fbStart() {
+  const cmd = (byId('term-cmd').value || 'freebuff').trim();
+  try {
+    const r = await api('/api/term/start', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ cmd }) });
+    fbStatus = true;
+    fbSetStatus(true, 'starting…');
+    toast('Freebuff avviato in tmux (' + cmd + ')');
+    setTimeout(fbFit, 80);
+    fbPollNow();
+  } catch (e) { toast(String(e.message || e), 'err'); }
+}
+
+async function fbStop() {
+  if (!confirm('Stop della sessione Freebuff? Il processo verrà terminato.')) return;
+  try {
+    await api('/api/term/stop', { method: 'POST' });
+    fbStatus = false;
+    fbSetStatus(false, 'stopped — press ▶ Start');
+    byId('term-out').textContent = '';
+    toast('Sessione terminata');
+  } catch (e) { toast(String(e.message || e), 'err'); }
+}
+
+setInterval(() => {
+  if (document.hidden) return;
+  if (activeTab === 'overview' || activeTab === 'pipeline' || activeTab === 'sessions') renderTab(activeTab);
+}, 15000);
+
+refreshBadges();

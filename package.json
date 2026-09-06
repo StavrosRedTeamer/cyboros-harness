@@ -1,0 +1,15 @@
+{
+  "name": "stavros-redteamer-freebuff",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Workspace standalone Freebuff di StavrosRedTeamer (web/host pentest, zero-dipendenze).",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "test": "node tools/run-tests.js",
+    "test:all": "node tools/run-tests.js --e2e",
+    "test:list": "node tools/run-tests.js --list",
+    "console": "node tools/gui-server.js"
+  }
+}
