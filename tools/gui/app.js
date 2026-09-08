@@ -817,31 +817,54 @@ async function checkScope() {
 }
 
 // ── Sessions ────────────────────────────────────────────────────────────────
+// row click → detail drawer. Artifacts/meta shown are the same fields the
+// ledger already exposed; loot stays count-only (contents never shown). No
+// per-session PTY exists server-side, so the drawer links to the shared
+// operator console (Freebuff) rather than faking a live shell per session.
+function openSessionDrawer(s) {
+  const detailEl = el('div', { class: 'detail' });
+  const push = (k, v) => { if (v != null && v !== '') { detailEl.appendChild(el('h4', null, k)); detailEl.appendChild(el('p', null, String(v))); } };
+  push('Status', s.status); push('Host', s.host); push('Obtained via', s.obtained_via);
+  Object.keys(s.meta || {}).forEach((k) => push(k, s.meta[k]));
+  const arts = s.artifacts || [];
+  const consoleBtn = el('button', { class: 'btn btn-sm' }, 'open operator console →');
+  consoleBtn.addEventListener('click', () => { closeDrawer(); switchTab('freebuff'); });
+  const body = el('div', null, [
+    el('div', { class: 'row', style: { alignItems: 'center', gap: '10px', marginBottom: '14px' } }, [chip(s.status), el('span', { class: 'mono muted' }, s.host || '')]),
+    detailEl,
+    el('div', { class: 'kpi-label', style: { marginTop: '16px', marginBottom: '6px' } }, 'Artifacts (' + arts.length + ')'),
+    arts.length ? el('ul', { class: 'list-plain' }, arts.map((a) => el('li', { class: 'mono', style: { fontSize: '12px' } }, typeof a === 'string' ? a : JSON.stringify(a)))) : el('div', { class: 'faint' }, 'none'),
+    el('div', { style: { marginTop: '16px' } }, consoleBtn),
+  ]);
+  drawer({ title: 'Session ' + s.id, body });
+}
+
 function renderSessions(data) {
   const pane = byId('tab-sessions');
-  const rows = (data.rows || []).map((s) => {
-    const metaBits = [];
-    for (const k of ['payload', 'luri', 'port', 'opened']) if (s.meta[k] != null) metaBits.push(k + '=' + s.meta[k]);
-    return '<tr>' +
-      '<td class="mono">' + esc(s.id) + '</td>' +
-      '<td><span class="chip">' + esc(s.status) + '</span></td>' +
-      '<td class="mono">' + esc(s.host || '') + '</td>' +
-      '<td style="font-size:12px">' + esc(s.obtained_via || '') + '</td>' +
-      '<td>' + (s.artifacts.length ? s.artifacts.map((a) => esc(typeof a === 'string' ? a : JSON.stringify(a))).join('<br>') : '<span class="muted">none</span>') + '</td>' +
-      '<td class="mono muted" style="font-size:11px">' + esc(metaBits.join(' · ')) + '</td>' +
-      '</tr>';
-  }).join('');
-  pane.innerHTML =
-    '<div class="grid cols-3">' +
-      '<div class="card"><div class="kpi">' + data.active + '</div><div class="kpi-label">active sessions</div></div>' +
-      '<div class="card"><div class="kpi">' + data.artifactsTotal + '</div><div class="kpi-label">artifacts (teardown)</div></div>' +
-      '<div class="card"><div class="kpi" id="loot-count">…</div><div class="kpi-label">loot rows</div><div class="hint">contents never shown</div></div>' +
-    '</div>' +
-    '<div class="card" style="margin-top:12px;padding:0;overflow-x:auto"><table><thead><tr>' +
-      '<th>Session</th><th>Status</th><th>Host</th><th>Obtained via</th><th>Artifacts</th><th>Meta</th>' +
-      '</tr></thead><tbody>' + (rows || '<tr><td colspan="6" class="muted">no sessions in reports/sessions.json</td></tr>') + '</tbody></table></div>' +
-    '<div class="hint" style="margin-top:8px">Teardown ledger — <span class="mono">stavros-cleanup</span> empties it at engagement end. GUI is read-only here: cleanup is a confirm-tier action run from the CLI.</div>';
-  api('/api/loot/count').then((r) => { byId('loot-count').textContent = r.count; }).catch(() => { byId('loot-count').textContent = '—'; });
+  const lootTile = statTile({ label: 'Loot rows', value: '…', hint: 'contents never shown' });
+  const statRow = el('div', { class: 'stat-row' }, [
+    statTile({ label: 'Active sessions', value: data.active, tone: data.active > 0 ? 'live' : null }),
+    statTile({ label: 'Artifacts (teardown)', value: data.artifactsTotal }),
+    lootTile,
+  ]);
+
+  const tableCard = el('div', { class: 'card', style: { padding: '0', marginTop: '12px' } }, dataTable({
+    sticky: true, empty: 'no sessions in reports/sessions.json',
+    onRow: (s) => openSessionDrawer(s),
+    rows: data.rows || [],
+    columns: [
+      { label: 'Session', tdClass: 'mono', cell: (s) => s.id },
+      { label: 'Status', cell: (s) => chip(s.status) },
+      { label: 'Host', tdClass: 'mono', cell: (s) => s.host || '' },
+      { label: 'Obtained via', tdClass: 'mono', cell: (s) => s.obtained_via || '' },
+      { label: 'Artifacts', num: true, cell: (s) => s.artifacts.length },
+    ],
+  }));
+
+  const hint = el('div', { class: 'hint', style: { marginTop: '8px' }, html: 'Teardown ledger — <span class="mono">stavros-cleanup</span> empties it at engagement end. GUI is read-only here: cleanup is a confirm-tier action run from the CLI. Click a row for artifacts + meta.' });
+
+  pane.replaceChildren(statRow, tableCard, hint);
+  api('/api/loot/count').then((r) => { lootTile.querySelector('.stat-value').textContent = r.count; }).catch(() => { lootTile.querySelector('.stat-value').textContent = '—'; });
 }
 
 // ── Reports ─────────────────────────────────────────────────────────────────
