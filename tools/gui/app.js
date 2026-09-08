@@ -44,6 +44,129 @@ async function api(path, opts) {
   return body;
 }
 
+// ── vanilla component primitives (redesign foundation) ──────────────────────
+// Small composable helpers so each render<Tab>() builds nodes instead of
+// concatenating ad-hoc HTML strings. No framework, no deps.
+
+// el(tag, props, children) — mini hyperscript.
+//   props: { class, style:{}, dataset:{}, html:'<..>', onClick:fn, <attr>:val }
+//   children: string | Node | (string|Node|null|false)[]  (null/false skipped)
+function el(tag, props, children) {
+  const node = document.createElement(tag);
+  if (props) for (const k in props) {
+    const v = props[k];
+    if (v == null || v === false) continue;
+    if (k === 'class') node.className = v;
+    else if (k === 'html') node.innerHTML = v;
+    else if (k === 'dataset') Object.assign(node.dataset, v);
+    else if (k === 'style' && typeof v === 'object') Object.assign(node.style, v);
+    else if (k.slice(0, 2) === 'on' && typeof v === 'function') node.addEventListener(k.slice(2).toLowerCase(), v);
+    else node.setAttribute(k, v === true ? '' : v);
+  }
+  appendKids(node, children);
+  return node;
+}
+function appendKids(node, children) {
+  if (children == null) return;
+  (Array.isArray(children) ? children : [children]).forEach((c) => {
+    if (c == null || c === false) return;
+    node.appendChild(c instanceof Node ? c : document.createTextNode(String(c)));
+  });
+}
+// cellContent: Node → as-is; {html} → innerHTML span; else text node.
+function cellContent(val) {
+  if (val instanceof Node) return val;
+  if (val && typeof val === 'object' && 'html' in val) return el('span', { html: val.html });
+  return document.createTextNode(val == null ? '' : String(val));
+}
+
+function chip(text, cls) { return el('span', { class: 'chip' + (cls ? ' ' + cls : '') }, text); }
+function severityChip(sev) { return chip(sev || '—', SEV_CHIP[sev] || ''); }
+
+// statTile({ label, value, tone, hint, onClick }) — clickable KPI card.
+//   tone: 'crit'|'high'|'med'|'low'|'ok'|'live' (drives the accent rail)
+function statTile(o) {
+  const props = { class: 'stat-tile' + (o.tone ? ' tone-' + o.tone : '') + (o.onClick ? ' clickable' : '') };
+  if (o.onClick) { props.role = 'button'; props.tabindex = '0'; props.onClick = o.onClick; }
+  const tile = el('div', props, [
+    el('div', { class: 'stat-value' }, String(o.value)),
+    el('div', { class: 'stat-label' }, o.label),
+    o.hint != null ? el('div', { class: 'stat-hint' }, o.hint) : null,
+  ]);
+  if (o.onClick) tile.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); o.onClick(e); }
+  });
+  return tile;
+}
+
+// dataTable({ columns, rows, onRow, empty, sticky })
+//   columns: [{ key, label, cell(row,i), num, thClass, tdClass }]
+//     cell may return a Node, an {html} object, or a primitive (rendered as text)
+//   onRow(row, tr, i) — attaches a click handler + .clickable to each row
+// Returns a .table-wrap div (owns horizontal overflow) around the <table>.
+function dataTable(spec) {
+  const cols = spec.columns || [];
+  const thead = el('thead', null, el('tr', null,
+    cols.map((c) => el('th', { class: [c.num ? 'num' : '', c.thClass || ''].filter(Boolean).join(' ') || null }, c.label))));
+  const body = el('tbody');
+  const rows = spec.rows || [];
+  if (!rows.length) {
+    body.appendChild(el('tr', null, el('td', { colspan: cols.length || 1, class: 'muted' }, spec.empty || '—')));
+  } else rows.forEach((row, i) => {
+    const tr = el('tr', spec.onRow ? { class: 'clickable' } : null, cols.map((c) =>
+      el('td', { class: [c.num ? 'num' : '', c.tdClass || ''].filter(Boolean).join(' ') || null },
+        cellContent(c.cell ? c.cell(row, i) : row[c.key]))));
+    if (spec.onRow) tr.addEventListener('click', () => spec.onRow(row, tr, i));
+    body.appendChild(tr);
+  });
+  return el('div', { class: 'table-wrap' + (spec.sticky ? ' sticky' : '') }, el('table', null, [thead, body]));
+}
+
+// sparkline(points, { width, height, color, title }) — inline SVG trend line.
+function sparkline(points, opts) {
+  const o = opts || {};
+  const w = o.width || 130, h = o.height || 28, pad = 3;
+  const vals = (points || []).map(Number).filter((v) => !Number.isNaN(v));
+  if (vals.length < 2) return el('span', { class: 'sparkline faint' }, '—');
+  const max = Math.max(...vals), min = Math.min(...vals), span = (max - min) || 1;
+  const step = (w - pad * 2) / (vals.length - 1);
+  const pts = vals.map((v, i) => (pad + i * step).toFixed(1) + ',' + (h - pad - ((v - min) / span) * (h - pad * 2)).toFixed(1));
+  const [lx, ly] = pts[pts.length - 1].split(',');
+  const stroke = o.color || 'var(--cyan)';
+  return el('span', { class: 'sparkline', title: o.title || '', html:
+    '<svg viewBox="0 0 ' + w + ' ' + h + '" width="' + w + '" height="' + h + '" preserveAspectRatio="none" aria-hidden="true">' +
+      '<polyline fill="none" stroke="' + stroke + '" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round" points="' + pts.join(' ') + '"/>' +
+      '<circle cx="' + lx + '" cy="' + ly + '" r="2" fill="' + stroke + '"/></svg>' });
+}
+
+// drawer({ title, body, onClose }) — singleton right-side detail panel.
+let _drawerWrap = null, _drawerOnClose = null;
+function drawer(opts) {
+  closeDrawer();
+  const panel = el('aside', { class: 'drawer-panel', role: 'dialog', 'aria-modal': 'false', 'aria-label': opts.title || 'Details' }, [
+    el('div', { class: 'drawer-head' }, [
+      el('strong', null, opts.title || ''),
+      el('button', { class: 'btn btn-sm', 'aria-label': 'Close (Esc)', onClick: closeDrawer }, '✕'),
+    ]),
+    el('div', { class: 'drawer-body' }, opts.body || null),
+  ]);
+  _drawerWrap = el('div', { class: 'drawer-wrap' }, [el('div', { class: 'drawer-scrim', onClick: closeDrawer }), panel]);
+  _drawerOnClose = opts.onClose || null;
+  document.body.appendChild(_drawerWrap);
+  requestAnimationFrame(() => _drawerWrap.classList.add('open'));
+  setTimeout(() => { const b = panel.querySelector('.drawer-head button'); if (b) b.focus(); }, 30);
+  return _drawerWrap;
+}
+function drawerOpen() { return !!_drawerWrap; }
+function closeDrawer() {
+  if (!_drawerWrap) return;
+  const w = _drawerWrap; _drawerWrap = null;
+  const cb = _drawerOnClose; _drawerOnClose = null;
+  w.classList.remove('open');
+  if (cb) { try { cb(); } catch { /* ignore */ } }
+  setTimeout(() => w.remove(), 180);
+}
+
 // ── toast ───────────────────────────────────────────────────────────────────
 function toast(msg, type) {
   const el = document.createElement('div');
@@ -67,41 +190,68 @@ function switchTab(tab) {
   renderTab(tab);
 }
 
-// ── header badges ───────────────────────────────────────────────────────────
+// ── status rail (was: header badges) ─────────────────────────────────────────
+// Fetches /api/overview and repaints the persistent status rail. Named
+// refreshBadges for continuity — it is the single overview poll used by the
+// 15s timer and manual refresh, and still triggers renderOverview.
 async function refreshBadges() {
   try {
     const o = await api('/api/overview');
-    const sc = o.scope;
-    const b = byId('badge-scope');
-    b.textContent = sc.failClosed ? '⚠ SCOPE FAIL-CLOSED' : 'scope: ' + sc.hosts + ' host · ' + sc.ips + ' ip';
-    b.className = 'badge ' + (sc.failClosed ? 'badge-bad' : 'badge-ok');
-    byId('badge-rps').textContent = 'rps ' + sc.rps;
-    const g = byId('badge-gate');
-    if (!o.pipeline.db || !o.pipeline.hasRun) { g.textContent = 'no run yet'; g.className = 'badge'; }
-    else {
-      const s = o.pipeline.lastRunStatus;
-      if (o.pipeline.unclosed) {
-        g.textContent = 'run: done (unclosed)';
-        g.className = 'badge badge-warn';
-        g.title = 'target: ' + (o.pipeline.runTarget || '') + ' — phases finished, run never closed (see Pipeline tab)';
-      } else {
-        g.textContent = 'run: ' + s;
-        g.className = 'badge ' + (s === 'running' ? 'badge-warn' : s === 'done' ? 'badge-ok' : 'badge-bad');
-        g.title = 'target: ' + (o.pipeline.runTarget || '');
-      }
-    }
-    const sb = byId('badge-sessions');
-    sb.textContent = 'sessions ' + o.sessions.active;
-    sb.className = 'badge ' + (o.sessions.active > 0 ? 'badge-warn' : '');
+    renderStatusRail(o);
     byId('server-sub').textContent = o.opstate
       ? o.opstate.mode + ' · updated ' + shortTs(o.opstate.updated_at)
       : 'no operation-state.json';
     if (activeTab === 'overview') renderOverview(o);
     return o;
   } catch (e) {
-    byId('badge-scope').textContent = 'offline?';
+    renderStatusRail(null);
     byId('server-sub').textContent = 'server unreachable — start: node tools/gui-server.js';
   }
+}
+
+// railItem({ k, v, tone, title, tab }) — one rail cell; `tab` makes it drill in.
+function railItem(o) {
+  const props = { class: 'rail-item' + (o.tone ? ' st-' + o.tone : '') + (o.tab ? ' clickable' : '') };
+  if (o.title) props.title = o.title;
+  if (o.tab) { props.role = 'button'; props.tabindex = '0'; props.onClick = () => switchTab(o.tab); }
+  const node = el('div', props, [
+    el('span', { class: 'rail-pip' }),
+    el('span', { class: 'rail-k' }, o.k),
+    el('span', { class: 'rail-v' }, o.v),
+  ]);
+  if (o.tab) node.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); switchTab(o.tab); }
+  });
+  return node;
+}
+
+function renderStatusRail(o) {
+  const rail = byId('status-rail');
+  if (!rail) return;
+  if (!o) { rail.replaceChildren(railItem({ k: 'server', v: 'offline?', tone: 'bad' })); return; }
+  const sc = o.scope, p = o.pipeline, bs = o.findings.bySeverity || {};
+  const items = [
+    railItem({ k: 'scope', tone: sc.failClosed ? 'bad' : 'ok', title: 'scope.json', tab: 'scope',
+      v: sc.failClosed ? 'FAIL-CLOSED' : sc.hosts + ' host · ' + sc.ips + ' ip' }),
+    railItem({ k: 'rps', v: String(sc.rps), title: 'max_requests_per_second', tab: 'scope' }),
+  ];
+  if (!p.db || !p.hasRun) items.push(railItem({ k: 'run', v: 'no run yet', tab: 'pipeline' }));
+  else if (p.unclosed) items.push(railItem({ k: 'run', v: 'done (unclosed)', tone: 'warn', tab: 'pipeline',
+    title: 'target: ' + (p.runTarget || '') + ' — phases finished, run never closed' }));
+  else {
+    const s = p.lastRunStatus;
+    items.push(railItem({ k: 'run', v: s, tab: 'pipeline', title: 'target: ' + (p.runTarget || ''),
+      tone: s === 'running' ? 'live' : s === 'done' ? 'ok' : 'bad' }));
+  }
+  items.push(railItem({ k: 'sessions', v: String(o.sessions.active), tone: o.sessions.active > 0 ? 'live' : '',
+    title: 'active C2 sessions', tab: 'sessions' }));
+  items.push(railItem({ k: 'findings', tab: 'findings', title: 'total · critical · high',
+    v: (o.findings.total || 0) + ' · ' + (bs.Critical || 0) + 'C ' + (bs.High || 0) + 'H',
+    tone: (bs.Critical || 0) > 0 ? 'bad' : (bs.High || 0) > 0 ? 'warn' : 'ok' }));
+  items.push(railItem({ k: 'loot', v: String(o.lootCount || 0), title: 'loot rows (contents never shown)' }));
+  items.push(el('div', { class: 'rail-spacer' }));
+  items.push(el('div', { class: 'rail-item rail-hint', html: 'press <kbd>⌘K</kbd> for commands' }));
+  rail.replaceChildren(...items);
 }
 
 // ── Overview ────────────────────────────────────────────────────────────────
@@ -624,6 +774,66 @@ function closeJobModal() {
   modal.classList.add('hidden');
 }
 
+// ── command palette (⌘/Ctrl-K) — client-side navigator + quick actions ───────
+// Pure client-side: tab jumps + wrappers over existing endpoints. No new API.
+function cmdkActions() {
+  return [
+    { kind: 'tab', label: 'Overview', run: () => switchTab('overview') },
+    { kind: 'tab', label: 'Findings', run: () => switchTab('findings') },
+    { kind: 'tab', label: 'Pipeline', run: () => switchTab('pipeline') },
+    { kind: 'tab', label: 'Scope', run: () => switchTab('scope') },
+    { kind: 'tab', label: 'Sessions', run: () => switchTab('sessions') },
+    { kind: 'tab', label: 'Reports', run: () => switchTab('reports') },
+    { kind: 'tab', label: 'Freebuff terminal', run: () => switchTab('freebuff') },
+    { kind: 'action', label: 'Refresh current tab', run: () => renderTab(activeTab) },
+    { kind: 'action', label: 'Resume incomplete pipeline run', run: cmdkResumePipeline },
+    { kind: 'action', label: 'Generate report.html', run: () => startJob('report-html', '/api/reports/generate', 'tools/report-html.js') },
+  ];
+}
+let cmdkItems = [], cmdkIdx = 0;
+function cmdkIsOpen() { return !byId('cmdk').classList.contains('hidden'); }
+function cmdkOpen() {
+  byId('cmdk').classList.remove('hidden');
+  const input = byId('cmdk-input');
+  input.value = '';
+  cmdkFilter('');
+  input.focus();
+}
+function cmdkClose() { byId('cmdk').classList.add('hidden'); }
+function cmdkFilter(q) {
+  const ql = q.trim().toLowerCase();
+  const all = cmdkActions();
+  cmdkItems = ql ? all.filter((a) => a.label.toLowerCase().includes(ql)) : all;
+  cmdkIdx = 0;
+  cmdkRender();
+}
+function cmdkRender() {
+  const list = byId('cmdk-list');
+  if (!cmdkItems.length) { list.replaceChildren(el('li', { class: 'cmdk-empty' }, 'no matching command')); return; }
+  list.replaceChildren(...cmdkItems.map((a, i) => el('li', {
+    role: 'option', 'aria-selected': i === cmdkIdx ? 'true' : 'false', onClick: () => cmdkRun(i),
+  }, [el('span', { class: 'cmdk-kind' }, a.kind), el('span', { class: 'cmdk-label' }, a.label)])));
+  const sel = list.children[cmdkIdx];
+  if (sel && sel.scrollIntoView) sel.scrollIntoView({ block: 'nearest' });
+}
+function cmdkMove(d) {
+  if (!cmdkItems.length) return;
+  cmdkIdx = (cmdkIdx + d + cmdkItems.length) % cmdkItems.length;
+  cmdkRender();
+}
+function cmdkRun(i) {
+  const a = cmdkItems[i == null ? cmdkIdx : i];
+  if (!a) return;
+  cmdkClose();
+  try { a.run(); } catch (e) { toast(String(e.message || e), 'err'); }
+}
+function cmdkResumePipeline() {
+  api('/api/pipeline').then((d) => {
+    if (d.resumePossible) startJob('resume', '/api/pipeline/resume', 'stavros.js resume');
+    else toast('nothing to resume — no genuinely incomplete run', '');
+  }).catch((e) => toast(String(e.message || e), 'err'));
+}
+
 // ── wiring ──────────────────────────────────────────────────────────────────
 function debounce(fn, ms) {
   let t;
@@ -661,6 +871,23 @@ function renderTab(tab) {
 })();
 byId('btn-refresh').addEventListener('click', () => renderTab(activeTab));
 
+// command palette wiring
+byId('btn-cmdk').addEventListener('click', cmdkOpen);
+byId('cmdk-input').addEventListener('input', (e) => cmdkFilter(e.target.value));
+byId('cmdk-input').addEventListener('keydown', (e) => {
+  if (e.key === 'ArrowDown') { e.preventDefault(); cmdkMove(1); }
+  else if (e.key === 'ArrowUp') { e.preventDefault(); cmdkMove(-1); }
+  else if (e.key === 'Enter') { e.preventDefault(); cmdkRun(); }
+});
+byId('cmdk').addEventListener('click', (e) => { if (e.target.id === 'cmdk') cmdkClose(); });
+// ⌘K / Ctrl-K toggles the palette from anywhere (except while typing in the term)
+document.addEventListener('keydown', (e) => {
+  if ((e.metaKey || e.ctrlKey) && (e.key === 'k' || e.key === 'K')) {
+    e.preventDefault();
+    cmdkIsOpen() ? cmdkClose() : cmdkOpen();
+  }
+});
+
 // Overview → Findings drill-down: clicking a hotspot row or a latest finding
 // filters the Findings tab by that host. Delegated so it survives the periodic
 // re-render of the overview panels.
@@ -678,8 +905,11 @@ document.addEventListener('click', (e) => {
 });
 document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape') {
-    // exit terminal fullscreen first (Esc in the terminal textarea is handled
-    // by its own attachCustomKeyEventHandler), then the job modal
+    // order: command palette → detail drawer → terminal fullscreen → job modal
+    if (cmdkIsOpen()) { cmdkClose(); return; }
+    if (drawerOpen()) { closeDrawer(); return; }
+    // exit terminal fullscreen (Esc in the terminal textarea is handled by its
+    // own attachCustomKeyEventHandler), then the job modal
     if (activeTab === 'freebuff') {
       const stage = byId('term-stage-' + activeTab);
       if (stage && stage.classList.contains('max')) { fbToggleMax(activeTab); return; }

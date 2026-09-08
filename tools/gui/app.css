@@ -2,8 +2,18 @@
    Offensive-security HUD: red-team = breaking the ICE. Neon duotone (cyan +
    magenta) used as SIGNAL, notched-corner HUD panels + corner brackets as
    STRUCTURE, severity as the spine. Data cells stay dark and legible — neon
-   only where it aids triage. Class names are load-bearing (app.js) — keep them. */
+   only where it aids triage. Class names are load-bearing (app.js) — keep them.
 
+   Organised in three cascade layers (redesign foundation):
+     tokens      — CSS custom properties (the neon palette, unchanged values)
+     primitives  — reusable structure: cards, chips, tables, forms, KPIs, a11y
+     views       — tab-specific / chrome surfaces (terminal, status rail, palette)
+   Layer order is tokens < primitives < views, so a view rule always wins over a
+   primitive of equal specificity without needing !important. */
+
+@layer tokens, primitives, views;
+
+@layer tokens {
 :root {
   /* near-black with a violet cast, not flat black */
   --bg:        #08060d;
@@ -45,7 +55,19 @@
 
   --notch: 9px;                 /* HUD corner cut */
   --r2: 3px;
+
+  /* ── layout scale (redesign foundation — additive, no existing value changed) ── */
+  --space-1: 4px; --space-2: 8px; --space-3: 12px; --space-4: 16px; --space-5: 22px; --space-6: 30px;
+  --r1: 2px;                                     /* tighter radius / notch fallback */
+  --shadow-card: 0 2px 10px rgba(0,0,0,.45);     /* non-glow depth for cards/tiles */
+  --shadow-pop:  0 22px 60px rgba(0,0,0,.62);    /* command palette / popovers */
+  --hover-bg:  rgba(36,227,255,.06);             /* row / tile hover wash */
+  --active-bg: rgba(36,227,255,.11);             /* pressed / selected wash */
+  --rail-h: 32px;                                /* persistent status rail height */
 }
+} /* @layer tokens */
+
+@layer primitives {
 
 * { box-sizing: border-box; }
 html, body { margin: 0; padding: 0; }
@@ -404,6 +426,9 @@ tr.clickable:focus-visible td { background: rgba(36,227,255,.07); }
 }
 #job-modal-done { padding: 11px 16px; border-top: 1px solid var(--line-2); display: none; }
 
+} /* @layer primitives */
+
+@layer views {
 /* ── Freebuff terminal tab ─────────────────────────────── */
 #term-toolbar-freebuff, #term-toolbar-opencode { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 11px; }
 #term-toolbar-freebuff .status, #term-toolbar-opencode .status { display: inline-flex; align-items: center; gap: 7px; font: 12px var(--mono); color: var(--muted); }
@@ -501,6 +526,9 @@ body.term-resizing .term-grip { pointer-events: none; }
 }
 .term-banner code { color: #9fd8ef; font-family: var(--mono); }
 
+} /* @layer views */
+
+@layer primitives {
 /* ── accessibility floor ───────────────────────────────── */
 :focus-visible { outline: 2px solid var(--cyan); outline-offset: 2px; }
 @media (prefers-reduced-motion: reduce) {
@@ -513,6 +541,128 @@ body.term-resizing .term-grip { pointer-events: none; }
 @media (max-width: 760px) {
   #topbar { flex-direction: column; align-items: stretch; }
   #tabs { top: 116px; overflow-x: auto; }
+  #status-rail { top: 156px; }
   .tabpane { padding: 14px; }
   .filters .f { flex: 1 1 100%; }
 }
+} /* @layer primitives */
+
+@layer views {
+/* ══ status rail — persistent engagement telemetry under the tabs ═══════════
+   Promotes the old topbar badges to an always-visible strip: each item is a
+   labelled value with a colour-coded leading pip (ok / warn / bad / idle). */
+#status-rail {
+  display: flex; align-items: stretch; gap: 0; flex-wrap: wrap;
+  padding: 0 16px; min-height: var(--rail-h);
+  background: linear-gradient(180deg, #0a0715, #070510);
+  border-bottom: 1px solid var(--line-2);
+  position: sticky; top: 100px; z-index: 18;
+  font: 11px var(--mono);
+}
+.rail-item {
+  display: inline-flex; align-items: center; gap: 7px;
+  padding: 0 16px 0 14px; border-right: 1px solid var(--line);
+  color: var(--muted); white-space: nowrap;
+}
+.rail-item:first-child { padding-left: 2px; }
+.rail-item .rail-k { color: var(--faint); text-transform: uppercase; letter-spacing: 1px; font-size: 9.5px; }
+.rail-item .rail-v { color: var(--ink); font-weight: 600; letter-spacing: .3px; }
+.rail-item .rail-pip {
+  width: 8px; height: 8px; border-radius: 50%; flex: 0 0 auto;
+  background: var(--line-2);
+}
+.rail-item.clickable { cursor: pointer; }
+.rail-item.clickable:hover { background: var(--hover-bg); color: var(--ink); }
+.rail-item.st-ok   .rail-pip { background: var(--green);  box-shadow: 0 0 7px var(--green); }
+.rail-item.st-warn .rail-pip { background: var(--yellow); box-shadow: 0 0 7px var(--yellow); }
+.rail-item.st-bad  .rail-pip { background: var(--crit);   box-shadow: var(--glow-crit); animation: pulse 1.1s infinite; }
+.rail-item.st-live .rail-pip { background: var(--cyan);   box-shadow: 0 0 9px var(--cyan); animation: pulse 1.4s infinite; }
+.rail-item.st-ok   .rail-v { color: #9ff0c8; }
+.rail-item.st-warn .rail-v { color: #ffe98f; }
+.rail-item.st-bad  .rail-v { color: #ff9fb6; }
+.rail-item.st-live .rail-v { color: #a9ecff; }
+.rail-spacer { flex: 1 1 auto; border-right: 0; }
+.rail-item.rail-hint { color: var(--faint); font-size: 10px; border-right: 0; }
+.rail-item.rail-hint kbd { margin: 0 2px; }
+
+/* ══ command palette (⌘/Ctrl-K) — client-side navigator + quick actions ══════ */
+#cmdk { position: fixed; inset: 0; z-index: 80; display: flex; align-items: flex-start; justify-content: center;
+  background: rgba(4,3,8,.6); backdrop-filter: blur(3px); padding-top: 12vh; }
+#cmdk.hidden { display: none; }
+.cmdk-box {
+  width: min(620px, 92vw); max-height: 66vh; display: flex; flex-direction: column;
+  background: var(--surface); border: 1px solid var(--cyan);
+  box-shadow: var(--shadow-pop), 0 0 26px rgba(36,227,255,.18);
+  clip-path: polygon(var(--notch) 0, 100% 0, 100% calc(100% - var(--notch)), calc(100% - var(--notch)) 100%, 0 100%, 0 var(--notch));
+}
+.cmdk-box input {
+  border: 0; border-bottom: 1px solid var(--line-2); background: transparent;
+  padding: 14px 16px; font: 15px var(--mono); color: var(--ink);
+}
+.cmdk-box input:focus { outline: none; box-shadow: none; border-bottom-color: var(--cyan); }
+.cmdk-list { list-style: none; margin: 0; padding: 6px; overflow-y: auto; }
+.cmdk-list li {
+  display: flex; align-items: center; gap: 12px; padding: 9px 12px; cursor: pointer;
+  font: 13px var(--mono); color: var(--muted); border: 1px solid transparent;
+}
+.cmdk-list li .cmdk-kind { font-size: 9.5px; text-transform: uppercase; letter-spacing: 1px; color: var(--faint);
+  border: 1px solid var(--line-2); padding: 2px 6px; flex: 0 0 auto; }
+.cmdk-list li .cmdk-label { flex: 1; color: var(--ink); }
+.cmdk-list li[aria-selected="true"] { background: var(--active-bg); border-color: var(--cyan); color: var(--ink); }
+.cmdk-list li[aria-selected="true"] .cmdk-kind { color: var(--cyan); border-color: var(--cyan); }
+.cmdk-list .cmdk-empty { color: var(--faint); padding: 16px 12px; cursor: default; }
+.cmdk-foot { border-top: 1px solid var(--line-2); padding: 8px 14px; font: 10.5px var(--mono); color: var(--faint);
+  display: flex; gap: 14px; flex-wrap: wrap; }
+.cmdk-foot kbd { margin-right: 3px; }
+} /* @layer views */
+
+@layer primitives {
+/* ══ redesign primitives: stat-tile · table-wrap · sparkline · drawer ════════ */
+
+/* stat-tile — clickable KPI card (reNgine-style overview row) */
+.stat-row { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
+.stat-tile {
+  position: relative; padding: 14px 16px 13px;
+  background: linear-gradient(180deg, rgba(36,227,255,.03), transparent 45%), var(--surface);
+  border: 1px solid var(--line-2); border-left: 3px solid var(--line-2);
+  box-shadow: var(--shadow-card);
+  transition: border-color .12s, box-shadow .12s, background .12s;
+}
+.stat-tile.clickable { cursor: pointer; }
+.stat-tile.clickable:hover { border-color: var(--cyan); box-shadow: var(--shadow-card), var(--glow-cyan); background: var(--hover-bg); }
+.stat-tile.clickable:focus-visible { outline: 2px solid var(--cyan); outline-offset: 2px; }
+.stat-value { font: 700 28px/1.05 var(--mono); letter-spacing: -.5px; color: var(--ink); }
+.stat-label { font: 10px var(--mono); text-transform: uppercase; letter-spacing: 1px; color: var(--muted); margin-top: 5px; }
+.stat-hint  { font: 10.5px var(--mono); color: var(--faint); margin-top: 3px; }
+.stat-tile.tone-crit { border-left-color: var(--crit); } .stat-tile.tone-crit .stat-value { color: #ffdfe7; text-shadow: 0 0 16px rgba(255,43,94,.4); }
+.stat-tile.tone-high { border-left-color: var(--high); } .stat-tile.tone-high .stat-value { color: #ffc39a; }
+.stat-tile.tone-med  { border-left-color: var(--med); }  .stat-tile.tone-med  .stat-value { color: #ffe98f; }
+.stat-tile.tone-low  { border-left-color: var(--low); }  .stat-tile.tone-low  .stat-value { color: #a9e9ff; }
+.stat-tile.tone-ok   { border-left-color: var(--green); }.stat-tile.tone-ok   .stat-value { color: #9ff0c8; }
+.stat-tile.tone-live { border-left-color: var(--magenta);}.stat-tile.tone-live .stat-value { color: #ffb3d6; }
+
+/* table-wrap — owns horizontal overflow so the body never scrolls sideways */
+.table-wrap { overflow-x: auto; }
+.table-wrap.sticky { max-height: 70vh; overflow-y: auto; }
+
+/* sparkline — inline SVG trend */
+.sparkline { display: inline-flex; align-items: center; vertical-align: middle; line-height: 0; }
+.sparkline svg { display: block; }
+.sparkline.faint { color: var(--faint); font: 12px var(--mono); line-height: 1; }
+
+/* drawer — singleton right-side detail panel */
+.drawer-wrap { position: fixed; inset: 0; z-index: 75; }
+.drawer-scrim { position: absolute; inset: 0; background: rgba(4,3,8,.5); opacity: 0; transition: opacity .18s; }
+.drawer-wrap.open .drawer-scrim { opacity: 1; }
+.drawer-panel {
+  position: absolute; top: 0; right: 0; height: 100%; width: min(560px, 94vw);
+  display: flex; flex-direction: column;
+  background: var(--surface); border-left: 1px solid var(--cyan);
+  box-shadow: var(--shadow-pop), -12px 0 40px rgba(0,0,0,.5);
+  transform: translateX(100%); transition: transform .2s ease-out;
+}
+.drawer-wrap.open .drawer-panel { transform: translateX(0); }
+.drawer-head { display: flex; align-items: center; gap: 10px; padding: 13px 16px; border-bottom: 1px solid var(--line-2); background: var(--surface-2); }
+.drawer-head strong { flex: 1; font: 600 13px var(--mono); color: var(--cyan); }
+.drawer-body { padding: 16px 18px; overflow-y: auto; flex: 1; }
+} /* @layer primitives */

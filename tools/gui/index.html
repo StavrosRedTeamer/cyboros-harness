@@ -17,10 +17,7 @@
     </div>
   </div>
   <div class="badges">
-    <span id="badge-scope" class="badge badge-ok" title="scope.json">scope: …</span>
-    <span id="badge-rps" class="badge" title="max_requests_per_second">rps —</span>
-    <span id="badge-gate" class="badge" title="latest pipeline run">run —</span>
-    <span id="badge-sessions" class="badge" title="active C2 sessions">sessions 0</span>
+    <button id="btn-cmdk" class="btn btn-ghost" title="Command palette (Ctrl/⌘-K)" aria-haspopup="dialog"><kbd>⌘K</kbd> commands</button>
     <button id="btn-refresh" class="btn" title="refresh all">⟳ refresh</button>
   </div>
 </header>
@@ -35,6 +32,8 @@
   <button class="tab" data-tab="freebuff" role="tab" id="tabbtn-freebuff" aria-controls="tab-freebuff" aria-selected="false" tabindex="-1">Freebuff</button>
 </nav>
 
+<div id="status-rail" role="status" aria-live="polite" aria-label="Engagement status"></div>
+
 <main id="view">
   <section id="tab-overview" class="tabpane active" role="tabpanel" aria-labelledby="tabbtn-overview"></section>
   <section id="tab-findings" class="tabpane" role="tabpanel" aria-labelledby="tabbtn-findings"></section>
@@ -46,6 +45,14 @@
 </main>
 
 <div id="toast-wrap"></div>
+
+<div id="cmdk" class="hidden" role="dialog" aria-modal="true" aria-label="Command palette">
+  <div class="cmdk-box">
+    <input type="text" id="cmdk-input" placeholder="Jump to a tab or run an action…" aria-label="Command palette search" spellcheck="false" autocomplete="off">
+    <ul class="cmdk-list" id="cmdk-list" role="listbox" aria-label="Commands"></ul>
+    <div class="cmdk-foot"><span><kbd>↑</kbd><kbd>↓</kbd> navigate</span><span><kbd>↵</kbd> run</span><span><kbd>esc</kbd> close</span></div>
+  </div>
+</div>
 
 <div id="job-modal" class="modal hidden">
   <div class="modal-box">
