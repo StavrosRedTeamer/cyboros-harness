@@ -700,4 +700,16 @@ th.sortable:focus-visible { outline: 2px solid var(--cyan); outline-offset: -2px
 .drawer-head { display: flex; align-items: center; gap: 10px; padding: 13px 16px; border-bottom: 1px solid var(--line-2); background: var(--surface-2); }
 .drawer-head strong { flex: 1; font: 600 13px var(--mono); color: var(--cyan); }
 .drawer-body { padding: 16px 18px; overflow-y: auto; flex: 1; }
+.report-preview { width: 100%; height: 68vh; border: 1px solid var(--line-2); background: var(--bg2); }
+
+/* loading skeleton — sober shimmer, disabled under reduced-motion (below) */
+.skeleton { position: relative; overflow: hidden; background: var(--surface-2); border: 1px solid var(--line); min-height: 96px; }
+.skeleton::after { content: ""; position: absolute; inset: 0; transform: translateX(-100%);
+  background: linear-gradient(90deg, transparent, rgba(36,227,255,.09), transparent); animation: shimmer 1.15s infinite; }
+@keyframes shimmer { 100% { transform: translateX(100%); } }
+
+/* perf: skip rendering off-screen cards that have no sticky/table/iframe/DAG
+   content (those manage their own layout and must not be contained). :has() is
+   live, so a card gets un-contained the moment a table is injected into it. */
+.card:not(:has(table)):not(:has(.dag)):not(:has(iframe)) { content-visibility: auto; contain-intrinsic-size: auto 200px; }
 } /* @layer primitives */

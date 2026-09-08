@@ -747,40 +747,46 @@ let scopeData = null;
 function renderScope(data) {
   scopeData = data;
   const pane = byId('tab-scope');
+
   const banner = data.failClosed
-    ? '<div class="card" style="border-color:#7c2530;background:#2a1216"><b style="color:#ff5d6c">⚠ FAIL-CLOSED</b> — no hosts, prefixes or IPs allowed: scope-guard blocks everything until you add targets.</div>'
-    : '<div class="card" style="border-color:#1e5c3d;background:#10251a"><b style="color:#3ddc84">✓ Scope active</b> — ' + data.allowed_hosts.length + ' host(s), ' + data.allowed_url_prefixes.length + ' prefix(es), ' + data.allowed_ips.length + ' IP/CIDR.</div>';
-  pane.innerHTML = banner +
-    '<div class="grid cols-2" style="margin-top:12px">' +
-      '<div class="card"><h2>scope.json editor</h2>' +
-        '<label for="sc-hosts">allowed_hosts (one per line — covers host + subdomains)</label>' +
-        '<textarea id="sc-hosts">' + esc(data.allowed_hosts.join('\n')) + '</textarea>' +
-        '<label for="sc-prefixes">allowed_url_prefixes (one per line, must end with /)</label>' +
-        '<textarea id="sc-prefixes">' + esc(data.allowed_url_prefixes.join('\n')) + '</textarea>' +
-        '<label for="sc-ips">allowed_ips / CIDR (internal, SSRF, lab)</label>' +
-        '<textarea id="sc-ips">' + esc(data.allowed_ips.join('\n')) + '</textarea>' +
-        '<label for="sc-rps">max_requests_per_second (global pacing)</label>' +
-        '<input type="number" id="sc-rps" min="1" max="600" value="' + esc(data.max_requests_per_second) + '">' +
-        '<div class="row" style="margin-top:14px;align-items:center">' +
-          '<button class="btn btn-primary" id="sc-save">💾 Save scope.json</button>' +
-          '<span id="sc-save-hint" class="hint"></span>' +
-        '</div>' +
-        '<div class="hint" style="margin-top:8px">Host/IP/CIDR entries are validated server-side before writing. The runtime truth stays <span class="mono">tools/scope-guard.js</span> — the GUI never bypasses it. Every save appends a timestamped note.</div>' +
-      '</div>' +
-      '<div class="stack">' +
-        '<div class="card"><h2>Verify a URL against the guard</h2>' +
-          '<input type="text" id="sc-url" placeholder="https://target.example/path?x=1">' +
-          '<div class="row" style="margin-top:8px;align-items:center"><button class="btn" id="sc-check">Check scope</button><span id="sc-check-out" class="hint"></span></div>' +
-        '</div>' +
-        '<div class="card"><h2>Notes (history)</h2>' +
-          '<pre style="max-height:220px;overflow:auto;font:11px/1.5 var(--mono);color:var(--muted);white-space:pre-wrap">' + esc(data.notes || '') + '</pre>' +
-        '</div>' +
-      '</div>' +
-    '</div>';
+    ? el('div', { class: 'card', style: { borderColor: '#7c2530', background: '#2a1216' }, html: '<b style="color:#ff5d6c">⚠ FAIL-CLOSED</b> — no hosts, prefixes or IPs allowed: scope-guard blocks everything until you add targets.' })
+    : el('div', { class: 'card', style: { borderColor: '#1e5c3d', background: '#10251a' }, html: '<b style="color:#3ddc84">✓ Scope active</b> — ' + data.allowed_hosts.length + ' host(s), ' + data.allowed_url_prefixes.length + ' prefix(es), ' + data.allowed_ips.length + ' IP/CIDR.' });
+
+  const field = (id, labelText, control) => [el('label', { for: id }, labelText), control];
+  const ta = (id, val) => el('textarea', { id }, val);
+  const editorCard = el('div', { class: 'card' }, [
+    el('h2', null, 'scope.json editor'),
+    ...field('sc-hosts', 'allowed_hosts (one per line — covers host + subdomains)', ta('sc-hosts', data.allowed_hosts.join('\n'))),
+    ...field('sc-prefixes', 'allowed_url_prefixes (one per line, must end with /)', ta('sc-prefixes', data.allowed_url_prefixes.join('\n'))),
+    ...field('sc-ips', 'allowed_ips / CIDR (internal, SSRF, lab)', ta('sc-ips', data.allowed_ips.join('\n'))),
+    ...field('sc-rps', 'max_requests_per_second (global pacing)', el('input', { type: 'number', id: 'sc-rps', min: '1', max: '600', value: data.max_requests_per_second })),
+    el('div', { class: 'row', style: { marginTop: '14px', alignItems: 'center' } }, [
+      el('button', { class: 'btn btn-primary', id: 'sc-save' }, '💾 Save scope.json'),
+      el('span', { id: 'sc-save-hint', class: 'hint' }),
+    ]),
+    el('div', { class: 'hint', style: { marginTop: '8px' }, html: 'Host/IP/CIDR entries are validated server-side before writing. The runtime truth stays <span class="mono">tools/scope-guard.js</span> — the GUI never bypasses it. Every save appends a timestamped note.' }),
+  ]);
+
+  const checkCard = el('div', { class: 'card' }, [
+    el('h2', null, 'Verify a URL against the guard'),
+    el('input', { type: 'text', id: 'sc-url', placeholder: 'https://target.example/path?x=1' }),
+    el('div', { class: 'row', style: { marginTop: '8px', alignItems: 'center' } }, [
+      el('button', { class: 'btn', id: 'sc-check' }, 'Check scope'),
+      el('span', { id: 'sc-check-out', class: 'hint' }, 'type a URL — checked live against scope-guard'),
+    ]),
+  ]);
+  const notesCard = el('div', { class: 'card' }, [
+    el('h2', null, 'Notes (history)'),
+    el('pre', { style: { maxHeight: '220px', overflow: 'auto', font: '11px/1.5 var(--mono)', color: 'var(--muted)', whiteSpace: 'pre-wrap' } }, data.notes || ''),
+  ]);
+
+  pane.replaceChildren(banner, el('div', { class: 'grid cols-2', style: { marginTop: '12px' } }, [editorCard, el('div', { class: 'stack' }, [checkCard, notesCard])]));
 
   byId('sc-save').addEventListener('click', saveScope);
   byId('sc-check').addEventListener('click', checkScope);
   byId('sc-url').addEventListener('keydown', (e) => { if (e.key === 'Enter') checkScope(); });
+  // live validation as you type (debounced; read-only guard check, no write)
+  byId('sc-url').addEventListener('input', debounce(() => { if (byId('sc-url').value.trim()) checkScope(); else { const o = byId('sc-check-out'); o.textContent = 'type a URL — checked live against scope-guard'; o.className = 'hint'; } }, 400));
 }
 
 function parseList(textarea) {
@@ -812,7 +818,7 @@ async function checkScope() {
   try {
     const r = await api('/api/scope/check?url=' + encodeURIComponent(u));
     if (r.ok) { out.textContent = '✓ IN SCOPE — allowed'; out.className = 'hint ok'; }
-    else out.textContent = '✗ OUT OF SCOPE' + (r.reason ? ' — ' + r.reason : ''); out.className = 'hint err';
+    else { out.textContent = '✗ OUT OF SCOPE' + (r.reason ? ' — ' + r.reason : ''); out.className = 'hint err'; }
   } catch (e) { out.textContent = String(e.message || e); out.className = 'hint err'; }
 }
 
@@ -868,30 +874,44 @@ function renderSessions(data) {
 }
 
 // ── Reports ─────────────────────────────────────────────────────────────────
+function reportIsHtml(r) { return r.kind === 'report' || /\.html$/.test(r.name); }
+function openReportDrawer(r) {
+  const href = '/reports/' + encodeURIComponent(r.name);
+  const openBtn = el('a', { class: 'btn btn-sm', href, target: '_blank', rel: 'noopener' }, 'open in new tab ↗');
+  const body = el('div', null, [
+    el('div', { class: 'row', style: { alignItems: 'center', gap: '10px', marginBottom: '12px' } }, [chip(r.kind), el('span', { class: 'faint mono' }, fmtBytes(r.size) + ' · ' + shortTs(r.mtime)), openBtn]),
+    reportIsHtml(r)
+      ? el('iframe', { class: 'report-preview', src: href, title: 'Preview of ' + r.name, loading: 'lazy' })
+      : el('div', { class: 'faint' }, 'markdown file — open in a new tab to view (' + r.name + ')'),
+  ]);
+  drawer({ title: r.name, body });
+}
+
 function renderReports(data) {
   const pane = byId('tab-reports');
-  const kinds = { report: 'report', finding: 'finding', overview: 'overview', doc: 'doc' };
-  const rows = data.map((r) =>
-    '<tr>' +
-    '<td class="mono" style="font-size:12px">' + esc(r.name) + '</td>' +
-    '<td><span class="chip">' + kinds[r.kind] + '</span></td>' +
-    '<td class="muted">' + fmtBytes(r.size) + '</td>' +
-    '<td class="muted">' + shortTs(r.mtime) + '</td>' +
-    '<td>' + (r.kind === 'report' || /\.html$/.test(r.name)
-      ? '<a class="btn btn-sm" href="/reports/' + encodeURIComponent(r.name) + '" target="_blank" rel="noopener">open ↗</a>'
-      : '<span class="muted mono" style="font-size:11px">reports/' + esc(r.name) + '</span>') + '</td>' +
-    '</tr>').join('');
-  pane.innerHTML =
-    '<div class="card" style="margin-bottom:12px">' +
-      '<div class="row" style="align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">' +
-        '<div><b>Standalone HTML report</b><div class="hint">consolidates findings.jsonl + state.db + attack chains via tools/report-html.js (severity · CVSS · CWE · EPSS · confidence)</div></div>' +
-        '<button class="btn btn-primary" id="btn-gen-report">⚙ Generate report.html</button>' +
-      '</div>' +
-    '</div>' +
-    '<div class="card" style="padding:0;overflow-x:auto"><table><thead><tr>' +
-      '<th>File</th><th>Kind</th><th>Size</th><th>Modified</th><th></th>' +
-      '</tr></thead><tbody>' + (rows || '<tr><td colspan="5" class="muted">reports/ is empty</td></tr>') + '</tbody></table></div>';
-  byId('btn-gen-report').addEventListener('click', () => startJob('report-html', '/api/reports/generate', 'tools/report-html.js'));
+  const genBtn = el('button', { class: 'btn btn-primary', id: 'btn-gen-report' }, '⚙ Generate report.html');
+  genBtn.addEventListener('click', () => startJob('report-html', '/api/reports/generate', 'tools/report-html.js'));
+  const genCard = el('div', { class: 'card', style: { marginBottom: '12px' } },
+    el('div', { class: 'row', style: { alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' } }, [
+      el('div', null, [el('b', null, 'Standalone HTML report'), el('div', { class: 'hint' }, 'consolidates findings.jsonl + state.db + attack chains via tools/report-html.js (severity · CVSS · CWE · EPSS · confidence)')]),
+      genBtn,
+    ]));
+
+  const tableCard = el('div', { class: 'card', style: { padding: '0' } }, dataTable({
+    sticky: true, empty: 'reports/ is empty', rows: data || [],
+    onRow: (r) => openReportDrawer(r),
+    columns: [
+      { label: 'File', tdClass: 'mono', cell: (r) => r.name },
+      { label: 'Kind', cell: (r) => chip(r.kind) },
+      { label: 'Size', num: true, tdClass: 'muted', cell: (r) => fmtBytes(r.size) },
+      { label: 'Modified', tdClass: 'muted', cell: (r) => shortTs(r.mtime) },
+      { label: '', cell: (r) => reportIsHtml(r)
+        ? el('a', { class: 'btn btn-sm', href: '/reports/' + encodeURIComponent(r.name), target: '_blank', rel: 'noopener', onClick: (e) => e.stopPropagation() }, 'open ↗')
+        : el('span', { class: 'faint mono', style: { fontSize: '11px' } }, 'reports/' + r.name) },
+    ],
+  }));
+
+  pane.replaceChildren(genCard, tableCard);
 }
 
 // ── jobs / live log modal ───────────────────────────────────────────────────
@@ -1004,13 +1024,24 @@ function debounce(fn, ms) {
   return function () { clearTimeout(t); t = setTimeout(fn, ms); };
 }
 
+// brief loading skeleton shown while an async tab fetches (local, usually one
+// frame). Only on tab entry — not on in-tab refetches (filters/pagination).
+function showSkeleton(tab) {
+  const pane = byId('tab-' + tab);
+  if (!pane || pane.childElementCount > 0) return; // keep existing content — no flash on refresh/poll
+  pane.replaceChildren(el('div', { class: 'grid cols-2' }, [
+    el('div', { class: 'skeleton', style: { minHeight: '140px' } }),
+    el('div', { class: 'skeleton', style: { minHeight: '140px' } }),
+  ]));
+}
+
 function renderTab(tab) {
   if (tab === 'overview') refreshBadges();
-  else if (tab === 'findings') fetchFindings();
-  else if (tab === 'pipeline') api('/api/pipeline').then(renderPipeline).catch((e) => toast(String(e.message || e), 'err'));
-  else if (tab === 'scope') api('/api/scope').then(renderScope).catch((e) => toast(String(e.message || e), 'err'));
-  else if (tab === 'sessions') api('/api/sessions').then(renderSessions).catch((e) => toast(String(e.message || e), 'err'));
-  else if (tab === 'reports') api('/api/reports').then(renderReports).catch((e) => toast(String(e.message || e), 'err'));
+  else if (tab === 'findings') { showSkeleton('findings'); fetchFindings(); }
+  else if (tab === 'pipeline') { showSkeleton('pipeline'); api('/api/pipeline').then(renderPipeline).catch((e) => toast(String(e.message || e), 'err')); }
+  else if (tab === 'scope') { showSkeleton('scope'); api('/api/scope').then(renderScope).catch((e) => toast(String(e.message || e), 'err')); }
+  else if (tab === 'sessions') { showSkeleton('sessions'); api('/api/sessions').then(renderSessions).catch((e) => toast(String(e.message || e), 'err')); }
+  else if (tab === 'reports') { showSkeleton('reports'); api('/api/reports').then(renderReports).catch((e) => toast(String(e.message || e), 'err')); }
   else if (tab === 'freebuff') renderFreebuffTab();
 }
 
