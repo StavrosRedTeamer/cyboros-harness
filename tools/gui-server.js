@@ -491,6 +491,30 @@ function findingsPayload(q) {
   return { rows, hosts, bySeverity, byStatus, total: rows.length };
 }
 
+// findings-per-day for the overview sparkline. Read-only aggregation of the
+// findings.jsonl timestamps into a continuous daily series (UTC) ending today,
+// gaps filled with 0 so the sparkline has an even x-axis. No guard touched.
+function findingsTrend(rows, days) {
+  const n = days || 14;
+  const byDay = {};
+  for (const f of rows) {
+    if (!f || !f.ts) continue;
+    const d = new Date(f.ts);
+    if (Number.isNaN(d.getTime())) continue;
+    const key = d.toISOString().slice(0, 10);
+    byDay[key] = (byDay[key] || 0) + 1;
+  }
+  const out = [];
+  const base = new Date();
+  for (let i = n - 1; i >= 0; i--) {
+    const d = new Date(base);
+    d.setUTCDate(d.getUTCDate() - i);
+    const key = d.toISOString().slice(0, 10);
+    out.push({ day: key, count: byDay[key] || 0 });
+  }
+  return out;
+}
+
 function pipelinePayload() {
   if (!fs.existsSync(STATE_DB)) return { db: false };
   let DatabaseSync;
@@ -611,7 +635,7 @@ function overviewPayload() {
       hosts: sc.allowed_hosts.length, prefixes: sc.allowed_url_prefixes.length,
       ips: sc.allowed_ips.length, rps: sc.max_requests_per_second, failClosed: sc.failClosed, mtime: sc.mtime,
     },
-    findings: { total: f.total, bySeverity: f.bySeverity, byStatus: f.byStatus },
+    findings: { total: f.total, bySeverity: f.bySeverity, byStatus: f.byStatus, trend: findingsTrend(f.rows) },
     pipeline: {
       db: pipe.db, hasRun: !!(pipe.lastRun), lastRunStatus: pipe.lastRun ? pipe.lastRun.status : null,
       runTarget: pipe.lastRun ? pipe.lastRun.target : null,

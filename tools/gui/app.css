@@ -648,6 +648,8 @@ body.term-resizing .term-grip { pointer-events: none; }
 /* sparkline — inline SVG trend */
 .sparkline { display: inline-flex; align-items: center; vertical-align: middle; line-height: 0; }
 .sparkline svg { display: block; }
+.sparkline.fluid { display: block; width: 100%; }
+.sparkline.fluid svg { width: 100%; }
 .sparkline.faint { color: var(--faint); font: 12px var(--mono); line-height: 1; }
 
 /* drawer — singleton right-side detail panel */

@@ -133,8 +133,9 @@ function sparkline(points, opts) {
   const pts = vals.map((v, i) => (pad + i * step).toFixed(1) + ',' + (h - pad - ((v - min) / span) * (h - pad * 2)).toFixed(1));
   const [lx, ly] = pts[pts.length - 1].split(',');
   const stroke = o.color || 'var(--cyan)';
-  return el('span', { class: 'sparkline', title: o.title || '', html:
-    '<svg viewBox="0 0 ' + w + ' ' + h + '" width="' + w + '" height="' + h + '" preserveAspectRatio="none" aria-hidden="true">' +
+  const wAttr = o.fluid ? '100%' : w;
+  return el('span', { class: 'sparkline' + (o.fluid ? ' fluid' : ''), title: o.title || '', html:
+    '<svg viewBox="0 0 ' + w + ' ' + h + '" width="' + wAttr + '" height="' + h + '" preserveAspectRatio="none" aria-hidden="true">' +
       '<polyline fill="none" stroke="' + stroke + '" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round" points="' + pts.join(' ') + '"/>' +
       '<circle cx="' + lx + '" cy="' + ly + '" r="2" fill="' + stroke + '"/></svg>' });
 }
@@ -255,56 +256,107 @@ function renderStatusRail(o) {
 }
 
 // ── Overview ────────────────────────────────────────────────────────────────
+// severity stat-tile → jumps to Findings pre-filtered by that severity
+function overviewSevTile(sev, n) {
+  return statTile({
+    label: sev, value: n, tone: { Critical: 'crit', High: 'high', Medium: 'med', Low: 'low' }[sev],
+    onClick: () => {
+      Object.assign(findingsState, { host: '', severity: sev, status: '', q: '', detailOpen: null, page: 1 });
+      switchTab('findings');
+    },
+  });
+}
+
 function renderOverview(o) {
   const pane = byId('tab-overview');
   const f = o.findings;
   const bySev = f.bySeverity || {};
-  const sevTotal = Object.values(bySev).reduce((a, b) => a + b, 0) || 0;
-  const sevBars = ['Critical', 'High', 'Medium', 'Low', 'Info'].map((s) => {
+
+  // ── stat-tile row (reNgine-style KPIs, each clickable) ──
+  const tiles = ['Critical', 'High', 'Medium', 'Low'].map((s) => overviewSevTile(s, bySev[s] || 0));
+  tiles.push(statTile({ label: 'Active sessions', value: o.sessions.active, tone: o.sessions.active > 0 ? 'live' : null, onClick: () => switchTab('sessions') }));
+  tiles.push(statTile({ label: 'Loot rows', value: o.lootCount || 0, hint: 'contents never shown', onClick: () => switchTab('sessions') }));
+  tiles.push(statTile({ label: 'Req/s cap', value: o.scope.rps, tone: o.scope.failClosed ? 'crit' : null, hint: o.scope.hosts + ' host · ' + o.scope.ips + ' ip', onClick: () => switchTab('scope') }));
+  const statRow = el('div', { class: 'stat-row' }, tiles);
+
+  // ── findings triage (severity meter + proof split + weakness classes) ──
+  const sevTotal = ['Critical', 'High', 'Medium', 'Low', 'Info'].reduce((a, s) => a + (bySev[s] || 0), 0);
+  const sevbarHtml = ['Critical', 'High', 'Medium', 'Low', 'Info'].map((s) => {
     const n = bySev[s] || 0;
-    return n ? '<div class="' + (SEV_BAR[s] || 's-info') + '" style="width:' + (sevTotal ? (n / sevTotal) * 100 : 0) + '%" title="' + s + ': ' + n + '"></div>' : '';
+    return n ? '<div class="' + (SEV_BAR[s] || 's-info') + '" style="width:' + (sevTotal ? (n / sevTotal) * 100 : 0) + '%" title="' + esc(s + ': ' + n) + '"></div>' : '';
   }).join('');
-  const sevChips = ['Critical', 'High', 'Medium', 'Low', 'Info'].map((s) =>
-    '<span class="chip ' + (SEV_CHIP[s] || '') + '">' + s + ' ' + (bySev[s] || 0) + '</span>').join('');
-  // proof-level split — the operator-critical signal (proven vs claimed vs weak)
   const proof = { proven: 0, confirmed: 0, weak: 0 };
   Object.keys(f.byStatus || {}).forEach((st) => { proof[proofLevel(st)] += f.byStatus[st]; });
-  const openReport = (r) => '<li><span class="dot done" style="background:var(--cyan);box-shadow:var(--glow-cyan)"></span>' +
-    '<a href="/reports/' + encodeURIComponent(r.name) + '" target="_blank" rel="noopener" class="mono">' + esc(r.name) + '</a>' +
-    '<span class="faint" style="margin-left:auto">' + shortTs(r.mtime) + ' · ' + fmtBytes(r.size) + '</span></li>';
+  const triageCard = el('div', { class: 'card' + ((bySev.Critical || 0) > 0 ? ' keel-crit' : '') }, [
+    el('h2', null, 'Findings triage'),
+    el('div', { class: 'sevbar', html: sevbarHtml }),
+    el('div', { class: 'row', style: { gap: '6px' } }, ['Critical', 'High', 'Medium', 'Low', 'Info'].map((s) => chip(s + ' ' + (bySev[s] || 0), SEV_CHIP[s] || ''))),
+    el('div', { class: 'row', style: { marginTop: '14px', gap: '18px' } }, [
+      el('span', { class: 'verify v-proven' }, proof.proven + ' proven'),
+      el('span', { class: 'verify v-confirmed' }, proof.confirmed + ' confirmed'),
+      el('span', { class: 'verify v-weak' }, proof.weak + ' suspected'),
+    ]),
+    el('div', { class: 'kpi-label', style: { marginTop: '14px' } }, 'recurring weakness classes'),
+    el('div', { id: 'ov-classes', class: 'row', style: { gap: '6px', marginTop: '6px' } }, el('span', { class: 'faint' }, 'loading…')),
+  ]);
 
-  pane.innerHTML =
-    '<div class="grid cols-2">' +
-      '<div class="card' + ((bySev.Critical || 0) > 0 ? ' keel-crit' : '') + '"><h2>Findings triage</h2>' +
-        '<div class="row" style="align-items:baseline;gap:16px">' +
-          '<div><div class="kpi">' + f.total + '</div><div class="kpi-label">total findings</div></div>' +
-          '<div style="flex:1;min-width:180px">' +
-            '<div class="sevbar">' + sevBars + '</div>' +
-            '<div class="row" style="gap:6px">' + sevChips + '</div>' +
-          '</div>' +
-        '</div>' +
-        '<div class="row" style="margin-top:14px;gap:18px">' +
-          '<span class="verify v-proven">' + proof.proven + ' proven</span>' +
-          '<span class="verify v-confirmed">' + proof.confirmed + ' confirmed</span>' +
-          '<span class="verify v-weak">' + proof.weak + ' suspected</span>' +
-        '</div>' +
-        '<div class="kpi-label" style="margin-top:14px">recurring weakness classes</div>' +
-        '<div id="ov-classes" class="row" style="gap:6px;margin-top:6px"><span class="faint">loading…</span></div>' +
-      '</div>' +
-      '<div class="card"><h2>Hotspots — targets by risk</h2>' +
-        '<div id="ov-hotspots"><div class="faint">loading…</div></div>' +
-      '</div>' +
-    '</div>' +
-    '<div class="grid cols-2" style="margin-top:14px">' +
-      '<div class="card"><h2>Latest findings</h2>' +
-        '<div id="ov-latest"><div class="faint">loading…</div></div>' +
-      '</div>' +
-      '<div class="card"><h2>Recent reports</h2>' +
-        (o.reportsRecent && o.reportsRecent.length
-          ? '<ul class="list-plain">' + o.reportsRecent.map(openReport).join('') + '</ul>'
-          : '<div class="faint">no HTML reports yet — generate one from the Reports tab.</div>') +
-      '</div>' +
-    '</div>';
+  // ── findings over time (sparkline from findings.trend) ──
+  const trend = f.trend || [];
+  const counts = trend.map((d) => d.count);
+  const trendTotal = counts.reduce((a, b) => a + b, 0);
+  const trendCard = el('div', { class: 'card' }, [
+    el('h2', null, 'Findings over time'),
+    el('div', { class: 'row', style: { alignItems: 'baseline', gap: '16px' } }, [
+      el('div', null, [el('div', { class: 'kpi' }, String(f.total)), el('div', { class: 'kpi-label' }, 'total findings')]),
+      el('div', { style: { flex: '1', minWidth: '160px' } }, [
+        sparkline(counts, { width: 420, height: 46, fluid: true, title: trendTotal + ' recorded in the last ' + trend.length + ' days' }),
+        el('div', { class: 'kpi-label', style: { marginTop: '8px' } }, 'last ' + trend.length + ' days · ' + trendTotal + ' recorded'),
+      ]),
+    ]),
+  ]);
+
+  // ── hotspots / latest (filled client-side by fillOverviewRows) ──
+  const hotCard = el('div', { class: 'card' }, [el('h2', null, 'Hotspots — targets by risk'), el('div', { id: 'ov-hotspots' }, el('div', { class: 'faint' }, 'loading…'))]);
+  const latestCard = el('div', { class: 'card' }, [el('h2', null, 'Latest findings'), el('div', { id: 'ov-latest' }, el('div', { class: 'faint' }, 'loading…'))]);
+
+  // ── last pipeline run ──
+  const p = o.pipeline;
+  const phases = p.phases || [];
+  const doneN = phases.filter((x) => x.status === 'done').length;
+  const runCard = el('div', { class: 'card' }, [
+    el('h2', null, 'Last pipeline run'),
+    (!p.db || !p.hasRun)
+      ? el('div', { class: 'muted' }, 'no run yet — start a recon from the Pipeline tab')
+      : el('div', null, [
+        el('div', { class: 'row', style: { alignItems: 'center', gap: '10px' } }, [
+          chip('status: ' + (p.unclosed ? 'done (unclosed)' : p.lastRunStatus)),
+          el('span', { class: 'mono muted' }, p.runTarget || ''),
+        ]),
+        el('div', { style: { margin: '10px 0' } }, phases.map((ph) => el('span', { class: 'phase' }, [el('span', { class: 'dot ' + ph.status }), ph.name]))),
+        el('div', { class: 'kpi', style: { fontSize: '16px' } }, doneN + '/' + phases.length + ' phases done'),
+        el('button', { class: 'btn btn-sm', style: { marginTop: '10px' }, onClick: () => switchTab('pipeline') }, 'open pipeline →'),
+      ]),
+  ]);
+
+  // ── recent reports ──
+  const openReportNode = (r) => el('li', null, [
+    el('span', { class: 'dot done', style: { background: 'var(--cyan)', boxShadow: 'var(--glow-cyan)' } }),
+    el('a', { href: '/reports/' + encodeURIComponent(r.name), target: '_blank', rel: 'noopener', class: 'mono' }, r.name),
+    el('span', { class: 'faint', style: { marginLeft: 'auto' } }, shortTs(r.mtime) + ' · ' + fmtBytes(r.size)),
+  ]);
+  const reportsCard = el('div', { class: 'card' }, [
+    el('h2', null, 'Recent reports'),
+    (o.reportsRecent && o.reportsRecent.length)
+      ? el('ul', { class: 'list-plain' }, o.reportsRecent.map(openReportNode))
+      : el('div', { class: 'faint' }, 'no HTML reports yet — generate one from the Reports tab.'),
+  ]);
+
+  pane.replaceChildren(
+    statRow,
+    el('div', { class: 'grid cols-2', style: { marginTop: '14px' } }, [triageCard, trendCard]),
+    el('div', { class: 'grid cols-2', style: { marginTop: '14px' } }, [hotCard, latestCard]),
+    el('div', { class: 'grid cols-2', style: { marginTop: '14px' } }, [runCard, reportsCard]),
+  );
 
   // rows-derived panels (hotspots / latest / classes) — fetched client-side
   api('/api/findings').then((d) => fillOverviewRows(d.rows || [])).catch(() => {});
