@@ -652,6 +652,19 @@ body.term-resizing .term-grip { pointer-events: none; }
 .sparkline.fluid svg { width: 100%; }
 .sparkline.faint { color: var(--faint); font: 12px var(--mono); line-height: 1; }
 
+/* sortable table headers */
+th.sortable { cursor: pointer; user-select: none; }
+th.sortable:hover { color: var(--ink); }
+th.sortable:focus-visible { outline: 2px solid var(--cyan); outline-offset: -2px; }
+
+/* toggle chips (quick filters) — pressed state = neon outline */
+.quick-filters { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.qf-sep { width: 1px; align-self: stretch; min-height: 18px; background: var(--line-2); margin: 0 4px; }
+.chip-toggle { cursor: pointer; transition: border-color .12s, box-shadow .12s, color .12s; }
+.chip-toggle:hover { border-color: var(--cyan); color: var(--ink); }
+.chip-toggle.active { border-color: var(--cyan); color: #dcfbff; box-shadow: var(--glow-cyan), inset 0 0 8px rgba(36,227,255,.12); }
+.chip-toggle:focus-visible { outline: 2px solid var(--cyan); outline-offset: 2px; }
+
 /* drawer — singleton right-side detail panel */
 .drawer-wrap { position: fixed; inset: 0; z-index: 75; }
 .drawer-scrim { position: absolute; inset: 0; background: rgba(4,3,8,.5); opacity: 0; transition: opacity .18s; }

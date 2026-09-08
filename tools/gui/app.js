@@ -99,24 +99,44 @@ function statTile(o) {
   return tile;
 }
 
-// dataTable({ columns, rows, onRow, empty, sticky })
-//   columns: [{ key, label, cell(row,i), num, thClass, tdClass }]
+// dataTable({ columns, rows, onRow, rowClass, empty, sticky, sortState, onSort })
+//   columns: [{ key, label, cell(row,i), num, thClass, tdClass, sort }]
 //     cell may return a Node, an {html} object, or a primitive (rendered as text)
-//   onRow(row, tr, i) — attaches a click handler + .clickable to each row
+//     sort: a key string → makes the header clickable; onSort(key) is called and
+//           sortState {key,dir} drives the ▲/▼ indicator.
+//   onRow(row, tr, i) — click handler + .clickable on each row
+//   rowClass(row, i) — extra class string per <tr>
 // Returns a .table-wrap div (owns horizontal overflow) around the <table>.
 function dataTable(spec) {
   const cols = spec.columns || [];
-  const thead = el('thead', null, el('tr', null,
-    cols.map((c) => el('th', { class: [c.num ? 'num' : '', c.thClass || ''].filter(Boolean).join(' ') || null }, c.label))));
+  const ss = spec.sortState || {};
+  const thead = el('thead', null, el('tr', null, cols.map((c) => {
+    const sortable = c.sort && spec.onSort;
+    const arrow = sortable && ss.key === c.sort ? (ss.dir === 'asc' ? ' ▲' : ' ▼') : '';
+    const th = el('th', { class: [c.num ? 'num' : '', sortable ? 'sortable' : '', c.thClass || ''].filter(Boolean).join(' ') || null }, c.label + arrow);
+    if (sortable) {
+      th.setAttribute('role', 'button'); th.tabIndex = 0;
+      th.setAttribute('aria-sort', ss.key === c.sort ? (ss.dir === 'asc' ? 'ascending' : 'descending') : 'none');
+      const go = () => spec.onSort(c.sort);
+      th.addEventListener('click', go);
+      th.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); go(); } });
+    }
+    return th;
+  })));
   const body = el('tbody');
   const rows = spec.rows || [];
   if (!rows.length) {
     body.appendChild(el('tr', null, el('td', { colspan: cols.length || 1, class: 'muted' }, spec.empty || '—')));
   } else rows.forEach((row, i) => {
-    const tr = el('tr', spec.onRow ? { class: 'clickable' } : null, cols.map((c) =>
+    const cls = ['clickable', spec.rowClass ? spec.rowClass(row, i) : ''];
+    const tr = el('tr', { class: (spec.onRow ? cls : cls.slice(1)).filter(Boolean).join(' ') || null }, cols.map((c) =>
       el('td', { class: [c.num ? 'num' : '', c.tdClass || ''].filter(Boolean).join(' ') || null },
         cellContent(c.cell ? c.cell(row, i) : row[c.key]))));
-    if (spec.onRow) tr.addEventListener('click', () => spec.onRow(row, tr, i));
+    if (spec.onRow) {
+      tr.setAttribute('role', 'button'); tr.tabIndex = 0;
+      tr.addEventListener('click', () => spec.onRow(row, tr, i));
+      tr.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); spec.onRow(row, tr, i); } });
+    }
     body.appendChild(tr);
   });
   return el('div', { class: 'table-wrap' + (spec.sticky ? ' sticky' : '') }, el('table', null, [thead, body]));
@@ -423,132 +443,172 @@ function fillOverviewRows(rows) {
 }
 
 // ── Findings ────────────────────────────────────────────────────────────────
-// page/pageSize drive client-side pagination over the already-filtered rows the
-// server returns; pageSize 0 means "show all". focusIdx restores keyboard focus
-// to a row after the pane is re-rendered (expand/collapse rebuilds innerHTML).
-const findingsState = { host: '', severity: '', status: '', q: '', rows: [], detailOpen: null, page: 1, pageSize: 50, focusIdx: null };
+// Filters (host/severity/status/q) are applied server-side via /api/findings.
+// Sorting + pagination are client-side over the returned rows. Row click opens
+// a detail drawer (no page change). pageSize 0 = "show all".
+const findingsState = { host: '', severity: '', status: '', q: '', rows: [], page: 1, pageSize: 50, sortKey: '', sortDir: 'desc', lastData: null };
+
+// client-side sort over the server-filtered rows (default = server order)
+function sortFindings(rows) {
+  const { sortKey, sortDir } = findingsState;
+  if (!sortKey) return rows;
+  const dir = sortDir === 'asc' ? 1 : -1;
+  const val = (f) => {
+    switch (sortKey) {
+      case 'severity': return f.sevRank || 0;
+      case 'cvss': return f.cvss == null ? -1 : Number(f.cvss);
+      case 'ts': return String(f.ts || '');
+      case 'status': return proofLevel(f.status);
+      default: return String(f[sortKey] || '').toLowerCase();
+    }
+  };
+  return rows.slice().sort((a, b) => { const va = val(a), vb = val(b); return (va < vb ? -1 : va > vb ? 1 : 0) * dir; });
+}
+function findingsSort(key) {
+  if (findingsState.sortKey === key) findingsState.sortDir = findingsState.sortDir === 'asc' ? 'desc' : 'asc';
+  else { findingsState.sortKey = key; findingsState.sortDir = key === 'title' || key === 'host' ? 'asc' : 'desc'; }
+  renderFindings(findingsState.lastData);
+}
+
+// toggle chip for a single-select facet (severity / status) → refetch
+function facetChip(text, cls, active, onToggle) {
+  const c = chip(text, (cls || '') + (active ? ' active' : ''));
+  c.classList.add('chip-toggle');
+  c.setAttribute('role', 'button'); c.tabIndex = 0;
+  c.setAttribute('aria-pressed', active ? 'true' : 'false');
+  c.addEventListener('click', onToggle);
+  c.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onToggle(); } });
+  return c;
+}
 
 function renderFindings(data) {
+  findingsState.lastData = data;
   findingsState.rows = data.rows || [];
   const pane = byId('tab-findings');
-  const sevCounts = ['Critical', 'High', 'Medium', 'Low', 'Info'].map((s) => {
-    const n = (data.bySeverity || {})[s] || 0;
-    return n ? '<span class="chip ' + (SEV_CHIP[s] || '') + '">' + s + ': ' + n + '</span>' : '';
-  }).filter(Boolean).join('');
-  const hostOpts = (data.hosts || []).map((h) => '<option value="' + esc(h) + '"' + (h === findingsState.host ? ' selected' : '') + '>' + esc(h) + '</option>').join('');
 
-  const total = findingsState.rows.length;
+  // ── filters: search + host select + reset ──
+  const q = el('input', { type: 'search', id: 'f-q', placeholder: 'search title / endpoint / host / cwe…', value: findingsState.q });
+  q.addEventListener('input', debounce(() => { findingsState.q = q.value.trim(); fetchFindings(); }, 350));
+  const hostSel = el('select', { id: 'f-host' }, [el('option', { value: '' }, 'all hosts'),
+    ...(data.hosts || []).map((h) => el('option', { value: h, selected: h === findingsState.host }, h))]);
+  hostSel.addEventListener('change', () => { findingsState.host = hostSel.value; fetchFindings(); });
+  const resetBtn = el('button', { class: 'btn', id: 'f-reset' }, 'reset');
+  resetBtn.addEventListener('click', () => { Object.assign(findingsState, { host: '', severity: '', status: '', q: '' }); fetchFindings(); });
+  const filters = el('div', { class: 'filters' }, [
+    el('div', { class: 'f wide' }, q),
+    el('div', { class: 'f' }, hostSel),
+    el('div', { class: 'f', style: { flex: '0 0 auto' } }, resetBtn),
+  ]);
+
+  // ── quick-filter chips: severity + status (toggle, single-select each) ──
+  const sevChips = ['Critical', 'High', 'Medium', 'Low', 'Info'].map((s) =>
+    facetChip(s + ' ' + ((data.bySeverity || {})[s] || 0), SEV_CHIP[s] || '', findingsState.severity === s,
+      () => { findingsState.severity = findingsState.severity === s ? '' : s; fetchFindings(); }));
+  const statusKeys = Object.keys(data.byStatus || {});
+  const statusChips = statusKeys.map((s) =>
+    facetChip(s + ' ' + data.byStatus[s], 'st-' + proofLevel(s), findingsState.status === s,
+      () => { findingsState.status = findingsState.status === s ? '' : s; fetchFindings(); }));
+  const quickRow = el('div', { class: 'card quick-filters', style: { marginBottom: '12px' } }, [
+    el('span', { class: 'chip' }, data.total + ' findings'),
+    ...sevChips,
+    statusChips.length ? el('span', { class: 'qf-sep' }) : null,
+    ...statusChips,
+  ]);
+
+  // ── table (sorted + paginated) ──
+  const sorted = sortFindings(findingsState.rows);
+  const total = sorted.length;
   const pageSize = findingsState.pageSize > 0 ? findingsState.pageSize : (total || 1);
   const pageCount = Math.max(1, Math.ceil(total / pageSize));
   findingsState.page = Math.min(Math.max(1, findingsState.page), pageCount);
   const start = (findingsState.page - 1) * pageSize;
-  const end = start + pageSize;
+  const pageRows = sorted.slice(start, start + pageSize);
 
-  const rows = findingsState.rows.map((f, i) => {
-    if (i < start || i >= end) return ''; // outside the current page — i stays the absolute row index
-    const cwes = Array.isArray(f.cwe) ? f.cwe : (f.cwe ? [f.cwe] : []);
-    const confLabel = f.confidence ? f.confidence.label : '';
-    const conf = f.confidence
-      ? '<span class="conf ' + esc(confLabel) + '">' + f.confidence.score.toFixed(2) + '</span> <span class="faint">' + esc(confLabel) + '</span>'
-      : '<span class="faint">—</span>';
-    const cvss = f.cvss != null
-      ? '<span class="cvss g-' + cvssGrade(Number(f.cvss)) + '">' + Number(f.cvss).toFixed(1) + '</span>'
-      : '<span class="cvss g-none">—</span>';
-    const status = f.status
-      ? '<span class="verify v-' + proofLevel(f.status) + '">' + esc(f.status) + '</span>'
-      : '<span class="faint">—</span>';
-    const open = findingsState.detailOpen === i;
-    const row =
-      '<tr class="clickable sev-row ' + (SEV_ROW[f.severity] || 's-info') + '" data-idx="' + i + '"' +
-      ' role="button" tabindex="0" aria-expanded="' + (open ? 'true' : 'false') + '"' +
-      ' aria-label="' + esc((open ? 'Comprimi dettaglio' : 'Espandi dettaglio') + ': ' + (f.title || 'finding')) + '">' +
-      '<td><span class="chip ' + (SEV_CHIP[f.severity] || '') + '">' + esc(f.severity || '—') + '</span></td>' +
-      '<td>' + esc(f.title || '') + '</td>' +
-      '<td class="mono" style="font-size:12px">' + esc(f.host || '') + '</td>' +
-      '<td class="endpoint">' + epBreak(f.endpoint || '') + '</td>' +
-      '<td>' + cwes.map((c) => '<span class="chip">' + esc(c) + '</span>').join(' ') + '</td>' +
-      '<td class="num">' + cvss + '</td>' +
-      '<td>' + conf + '</td>' +
-      '<td>' + status + '</td>' +
-      '<td class="faint mono" style="font-size:11px">' + shortTs(f.ts) + '</td>' +
-      '</tr>';
-    const detail = findingsState.detailOpen === i ? detailRow(f, i) : '';
-    return row + detail;
-  }).join('');
-
-  const pagerInfo = total === 0
-    ? '0 risultati'
-    : 'Pagina ' + findingsState.page + ' / ' + pageCount + ' · ' + (start + 1) + '–' + Math.min(end, total) + ' di ' + total;
-  const sizeOpts = [25, 50, 100].map((n) => '<option value="' + n + '"' + (findingsState.pageSize === n ? ' selected' : '') + '>' + n + '</option>').join('') +
-    '<option value="0"' + (findingsState.pageSize === 0 ? ' selected' : '') + '>Tutti</option>';
-  const pager =
-    '<div class="pager">' +
-      '<button class="btn btn-sm" id="f-prev"' + (findingsState.page <= 1 ? ' disabled' : '') + ' aria-label="Pagina precedente">‹ Prev</button>' +
-      '<span class="pager-info" aria-live="polite">' + pagerInfo + '</span>' +
-      '<button class="btn btn-sm" id="f-next"' + (findingsState.page >= pageCount ? ' disabled' : '') + ' aria-label="Pagina successiva">Next ›</button>' +
-      '<label class="pager-size">per pagina <select id="f-size">' + sizeOpts + '</select></label>' +
-    '</div>';
-
-  pane.innerHTML =
-    '<div class="filters">' +
-      '<div class="f wide"><input type="search" id="f-q" placeholder="search title / endpoint / host / cwe…" value="' + esc(findingsState.q) + '"></div>' +
-      '<div class="f"><select id="f-sev">' + '<option value="">all severities</option>' + ['Critical', 'High', 'Medium', 'Low', 'Info'].map((s) => '<option' + (s === findingsState.severity ? ' selected' : '') + '>' + s + '</option>').join('') + '</select></div>' +
-      '<div class="f"><select id="f-status">' + '<option value="">all statuses</option>' + Object.keys(data.byStatus || {}).map((s) => '<option' + (s === findingsState.status ? ' selected' : '') + '>' + esc(s) + '</option>').join('') + '</select></div>' +
-      '<div class="f"><select id="f-host">' + '<option value="">all hosts</option>' + hostOpts + '</select></div>' +
-      '<div class="f" style="flex:0 0 auto"><button class="btn" id="f-reset">reset</button></div>' +
-    '</div>' +
-    '<div class="card" style="margin-bottom:12px"><div class="row" style="align-items:center;gap:8px"><span class="chip">' + data.total + ' findings</span>' + sevCounts + '</div></div>' +
-    '<div class="card" style="padding:0;overflow-x:auto"><table><thead><tr>' +
-      '<th>Severity</th><th>Title</th><th>Host</th><th>Endpoint</th><th>CWE</th><th>CVSS</th><th>Conf</th><th>Status</th><th>Detected</th>' +
-      '</tr></thead><tbody>' + (rows || '<tr><td colspan="9" class="muted">no findings match</td></tr>') + '</tbody></table></div>' +
-    pager;
-
-  byId('f-q').addEventListener('input', debounce(() => { findingsState.q = byId('f-q').value.trim(); fetchFindings(); }, 350));
-  byId('f-sev').addEventListener('change', (e) => { findingsState.severity = e.target.value; fetchFindings(); });
-  byId('f-status').addEventListener('change', (e) => { findingsState.status = e.target.value; fetchFindings(); });
-  byId('f-host').addEventListener('change', (e) => { findingsState.host = e.target.value; fetchFindings(); });
-  byId('f-reset').addEventListener('click', () => {
-    Object.assign(findingsState, { host: '', severity: '', status: '', q: '', detailOpen: null });
-    fetchFindings();
+  const cvssCell = (f) => el('span', { class: 'cvss g-' + (f.cvss != null ? cvssGrade(Number(f.cvss)) : 'none') }, f.cvss != null ? Number(f.cvss).toFixed(1) : '—');
+  const confCell = (f) => f.confidence
+    ? el('span', null, [el('span', { class: 'conf ' + f.confidence.label }, f.confidence.score.toFixed(2)), document.createTextNode(' '), el('span', { class: 'faint' }, f.confidence.label)])
+    : el('span', { class: 'faint' }, '—');
+  const cweCell = (f) => { const c = Array.isArray(f.cwe) ? f.cwe : (f.cwe ? [f.cwe] : []); return el('span', null, c.map((x) => chip(x))); };
+  const table = dataTable({
+    sticky: true,
+    sortState: { key: findingsState.sortKey, dir: findingsState.sortDir },
+    onSort: findingsSort,
+    rowClass: (f) => 'sev-row ' + (SEV_ROW[f.severity] || 's-info'),
+    onRow: (f) => openFindingDrawer(f),
+    empty: 'no findings match',
+    columns: [
+      { label: 'Severity', sort: 'severity', cell: (f) => severityChip(f.severity) },
+      { label: 'Title', sort: 'title', cell: (f) => f.title || '' },
+      { label: 'Host', sort: 'host', tdClass: 'mono', cell: (f) => f.host || '' },
+      { label: 'Endpoint', tdClass: 'endpoint', cell: (f) => ({ html: epBreak(f.endpoint || '') }) },
+      { label: 'CWE', cell: cweCell },
+      { label: 'CVSS', sort: 'cvss', num: true, cell: cvssCell },
+      { label: 'Conf', cell: confCell },
+      { label: 'Status', sort: 'status', cell: (f) => f.status ? el('span', { class: 'verify v-' + proofLevel(f.status) }, f.status) : el('span', { class: 'faint' }, '—') },
+      { label: 'Detected', sort: 'ts', tdClass: 'faint mono', cell: (f) => shortTs(f.ts) },
+    ],
+    rows: pageRows,
   });
-  byId('f-prev').addEventListener('click', () => { findingsState.page--; renderFindings(findingsState.lastData); });
-  byId('f-next').addEventListener('click', () => { findingsState.page++; renderFindings(findingsState.lastData); });
-  byId('f-size').addEventListener('change', (e) => {
-    findingsState.pageSize = parseInt(e.target.value, 10) || 0;
-    findingsState.page = 1;
-    renderFindings(findingsState.lastData);
-  });
+  const tableCard = el('div', { class: 'card', style: { padding: '0' } }, table);
 
-  $$('#tab-findings tbody tr.clickable').forEach((tr) => {
-    const toggle = () => {
-      const i = parseInt(tr.dataset.idx, 10);
-      findingsState.detailOpen = findingsState.detailOpen === i ? null : i;
-      findingsState.focusIdx = i; // keep keyboard focus on this row across the re-render
-      renderFindings(findingsState.lastData);
-    };
-    tr.addEventListener('click', toggle);
-    tr.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter' || e.key === ' ' || e.key === 'Spacebar') { e.preventDefault(); toggle(); }
-    });
-  });
+  // ── pager ──
+  const pagerInfo = total === 0 ? '0 risultati'
+    : 'Pagina ' + findingsState.page + ' / ' + pageCount + ' · ' + (start + 1) + '–' + Math.min(start + pageSize, total) + ' di ' + total;
+  const prev = el('button', { class: 'btn btn-sm', id: 'f-prev', disabled: findingsState.page <= 1, 'aria-label': 'Pagina precedente' }, '‹ Prev');
+  prev.addEventListener('click', () => { findingsState.page--; renderFindings(findingsState.lastData); });
+  const next = el('button', { class: 'btn btn-sm', id: 'f-next', disabled: findingsState.page >= pageCount, 'aria-label': 'Pagina successiva' }, 'Next ›');
+  next.addEventListener('click', () => { findingsState.page++; renderFindings(findingsState.lastData); });
+  const sizeSel = el('select', { id: 'f-size' }, [
+    ...[25, 50, 100].map((n) => el('option', { value: n, selected: findingsState.pageSize === n }, String(n))),
+    el('option', { value: 0, selected: findingsState.pageSize === 0 }, 'Tutti'),
+  ]);
+  sizeSel.addEventListener('change', () => { findingsState.pageSize = parseInt(sizeSel.value, 10) || 0; findingsState.page = 1; renderFindings(findingsState.lastData); });
+  const pager = el('div', { class: 'pager' }, [
+    prev, el('span', { class: 'pager-info', 'aria-live': 'polite' }, pagerInfo), next,
+    el('label', { class: 'pager-size' }, ['per pagina ', sizeSel]),
+  ]);
 
-  if (findingsState.focusIdx != null) {
-    const t = $('#tab-findings tbody tr[data-idx="' + findingsState.focusIdx + '"]');
-    findingsState.focusIdx = null;
-    if (t) t.focus();
-  }
+  pane.replaceChildren(filters, quickRow, tableCard, pager);
 }
 
-function detailRow(f, i) {
-  const fields = [
-    ['Class', f.class], ['Verify level', f.verify_level], ['CVE', f.cve || (f.cves ? f.cves.join(', ') : '')],
+// finding detail fields for the drawer (skips empty). Same data already served
+// by /api/findings — no new server exposure; loot is untouched (count only).
+function findingDetailFields(f) {
+  const cwes = Array.isArray(f.cwe) ? f.cwe : (f.cwe ? [f.cwe] : []);
+  return [
+    ['Host', f.host],
+    ['Endpoint', f.endpoint],
+    ['Class', f.class],
+    ['CWE', cwes.join(', ')],
+    ['CVSS', f.cvss != null ? Number(f.cvss).toFixed(1) + (f.cvss_vector ? ' · ' + f.cvss_vector : '') : ''],
+    ['CVE', f.cve || (f.cves ? f.cves.join(', ') : '')],
     ['EPSS', f.epss != null ? (Number(f.epss) * 100).toFixed(1) + '%' : ''],
-    ['Impact', f.impact], ['PoC', f.poc], ['Remediation', f.remediation],
+    ['Confidence', f.confidence ? f.confidence.score.toFixed(2) + ' · ' + f.confidence.label : ''],
+    ['Status', f.status],
+    ['Verify level', f.verify_level],
+    ['Verified at', f.verified_at ? shortTs(f.verified_at) : ''],
+    ['Detected', f.ts ? shortTs(f.ts) : ''],
+    ['Impact', f.impact],
+    ['PoC', f.poc],
+    ['Remediation', f.remediation],
+    ['Evidence', f.evidence_quote],
     ['Oracle', f.oracle ? (f.oracle.type || '') + (f.oracle.ref ? ' · ' + f.oracle.ref : '') : ''],
+    ['Standards', Array.isArray(f.standards) ? f.standards.join(', ') : f.standards],
+    ['Chain', Array.isArray(f.chain) ? f.chain.join(' → ') : f.chain],
   ].filter(([, v]) => v != null && v !== '');
-  return '<tr class="detail-row"><td colspan="9"><div class="detail" data-idx="' + i + '">' +
-    fields.map(([k, v]) => '<h4>' + esc(k) + '</h4><p>' + esc(v) + '</p>').join('') +
-    '</div></td></tr>';
+}
+function openFindingDrawer(f) {
+  const detailEl = el('div', { class: 'detail' });
+  findingDetailFields(f).forEach(([k, v]) => { detailEl.appendChild(el('h4', null, k)); detailEl.appendChild(el('p', null, String(v))); });
+  const body = el('div', null, [
+    el('div', { class: 'row', style: { alignItems: 'center', gap: '10px', marginBottom: '14px' } }, [
+      severityChip(f.severity),
+      f.cvss != null ? el('span', { class: 'cvss g-' + cvssGrade(Number(f.cvss)) }, Number(f.cvss).toFixed(1)) : null,
+      f.status ? el('span', { class: 'verify v-' + proofLevel(f.status) }, f.status) : null,
+    ]),
+    detailEl,
+  ]);
+  drawer({ title: f.title || 'Finding', body });
 }
 
 function fetchFindings() {
@@ -558,7 +618,7 @@ function fetchFindings() {
   if (findingsState.severity) p.set('severity', findingsState.severity);
   if (findingsState.status) p.set('status', findingsState.status);
   if (findingsState.q) p.set('q', findingsState.q);
-  api('/api/findings?' + p.toString()).then((d) => { findingsState.lastData = d; renderFindings(d); }).catch((e) => toast(String(e.message || e), 'err'));
+  api('/api/findings?' + p.toString()).then((d) => renderFindings(d)).catch((e) => toast(String(e.message || e), 'err'));
 }
 
 // ── Pipeline ────────────────────────────────────────────────────────────────
