@@ -12,6 +12,17 @@ const esc = (v) => String(v == null ? '' : v)
 const fmtBytes = (n) => (n > 1048576 ? (n / 1048576).toFixed(1) + ' MB' : n > 1024 ? Math.round(n / 1024) + ' KB' : n + ' B');
 const fmtTs = (iso) => (iso ? new Date(iso).toLocaleString() : '—');
 const shortTs = (iso) => (iso ? new Date(iso).toLocaleDateString() + ' ' + new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—');
+// compact duration between two ISO timestamps (for pipeline phase nodes)
+const fmtDur = (a, b) => {
+  if (!a || !b) return '';
+  const ms = new Date(b) - new Date(a);
+  if (!(ms >= 0)) return '';
+  const s = Math.round(ms / 1000);
+  if (s < 60) return s + 's';
+  const m = Math.floor(s / 60);
+  if (m < 60) return m + 'm' + (s % 60 ? ' ' + (s % 60) + 's' : '');
+  return Math.floor(m / 60) + 'h ' + (m % 60) + 'm';
+};
 
 const SEV_CHIP = { Critical: 'crit', High: 'high', Medium: 'med', Low: 'low', Info: 'info' };
 const SEV_ROW = { Critical: 's-crit', High: 's-high', Medium: 's-med', Low: 's-low', Info: 's-info' };
@@ -622,74 +633,31 @@ function fetchFindings() {
 }
 
 // ── Pipeline ────────────────────────────────────────────────────────────────
+// one node in the horizontal phase DAG (Trickest-style). Status drives colour;
+// duration shown when the phase has both started_at and finished_at.
+function dagNode(ph) {
+  const dur = fmtDur(ph.started_at, ph.finished_at);
+  const meta = dur ? ph.status + ' · ' + dur : ph.status;
+  return el('div', { class: 'dag-node st-' + ph.status, role: 'listitem', title: ph.name + ' — ' + meta }, [
+    el('span', { class: 'dag-name' }, [el('span', { class: 'dot ' + ph.status }), ph.name]),
+    el('span', { class: 'dag-meta' }, meta),
+  ]);
+}
+
 function renderPipeline(data) {
   const pane = byId('tab-pipeline');
+  if (!data.db) {
+    pane.replaceChildren(el('div', { class: 'card' }, [
+      el('h2', null, 'Pipeline'),
+      el('div', { class: 'muted', html: 'no <span class="mono">reports/state.db</span> yet — run <code>node tools/stavros.js recon &lt;host&gt;</code> first.' }),
+    ]));
+    return;
+  }
   const lastRun = data.lastRun;
   const phases = data.phases || [];
-  const phaseChips = phases.map((p) => '<span class="phase"><span class="dot ' + esc(p.status) + '"></span>' + esc(p.name) + '</span>').join('');
   const doneN = phases.filter((p) => p.status === 'done').length;
-  const targetsRows = (data.targets || []).map((t) =>
-    '<tr><td class="mono">' + esc(t.host) + '</td><td>' + t.hosts + '</td><td>' + t.ports + '</td><td>' + t.endpoints + '</td><td class="muted">' + shortTs(t.last_seen) + '</td></tr>').join('');
 
-  const resumeBtn = data.resumePossible
-    ? '<button class="btn btn-primary" id="btn-resume">▶ Resume incomplete run</button>'
-    : '<button class="btn" id="btn-resume" disabled title="no genuinely incomplete phase to resume (a done scan-only run is not incomplete)">▶ Resume (nothing to resume)</button>';
-
-  const unclosedHint = (data.unclosed && lastRun)
-    ? '<div class="hint" style="color:var(--yellow);margin:4px 0 8px">⚠ run finished its phases but was never closed — mark it done or remove it</div>'
-    : '';
-  const lastRunCtl = (lastRun && lastRun.status !== 'done')
-    ? '<button class="btn btn-sm" id="btn-close-last" title="mark run #' + lastRun.id + ' as done">✓ mark done</button>' +
-      '<button class="btn btn-sm" id="btn-remove-last" title="delete run #' + lastRun.id + ' + its phases" style="margin-left:6px">✕ remove run</button>'
-    : '';
-
-  const runsRows = (data.runs || []).map((r) =>
-    '<tr>' +
-      '<td class="mono muted">#' + r.id + '</td>' +
-      '<td>' + esc(r.command || '') + '</td>' +
-      '<td class="mono">' + esc(r.target || '') + '</td>' +
-      '<td><span class="dot ' + esc(r.status) + '"></span> ' + esc(r.status) + '</td>' +
-      '<td class="muted">' + shortTs(r.started_at) + '</td>' +
-      '<td>' +
-        (r.status !== 'done' ? '<button class="btn btn-sm" data-run-act="close" data-run="' + r.id + '" title="mark run #' + r.id + ' as done">✓</button> ' : '') +
-        '<button class="btn btn-sm" data-run-act="remove" data-run="' + r.id + '" title="delete run #' + r.id + ' + its phases">✕</button>' +
-      '</td>' +
-    '</tr>').join('');
-
-  pane.innerHTML =
-    (!data.db
-      ? '<div class="card"><h2>Pipeline</h2><div class="muted">no <span class="mono">reports/state.db</span> yet — run <code>node tools/stavros.js recon &lt;host&gt;</code> first.</div></div>'
-      :
-      '<div class="grid cols-2">' +
-        '<div class="card"><h2>Last run' + (lastRun ? ' #' + lastRun.id : '') + '</h2>' +
-          (lastRun
-            ? '<div class="row" style="align-items:center;gap:10px"><span class="chip">status: ' + esc(lastRun.status) + '</span><span class="mono muted">' + esc(lastRun.target || '') + '</span></div>' +
-              '<div style="margin:10px 0">' + phaseChips + '</div>' +
-              '<div class="kpi" style="font-size:16px">' + doneN + '/' + phases.length + ' phases done</div>' +
-              '<div class="hint" style="margin-bottom:8px">' + esc(lastRun.command || '') + ' · started ' + shortTs(lastRun.started_at) + '</div>' +
-              unclosedHint +
-              resumeBtn +
-              lastRunCtl +
-              '<button class="btn" id="btn-reopen-log" style="margin-left:8px" title="last job log">log</button>'
-            : '<div class="muted">no runs recorded yet</div>') +
-        '</div>' +
-        '<div class="card"><h2>Targets (' + (data.targets || []).length + ')</h2>' +
-          '<table><thead><tr><th>Host</th><th>Hosts</th><th>Ports</th><th>Endpoints</th><th>Last seen</th></tr></thead>' +
-          '<tbody>' + (targetsRows || '<tr><td colspan="5" class="muted">—</td></tr>') + '</tbody></table>' +
-        '</div>' +
-      '</div>' +
-      '<div class="card" style="margin-top:12px"><h2>Recent runs</h2>' +
-        '<table><thead><tr><th>#</th><th>Command</th><th>Target</th><th>Status</th><th>Started</th><th>Actions</th></tr></thead>' +
-        '<tbody>' + (runsRows || '<tr><td colspan="6" class="muted">—</td></tr>') + '</tbody></table>' +
-        '<div class="hint" style="margin-top:6px">✓ = close a stale run (status stuck at running), ✕ = delete run + phases (targets/ports data is kept).</div>' +
-      '</div>');
-
-  const rb = byId('btn-resume');
-  if (rb && !rb.disabled) rb.addEventListener('click', () => startJob('resume', '/api/pipeline/resume', 'stavros.js resume'));
-  const logBtn = byId('btn-reopen-log');
-  if (logBtn) logBtn.addEventListener('click', () => toast('no persistent job log for past runs — new runs stream live here', ''));
-
-  // re-render with fresh data after a run mutation
+  // re-render with fresh data after a run mutation (guard-safe wrappers only)
   const refetchPipeline = () => api('/api/pipeline').then((d) => { renderPipeline(d); refreshBadges(); }).catch((e) => toast(String(e.message || e), 'err'));
   const runAction = (id, act) => {
     if (act === 'close') {
@@ -704,13 +672,74 @@ function renderPipeline(data) {
         .catch((e) => toast(String(e.message || e), 'err'));
     }
   };
-  const closeLast = byId('btn-close-last');
-  if (closeLast) closeLast.addEventListener('click', () => runAction(lastRun.id, 'close'));
-  const removeLast = byId('btn-remove-last');
-  if (removeLast) removeLast.addEventListener('click', () => runAction(lastRun.id, 'remove'));
-  $$('#tab-pipeline [data-run-act]').forEach((b) => {
-    b.addEventListener('click', () => runAction(parseInt(b.dataset.run, 10), b.dataset.runAct));
-  });
+  const actBtn = (label, title, fn) => { const b = el('button', { class: 'btn btn-sm', title }, label); b.addEventListener('click', (e) => { e.stopPropagation(); fn(); }); return b; };
+
+  // ── phase graph card ──
+  const dagKids = [];
+  phases.forEach((ph, i) => { if (i > 0) dagKids.push(el('span', { class: 'dag-edge', 'aria-hidden': 'true' })); dagKids.push(dagNode(ph)); });
+  const dagCard = el('div', { class: 'card' }, [
+    el('h2', null, [document.createTextNode('Phase graph'), lastRun ? el('span', { class: 'faint mono', style: { marginLeft: '8px', textTransform: 'none', letterSpacing: '0' } }, doneN + '/' + phases.length + ' done') : null]),
+    phases.length ? el('div', { class: 'dag', role: 'list', 'aria-label': 'pipeline phases' }, dagKids) : el('div', { class: 'muted' }, 'no phases recorded for the last run'),
+  ]);
+
+  // ── last run card ──
+  const resumeBtn = data.resumePossible
+    ? actBtn('▶ Resume incomplete run', 'resume the incomplete run', () => startJob('resume', '/api/pipeline/resume', 'stavros.js resume'))
+    : el('button', { class: 'btn', disabled: true, title: 'no genuinely incomplete phase to resume (a done scan-only run is not incomplete)' }, '▶ Resume (nothing to resume)');
+  if (data.resumePossible) resumeBtn.classList.add('btn-primary');
+  const lastCtl = (lastRun && lastRun.status !== 'done') ? [
+    actBtn('✓ mark done', 'mark run #' + lastRun.id + ' as done', () => runAction(lastRun.id, 'close')),
+    actBtn('✕ remove run', 'delete run #' + lastRun.id + ' + its phases', () => runAction(lastRun.id, 'remove')),
+  ] : [];
+  const unclosedHint = (data.unclosed && lastRun)
+    ? el('div', { class: 'hint', style: { color: 'var(--yellow)', margin: '4px 0 8px' } }, '⚠ run finished its phases but was never closed — mark it done or remove it')
+    : null;
+  const lastCard = el('div', { class: 'card' }, [
+    el('h2', null, 'Last run' + (lastRun ? ' #' + lastRun.id : '')),
+    lastRun ? el('div', null, [
+      el('div', { class: 'row', style: { alignItems: 'center', gap: '10px' } }, [chip('status: ' + lastRun.status), el('span', { class: 'mono muted' }, lastRun.target || '')]),
+      el('div', { class: 'kpi', style: { fontSize: '16px', marginTop: '10px' } }, doneN + '/' + phases.length + ' phases done'),
+      el('div', { class: 'hint', style: { marginBottom: '8px' } }, (lastRun.command || '') + ' · started ' + shortTs(lastRun.started_at)),
+      unclosedHint,
+      el('div', { class: 'row', style: { gap: '6px', marginTop: '6px' } }, [resumeBtn, ...lastCtl]),
+    ]) : el('div', { class: 'muted' }, 'no runs recorded yet'),
+  ]);
+
+  // ── targets card ──
+  const targetsCard = el('div', { class: 'card' }, [
+    el('h2', null, 'Targets (' + (data.targets || []).length + ')'),
+    dataTable({
+      empty: '—', rows: data.targets || [],
+      columns: [
+        { label: 'Host', tdClass: 'mono', cell: (t) => t.host },
+        { label: 'Hosts', num: true, cell: (t) => t.hosts },
+        { label: 'Ports', num: true, cell: (t) => t.ports },
+        { label: 'Endpoints', num: true, cell: (t) => t.endpoints },
+        { label: 'Last seen', tdClass: 'muted', cell: (t) => shortTs(t.last_seen) },
+      ],
+    }),
+  ]);
+
+  // ── recent runs card ──
+  const runsCard = el('div', { class: 'card', style: { marginTop: '12px' } }, [
+    el('h2', null, 'Recent runs'),
+    dataTable({
+      empty: '—', rows: data.runs || [],
+      columns: [
+        { label: '#', tdClass: 'mono muted', cell: (r) => '#' + r.id },
+        { label: 'Command', cell: (r) => r.command || '' },
+        { label: 'Target', tdClass: 'mono', cell: (r) => r.target || '' },
+        { label: 'Status', cell: (r) => el('span', null, [el('span', { class: 'dot ' + r.status }), document.createTextNode(' ' + r.status)]) },
+        { label: 'Started', tdClass: 'muted', cell: (r) => shortTs(r.started_at) },
+        { label: 'Actions', cell: (r) => el('span', { class: 'row', style: { gap: '6px' } },
+          [r.status !== 'done' ? actBtn('✓', 'mark run #' + r.id + ' as done', () => runAction(r.id, 'close')) : null,
+            actBtn('✕', 'delete run #' + r.id + ' + its phases', () => runAction(r.id, 'remove'))].filter(Boolean)) },
+      ],
+    }),
+    el('div', { class: 'hint', style: { marginTop: '6px' } }, '✓ = close a stale run (status stuck at running), ✕ = delete run + phases (targets/ports data is kept).'),
+  ]);
+
+  pane.replaceChildren(dagCard, el('div', { class: 'grid cols-2', style: { marginTop: '12px' } }, [lastCard, targetsCard]), runsCard);
 }
 
 // ── Scope ───────────────────────────────────────────────────────────────────
