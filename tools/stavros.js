@@ -26,6 +26,7 @@ const { loadScope, inScope, cidrInScope } = require('./scope-guard');
 const { collectHosts, isCidr, runBinary } = require('./run');
 const pace = require('./pace');
 const parsers = require('./parsers');
+const { resolveVendor } = require('./vendor-dir');
 
 const PHASES = ['recon', 'scan', 'enumerate'];
 
@@ -240,10 +241,13 @@ function fileExists(p) {
   try { return !!p && fs.existsSync(p); } catch { return false; }
 }
 
-// Env override wins; then vendor/tools/<rel>. Returns the absolute path or null.
+// Env override wins; then the external vendor root (tools/vendor-dir.js); then legacy
+// vendor/tools/<rel>. Returns the absolute path or null.
 function resolveOperatorTool(envVar, relPath, opts) {
   const envPath = process.env[envVar];
   if (fileExists(envPath)) return path.resolve(envPath);
+  const external = resolveVendor(path.join('tools', relPath), { noLegacy: true });
+  if (external) return external;
   const vendorPath = path.join(__dirname, '..', 'vendor', 'tools', relPath);
   if (!(opts && opts.noVendorDefaults) && fileExists(vendorPath)) return vendorPath;
   return null;

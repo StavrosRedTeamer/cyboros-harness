@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Installer best-effort dell'arsenale usato da Stavros, per Kali Linux / Debian-based.
-#   ./install-tools.sh            -> apt (tool Kali) + go install (ProjectDiscovery) + nuclei templates
+# Installer best-effort dell'arsenale usato da Stavros, per Parrot OS / Debian-based (echo/Debian 13).
+#   ./install-tools.sh            -> apt (tool Parrot) + go install (ProjectDiscovery) + nuclei templates
 #   ./install-tools.sh --sliver   -> in piu stampa il comando di install di Sliver (NON lo esegue)
 #
 # Copre web + rete/AD + creds + recon/OSINT + wireless (Fase 5, modalita separata). Ogni step
@@ -18,24 +18,46 @@ ok()   { printf '%sOK: %s%s\n' "$GREEN" "$*" "$NC"; }
 
 have() { command -v "$1" >/dev/null 2>&1; }
 
+# Root vendor ESTERNA per i binari grossi (obscura, frida-server) — fuori dal repo, cosi
+# copiare/spostare la workspace non trascina 290 MB. Ordine: $STAVROS_VENDOR_DIR → XDG →
+# ~/.local/share/stavros/vendor. Layout identico al workspace vendor/ (tools/<name>, mirror, ...).
+vendor_root() {
+  if [ -n "${STAVROS_VENDOR_DIR:-}" ]; then printf '%s' "$STAVROS_VENDOR_DIR"; return; fi
+  if [ -n "${XDG_DATA_HOME:-}" ]; then printf '%s' "$XDG_DATA_HOME/stavros/vendor"; return; fi
+  printf '%s' "$HOME/.local/share/stavros/vendor"
+}
+VENDOR_ROOT="$(vendor_root)"
+
+# -------------------- 0. ambiente (Parrot / Node) --------------------
+if [ -r /etc/os-release ]; then . /etc/os-release; info "Distro: ${PRETTY_NAME:-$ID} (atteso: Parrot OS / Debian-based)"; fi
+NODE_MAJOR="$(node -p 'process.versions.node.split(".")[0]' 2>/dev/null || echo 0)"
+if [ "$NODE_MAJOR" -lt 22 ]; then
+  warn "Node $(node --version 2>/dev/null || echo assente) < 22: il Command Center (tools/gui-server.js usa node:sqlite) NON parte."
+  warn "Parrot/Debian apt fornisce solo Node 20 -> installa Node 22 LTS via NodeSource:"
+  say  "  curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash - && sudo apt-get install -y nodejs"
+  say  "  # in alternativa nvm:  nvm install 22 && nvm use 22"
+else
+  ok "Node $(node --version) >= 22"
+fi
+
 # -------------------- 1. pacchetti apt (tool nativi Kali) --------------------
-info "Fase 1/5: pacchetti apt (tool Kali)"
+info "Fase 1/5: pacchetti apt (tool Parrot)"
 APT_PKGS=(
   # core rete / recon
-  nmap masscan rustscan netcat-openbsd dnsutils whois curl proxychains4
+  nmap masscan naabu netcat-openbsd bind9-dnsutils whois curl proxychains4
   # web app testing
-  sqlmap ghauri nuclei ffuf feroxbuster gobuster dirb dirsearch wfuzz wpscan nikto
-  whatweb wafw00f arjun linkfinder eyewitness
+  sqlmap nuclei ffuf feroxbuster gobuster dirb dirsearch wfuzz wpscan nikto
+  whatweb wafw00f arjun eyewitness
   # injection / fuzzing specializzati
-  dalfox xsstrike xsser commix tplmap lfimap nosqlmap
+  xsser commix
   # subdomain / OSINT / crawling
-  amass subfinder dnsx httpx katana theharvester dnsrecon fierce dnsenum spiderfoot recon-ng python3-shodan
+  amass subfinder dnsx httpx-toolkit theharvester dnsrecon fierce dnsenum recon-ng python3-shodan
   # network / AD (certipy-ad = ADCS ESC1..ESC16 enumeration, driven by tools/ad.js)
   metasploit-framework netexec impacket-scripts responder evil-winrm enum4linux-ng ldap-utils bloodhound.py certipy-ad
   # wireless (Fase 4 — modalita separata; richiede NIC in monitor mode)
   aircrack-ng reaver hcxdumptool hcxtools wifite
   # password / creds
-  john hashcat hashcat-utils hydra medusa cewl crunch
+  john hashcat hydra medusa cewl crunch
   # wordlist / payload
   seclists wordlists
   # browser per dom-check.js (CDP) + toolchain
@@ -115,6 +137,16 @@ else
   warn "pip3/pipx assenti: salto h8mail (installa python3-pip o pipx)"
 fi
 
+# tool Python che su Kali erano in apt ma su Parrot NON sono pacchettizzati: pipx best-effort.
+for t in ghauri xsstrike lfimap; do
+  if have "$t"; then ok "$t gia presente"; continue; fi
+  if have pipx; then info "pipx install $t"; pipx install "$t" && ok "$t installato" || warn "pipx install $t fallito (serve internet)";
+  elif have pip3; then pip3 install --user "$t" && ok "$t installato" || warn "pip3 install $t fallito";
+  else warn "pipx/pip3 assenti: salto $t"; fi
+done
+have linkfinder || warn "linkfinder: non in apt/PyPI su Parrot -> git clone https://github.com/GerbenJavado/LinkFinder"
+warn "tplmap/nosqlmap non pacchettizzati su Parrot: git clone upstream se servono (coperti anche da sqlmap/commix/repeater.js)"
+
 # certipy (ADCS ESC1..ESC16) — apt package is certipy-ad; pipx fallback if the apt name differs.
 if have certipy; then
   ok "certipy gia presente (ADCS enumeration per tools/ad.js)"
@@ -137,11 +169,12 @@ fi
 # -------------------- 4b. Obscura headless browser (CDP backend per dom-check.js) ----
 # Engine Rust CDP-compatibile (Apache-2.0, https://github.com/h4ckf0r0day/obscura). Versione
 # PINNATA: il progetto e giovane e la CLI puo cambiare tra release. Il tarball estrae obscura +
-# obscura-worker in vendor/tools/obscura/ (risolto da tools/obscura.js; override con
-# STAVROS_OBSCURA_BIN). Se imposti OBSCURA_SHA256=<sha256> l'archivio viene verificato.
+# obscura-worker in $OBSCURA_DIR (root vendor esterna, vedi vendor_root(); risolto da
+# tools/obscura.js; override con STAVROS_OBSCURA_BIN). Se imposti OBSCURA_SHA256=<sha256>
+# l'archivio viene verificato.
 info "Fase 4b/5: Obscura (headless browser antidetect, backend CDP opzionale)"
 OBSCURA_VERSION="${OBSCURA_VERSION:-v0.2.0}"
-OBSCURA_DIR="vendor/tools/obscura"
+OBSCURA_DIR="$VENDOR_ROOT/tools/obscura"
 case "$(uname -m)" in
   x86_64)          OBSCURA_ASSET="obscura-x86_64-linux-stealth.tar.gz" ;;
   aarch64|arm64)   OBSCURA_ASSET="obscura-aarch64-linux-stealth.tar.gz" ;;
@@ -149,8 +182,12 @@ case "$(uname -m)" in
 esac
 if [ -z "$OBSCURA_ASSET" ]; then
   warn "architettura $(uname -m) non coperta: scarica manualmente da github.com/h4ckf0r0day/obscura/releases"
-elif [ -x "$OBSCURA_DIR/obscura" ]; then
-  ok "Obscura gia presente in $OBSCURA_DIR ($($OBSCURA_DIR/obscura --version 2>/dev/null | head -1))"
+elif [ -x "$OBSCURA_DIR/obscura" ] || [ -x "vendor/tools/obscura/obscura" ]; then
+  if [ -x "$OBSCURA_DIR/obscura" ]; then
+    ok "Obscura gia presente in $OBSCURA_DIR ($($OBSCURA_DIR/obscura --version 2>/dev/null | head -1))"
+  else
+    ok "Obscura gia presente in vendor/tools/obscura (legacy in-workspace — considera ./install-tools.sh per spostarlo fuori)"
+  fi
 else
   OBSCURA_URL="https://github.com/h4ckf0r0day/obscura/releases/download/${OBSCURA_VERSION}/${OBSCURA_ASSET}"
   OBSCURA_TMP="$(mktemp -d)"
@@ -181,7 +218,7 @@ fi
 # Target: ReDroid locale (adb su 127.0.0.1:5555) + APK lab/bounty in-scope.
 # Best-effort come il resto dello script; i tool mancanti restano segnalati nel riepilogo.
 info "Fase 4c/5: Mobile / Android (apktool, jadx, frida, objection, mitmproxy)"
-MOBILE_APT=(apktool mitmproxy aapt)
+MOBILE_APT=(apktool mitmproxy aapt jadx)
 MISSING_MOBILE=()
 for p in "${MOBILE_APT[@]}"; do
   dpkg -s "$p" >/dev/null 2>&1 || MISSING_MOBILE+=("$p")
@@ -195,7 +232,7 @@ if [ "${#MISSING_MOBILE[@]}" -gt 0 ]; then
 else
   ok "pacchetti apt mobile gia presenti"
 fi
-# jadx: release GitHub (nessun pacchetto Kali stabile). Versione pinnata, verificabile via JADX_SHA256.
+# jadx: su Parrot e in apt (installato in Fase 4c); fallback release GitHub su Debian puro. Versione pinnata, verificabile via JADX_SHA256.
 JADX_VERSION="${JADX_VERSION:-v1.5.1}"
 if have jadx; then
   ok "jadx gia presente ($(command -v jadx))"
@@ -242,8 +279,13 @@ elif have pipx; then pipx inject objection uiautomator2 adbutils 2>/dev/null && 
 elif have pip3; then pip3 install --user uiautomator2 adbutils && ok "uiautomator2/adbutils installati" || warn "pip install uiautomator2 fallito"; fi
 # frida-server per ReDroid: binario Android x86_64 da abbinare al client (versione pinnata).
 FRIDA_VERSION="${FRIDA_VERSION:-17.17.0}"
-if [ -x "vendor/tools/frida/frida-server" ]; then
-  ok "frida-server gia presente in vendor/tools/frida"
+FRIDA_DIR="$VENDOR_ROOT/tools/frida"
+if [ -x "$FRIDA_DIR/frida-server" ] || [ -x "vendor/tools/frida/frida-server" ]; then
+  if [ -x "$FRIDA_DIR/frida-server" ]; then
+    ok "frida-server gia presente in $FRIDA_DIR"
+  else
+    ok "frida-server gia presente in vendor/tools/frida (legacy in-workspace — considera ./install-tools.sh per spostarlo fuori)"
+  fi
 else
   FRIDA_URL="https://github.com/frida/frida/releases/download/${FRIDA_VERSION}/frida-server-${FRIDA_VERSION}-android-x86_64.xz"
   FRIDA_TMP="$(mktemp -d)"
@@ -255,10 +297,10 @@ else
     fi
     if [ -z "${FRIDA_FAILED:-}" ]; then
       echo "sha256 (frida-server.xz): $(sha256sum "$FRIDA_TMP/frida-server.xz" | cut -d' ' -f1)  # registra nel vendor-mirror"
-      mkdir -p vendor/tools/frida
-      xz -d -c "$FRIDA_TMP/frida-server.xz" > vendor/tools/frida/frida-server \
-        && chmod +x vendor/tools/frida/frida-server \
-        && ok "frida-server in vendor/tools/frida (push su ReDroid: adb push + chmod 755, poi adb shell su 0 ./frida-server &)" \
+      mkdir -p "$FRIDA_DIR"
+      xz -d -c "$FRIDA_TMP/frida-server.xz" > "$FRIDA_DIR/frida-server" \
+        && chmod +x "$FRIDA_DIR/frida-server" \
+        && ok "frida-server in $FRIDA_DIR (push su ReDroid: adb push + chmod 755, poi adb shell su 0 ./frida-server &)" \
         || warn "estrazione frida-server fallita"
     fi
   else
@@ -284,7 +326,7 @@ fi
 # -------------------- riepilogo ----------------------------------------------
 say ""
 info "Riepilogo tool disponibili:"
-for b in nmap masscan rustscan naabu sqlmap ghauri nuclei ffuf feroxbuster gobuster wfuzz dirsearch \
+for b in nmap masscan naabu sqlmap ghauri nuclei ffuf feroxbuster gobuster wfuzz dirsearch \
          dalfox xsstrike commix tplmap lfimap nosqlmap wpscan nikto whatweb wafw00f arjun httpx subfinder \
          amass theHarvester dnsrecon fierce katana gau waybackurls interactsh-client eyewitness h8mail msfconsole \
          netexec impacket-GetNPUsers impacket-secretsdump impacket-GetUserSPNs certipy responder evil-winrm enum4linux-ng ldapsearch bloodhound-python \
@@ -297,11 +339,11 @@ for b in nmap masscan rustscan naabu sqlmap ghauri nuclei ffuf feroxbuster gobus
     printf '  %-22s %sMISSING%s\n' "$b" "$RED" "$NC"
   fi
 done
-# Obscura vive in vendor/ (non nel PATH): stato dedicato.
-if [ -x "vendor/tools/obscura/obscura" ]; then
-  printf '  %-22s %s%s%s\n' "obscura" "$GREEN" "vendor/tools/obscura (node tools/obscura.js status)" "$NC"
+# Obscura vive nella root vendor esterna (non nel PATH): stato dedicato.
+if [ -x "$OBSCURA_DIR/obscura" ] || [ -x "vendor/tools/obscura/obscura" ]; then
+  printf '  %-22s %s%s%s\n' "obscura" "$GREEN" "$([ -x "$OBSCURA_DIR/obscura" ] && echo "$OBSCURA_DIR" || echo 'vendor/tools/obscura (legacy)') (node tools/obscura.js status)" "$NC"
 else
-  printf '  %-22s %sMISSING%s (opzionale: backend CDP per dom-check.js)\n' "obscura" "$YELLOW" "$NC"
+  printf '  %-22s %sMISSING%s (opzionale: backend CDP per dom-check.js — ./install-tools.sh lo installa in %s)\n' "obscura" "$YELLOW" "$NC" "$VENDOR_ROOT/tools/obscura"
 fi
 
 say ""

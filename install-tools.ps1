@@ -44,12 +44,21 @@ Write-Host "nmap: installalo a mano da https://nmap.org/download.html se ti serv
 
 # Obscura (headless browser CDP-compatibile, backend opzionale per dom-check.js).
 # Su Windows l'archivio va scaricato ed estratto a mano (nessun package manager).
-if (Test-Path "vendor\tools\obscura\obscura.exe") {
-  Write-Host "Obscura gia presente in vendor\tools\obscura." -ForegroundColor Green
+# I binari grossi vivono FUORI dal repo (root vendor esterna): %STAVROS_VENDOR_DIR% se
+# impostata, altrimenti ~/.local/share/stavros/vendor (tools/vendor-dir.js) — copiare la
+# workspace non trascina i binari.
+$VendorRoot = if ($env:STAVROS_VENDOR_DIR) { $env:STAVROS_VENDOR_DIR }
+             elseif ($env:XDG_DATA_HOME) { Join-Path $env:XDG_DATA_HOME "stavros\vendor" }
+             else { Join-Path $HOME ".local\share\stavros\vendor" }
+$ObscuraDir = Join-Path $VendorRoot "tools\obscura"
+if (Test-Path (Join-Path $ObscuraDir "obscura.exe")) {
+  Write-Host "Obscura gia presente in $ObscuraDir." -ForegroundColor Green
+} elseif (Test-Path "vendor\tools\obscura\obscura.exe") {
+  Write-Host "Obscura gia presente in vendor\tools\obscura (legacy in-workspace)." -ForegroundColor Green
 } else {
   Write-Host "Obscura (opzionale): scarica obscura-x86_64-windows-stealth.zip da" -ForegroundColor Yellow
   Write-Host "  https://github.com/h4ckf0r0day/obscura/releases (versione pinnata: v0.2.0)" -ForegroundColor Yellow
-  Write-Host "ed estrai obscura.exe + obscura-worker.exe in vendor\tools\obscura\. Poi:" -ForegroundColor Yellow
+  Write-Host "ed estrai obscura.exe + obscura-worker.exe in $ObscuraDir. Poi:" -ForegroundColor Yellow
   Write-Host "  node tools/obscura.js status ;  node tools/dom-check.js <url> --backend obscura" -ForegroundColor Yellow
 }
 

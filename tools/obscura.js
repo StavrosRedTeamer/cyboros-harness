@@ -21,8 +21,9 @@
 //     invisible to pace.js, so concurrency is clamped hard (default 2, max 8) — raise only via
 //     OBSCURA_MAX_CONCURRENCY and keep max_requests_per_second honest.
 //
-// Binary resolution: $STAVROS_OBSCURA_BIN > vendor/tools/obscura/obscura[.exe] > $PATH
-// (install: ./install-tools.sh downloads a version-pinned release into vendor/tools/obscura/).
+// Binary resolution: $STAVROS_OBSCURA_BIN > external vendor root (tools/vendor-dir.js:
+// $STAVROS_VENDOR_DIR → ~/.local/share/stavros/vendor → legacy workspace vendor/) > $PATH
+// (install: ./install-tools.sh downloads a version-pinned release into the external root).
 //
 // ponytail: obscura is a YOUNG project (v0.2.x) — flags may shift between releases; this wrapper
 // pins behavior against v0.2.0 CLI. The engine is NOT Chromium: DOM/CSS edge cases differ from a
@@ -41,8 +42,9 @@ function egressStatePath() {
 }
 const AUDIT_FILE = () => process.env.OBSCURA_AUDIT_JSONL
   || path.join(__dirname, '..', 'reports', 'tmp', 'run-audit.jsonl');
-const VENDOR_BIN = () => path.join(__dirname, '..', 'vendor', 'tools', 'obscura',
-  process.platform === 'win32' ? 'obscura.exe' : 'obscura');
+const { resolveVendor } = require('./vendor-dir');
+const VENDOR_BIN = () => resolveVendor(path.join('tools', 'obscura',
+  process.platform === 'win32' ? 'obscura.exe' : 'obscura'));
 
 // Concurrency clamp for `scrape`: pace.js cannot see obscura's internal workers.
 function maxConcurrency() {

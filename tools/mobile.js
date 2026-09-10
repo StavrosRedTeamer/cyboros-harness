@@ -124,8 +124,9 @@ function fridaCommands(pkg, opts) {
   opts = opts || {};
   const serial = opts.serial || DEFAULT_SERIAL;
   const a = ['-U', '-n', pkg];
+  // Default unpin script is in-repo; override with -l/--script or STAVROS_FRIDA_SCRIPT.
   if (opts.script) a.push('-l', opts.script);
-  else a.push('-l', 'vendor/tools/frida/unpin.js');
+  else a.push('-l', process.env.STAVROS_FRIDA_SCRIPT || path.join(__dirname, 'frida', 'unpin.js'));
   if (opts.extra) a.push(...opts.extra);
   return [{ bin: 'frida', args: a.concat(['--device', serial]) }];
 }
