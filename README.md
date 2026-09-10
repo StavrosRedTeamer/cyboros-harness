@@ -25,24 +25,43 @@ reporter (stage-gate + coverage matrix) e scrive i risultati in `reports/`.
 Launcher grafico: `stavros-freebuff.desktop` (Exec già puntato a questa cartella).
 Console web opzionale: `node tools/gui-server.js` → http://127.0.0.1:8787 (o `npm run console`).
 
+## Parrot OS (questo dispositivo)
+
+Adattato a **Parrot Security (echo / Debian 13)** con KDE Plasma:
+
+- **Node ≥ 22 obbligatorio** per il Command Center (`tools/gui-server.js` usa `node:sqlite`).
+  L'apt di Parrot fornisce solo Node 20 → installa la 22 LTS:
+  `curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash - && sudo apt-get install -y nodejs`
+  (in alternativa `nvm install 22`). La TUI `freebuff` gira anche su Node 20.
+- **Chromium** non è preinstallato (solo Firefox): serve per `dom-check.js` (CDP) e per l'MCP
+  `chrome-devtools`. `./install-tools.sh` lo installa (`apt install chromium`).
+- **Terminale**: `open-freebuff-terminal.sh` usa **konsole** (default KDE su Parrot); fallback
+  qterminal / mate-terminal / x-terminal-emulator / xterm.
+- **Pacchetti**: alcuni nomi differiscono da Kali — `bind9-dnsutils` (era `dnsutils`),
+  `httpx-toolkit` (era `httpx`), `naabu` al posto di `rustscan`. Tool solo-Kali
+  (`ghauri`, `xsstrike`, `lfimap`) sono installati via `pipx`; `linkfinder`/`tplmap`/`nosqlmap`
+  via git upstream (l'installer lo segnala). Verifica finale: `node tools/doctor.js`.
+
+
 ## Struttura
 
 ```
 stavrosredteamer/
 ├── .agents/*.ts        # 28 agenti Freebuff (orchestratore + specialisti) — il cuore
 ├── ops/harness.md      # regole condivise (disciplina, tool-wiring, MCP) — grep su richiesta
-├── skills/pentest-playbook/  # playbook operativo
+├── skills/pentest-playbook/  # playbook operativo: SKILL.md = scheletro; references/ = dettaglio (tool-manual, hunting-surface, client-side, verification-reporting)
 ├── refs/               # knowledge base per classe di vulnerabilità
-├── knowledge.md        # metodologia + regole di engagement
+├── knowledge.md        # metodologia + regole di engagement (contratto compatto; il dettaglio è in docs/)
+├── docs/               # dettaglio metodologico per-tool (toolbox, host-exploitation, egress-opsec, wireless, methodology-classes) — indicizzato da kb-search.js
 ├── tools/              # motore zero-dipendenze (scope-guard, repeater, pipeline, C2, wifi, GUI, test)
-├── vendor/             # tool vendored: obscura, frida-server, mirror hash-pinnati, poc-archive
+├── vendor/             # tool vendored: script vetted piccoli (noauth_finder, aptpp); i binari grossi (obscura, frida-server) li installa install-tools.sh fuori dal repo
 ├── memory/             # memoria RAG locale delle soluzioni
 ├── reports/            # output run: findings.jsonl, state.db, report HTML (storico incluso)
 ├── scope.json          # COMPILA QUESTO: fail-closed finché non autorizzi i target
 ├── auth.json           # (opzionale) identità per il pass autenticato
 ├── wifi-scope.json     # (opzionale) modalità wireless separata
 ├── c2.json             # (opzionale) profili listener host exploitation
-└── install-tools.sh    # installer binari (Kali/Debian; equivalente .ps1 per Windows)
+└── install-tools.sh    # installer binari (Parrot OS/Debian; equivalente .ps1 per Windows)
 ```
 
 ## Scope (obbligatorio, prima cosa)
@@ -70,8 +89,9 @@ include i test live.
 ## Workflow di modifica
 
 Questa è la **fonte**: per modificare un agente edita direttamente `.agents/<id>.ts`
-(poi riavvia Freebuff per ricaricarlo). Per la metodologia: `knowledge.md`, `ops/harness.md`,
-`refs/`, `skills/`. Non c'è alcun passaggio di generazione/sync in questa cartella.
+(poi riavvia Freebuff per ricaricarlo). Per la metodologia: `knowledge.md` (contratto) +
+`docs/` (dettaglio), `ops/harness.md`, `refs/`, `skills/pentest-playbook/` (SKILL.md scheletro +
+`references/` per il dettaglio). Non c'è alcun passaggio di generazione/sync in questa cartella.
 
 ## MCP nativo (Freebuff >= 0.0.156)
 

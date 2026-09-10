@@ -23,7 +23,7 @@ Pentest discipline (full rules: `knowledge.md` — "Verification levels", "False
 
 ## Tool-wiring (questa harness)
 
-- Playbook: read `skills/pentest-playbook/SKILL.md` once at start (operation workflow + rate discipline); `grep refs/INDEX.md` for your class → pick the doc → grep INSIDE that doc → read ONLY the matching region (offset/limit). Never stream a whole ref (30-65KB). `tools/payloads/<class>.md` holds ready detection payloads when present.
+- Playbook: read the `skills/pentest-playbook/SKILL.md` skeleton once at start (operation workflow + gate rules + orchestration); the DEEP content (tool flags, hunting surface, client-side line, verification/reporting) lives in `skills/pentest-playbook/references/<file>.md` — grep the matching file for the detail, never stream the whole SKILL.md. `grep refs/INDEX.md` for your class → pick the doc → grep INSIDE that doc → read ONLY the matching region (offset/limit). Never stream a whole ref (30-65KB). `tools/payloads/<class>.md` holds ready detection payloads when present.
 - Before choosing a binary: `node tools/tool-plane.js` (writes `reports/tmp/tool-plane.json`) — never invent output of a missing tool; install valve as above.
 - Third-party binaries ONLY via `node tools/run.js <bin> ...` (scope-check + audit `reports/tmp/run-audit.jsonl` + global pacing); recon/scan/enumerate prefer `node tools/stavros.js recon|scan|enumerate <host>`.
 - Gate progress: `node tools/gate.js status <host>` shows phase gates (recon→map→test→authed→chains→report); pass your phase's gate when its criteria are met (`node tools/gate.js pass <gate> <host>`).
