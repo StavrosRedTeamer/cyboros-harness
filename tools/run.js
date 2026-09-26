@@ -349,6 +349,7 @@ async function main() {
   let tokensOut = null;
   let tokensCost = null;
   let taskId = null;
+  let approvalId = null; // WP4: consent token (additive; enforced only when policy is on)
   const binArgs = [];
   for (let i = 0; i < argv.length; i++) {
     if (argv[i] === '--dry-run') { dryRun = true; continue; }
@@ -361,6 +362,7 @@ async function main() {
     if (argv[i] === '--tokens') { const p = String(argv[++i] || '').split(','); tokensIn = parseInt(p[0], 10); tokensOut = parseInt(p[1], 10); continue; }
     if (argv[i] === '--tokens-cost') { tokensCost = parseFloat(argv[++i]); continue; }
     if (argv[i] === '--task-id') { taskId = argv[++i]; continue; } // E9: process-registry hook
+    if (argv[i] === '--approval') { approvalId = argv[++i]; continue; } // WP4: consent token
     binArgs.push(argv[i]);
   }
   // F8: env override (RUN_TOKENS_IN/OUT/COST) — valido SOLO se il flag CLI non l'ha già dato;
@@ -440,6 +442,21 @@ async function main() {
   // before exec. Fail-closed: an uncertain verdict = refusal with a remediation. The verdict is
   // shown in --dry-run too so the agent can see the safety gate without executing.
   const fullCmd = [bin, ...args].join(' ');
+  // WP4 (additive, fail-closed, DEFAULT OFF): scope.host_ops.require_approval gates the
+  // run behind a valid consent token. With the policy absent this is a no-op and the
+  // command behaves exactly as before.
+  const apReq = require('./cc-approvals').requireToken(scope, { id: approvalId, host: hosts[0], command: fullCmd });
+  if (apReq.required && !apReq.ok) {
+    entry.blocked = true;
+    entry.gate = 'approval';
+    entry.reason = apReq.reason;
+    Object.assign(entry, taxonomyEntry('enforce_blocked'));
+    audit(entry);
+    console.error(JSON.stringify({ blocked: true, gate: 'approval', reason: apReq.reason }));
+    errReportLine({ bin, error_class: entry.error_class, recovery: entry.recovery, detail: apReq.reason });
+    process.exit(1);
+  }
+  if (apReq.required && apReq.ok) entry.approval = approvalId;
   const enforceReason = scanAll(fullCmd);
   if (enforceReason) {
     entry.blocked = true;

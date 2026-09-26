@@ -54,8 +54,21 @@ function classify(command, scope) {
 
 function enforce(command, opts, scope) {
   const { tier, actionClass } = classify(command, scope);
+  const o = opts || {};
+  // WP4 (additive, default-off): a valid approval token satisfies confirm-tier.
+  if (o.approval) {
+    const cc = require('./cc-approvals');
+    const v = cc.requireToken(scope, { id: o.approval, host: o.host, actionClass, command });
+    if (v.ok) return { ok: true, actionClass, tier, approved: true, approval: o.approval };
+    if (v.required) return { ok: false, reason: v.reason, actionClass, tier, approvalRequired: true };
+  }
   if (tier === 'auto') return { ok: true, actionClass, tier };
-  if (opts && opts.confirm && String(opts.confirm).trim())
+  // WP4: with the policy on, confirm-tier needs a token, not just a --confirm string.
+  const p = require('./cc-approvals').policy(scope);
+  if (p.enabled) {
+    return { ok: false, reason: `action '${actionClass}' is confirm-tier and scope.host_ops.require_approval is on: request a token with tools/request-approval.js, then pass --approval <id>`, actionClass, tier, approvalRequired: true };
+  }
+  if (o.confirm && String(o.confirm).trim())
     return { ok: true, actionClass, tier, confirmed: true };
   return { ok: false, reason: `action '${actionClass}' is confirm-tier: pass --confirm "<reason>" (requires explicit in-session user approval)`, actionClass, tier };
 }
