@@ -1,0 +1,20 @@
+[Desktop Entry]
+Type=Application
+Name=Stavros Command Center
+GenericName=Red team console
+Comment=Desktop console for StavrosRedTeamer
+Exec=stavros-cc %U
+Icon=stavros-cc
+Terminal=false
+Categories=Development;Security;
+StartupNotify=true
+StartupWMClass=stavros-cc
+Actions=ReadOnly;Web;
+
+[Desktop Action ReadOnly]
+Name=Open read-only
+Exec=stavros-cc --read-only
+
+[Desktop Action Web]
+Name=Open in browser
+Exec=stavros-cc --web

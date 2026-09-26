@@ -1,0 +1,18 @@
+[Unit]
+Description=Stavros Command Center backend (headless supervisor)
+Documentation=file://%h/Desktop/stavrosredteamer/docs/command-center-desktop.md
+After=network-online.target
+
+[Service]
+Type=simple
+# Adjust WorkingDirectory/ExecStart to your checkout path.
+WorkingDirectory=%h/Desktop/stavrosredteamer
+ExecStart=/usr/bin/python3 %h/Desktop/stavrosredteamer/tools/app/scc.py --headless --keep-server
+Restart=on-failure
+RestartSec=3
+# Keep the token out of the journal: scc.py writes reports/app/scc.log (gitignored).
+StandardOutput=null
+StandardError=journal
+
+[Install]
+WantedBy=default.target
