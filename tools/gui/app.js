@@ -5,6 +5,41 @@ const $ = (s, r) => (r || document).querySelector(s);
 const $$ = (s, r) => Array.from((r || document).querySelectorAll(s));
 const byId = (id) => document.getElementById(id);
 
+// ── session token ───────────────────────────────────────────────────────────
+// Writes (POST/DELETE) and the interactive streams require it. It arrives once as
+// ?token=<hex> (printed by the server, injected by the desktop shell), is kept in
+// sessionStorage and stripped from the URL so it never lands in history/bookmarks.
+const CC_TOKEN = (() => {
+  try {
+    const u = new URL(location.href);
+    const t = u.searchParams.get('token');
+    if (t) {
+      sessionStorage.setItem('cc_token', t);
+      u.searchParams.delete('token');
+      const qs = u.searchParams.toString();
+      history.replaceState(null, '', u.pathname + (qs ? '?' + qs : '') + u.hash);
+      return t;
+    }
+    return sessionStorage.getItem('cc_token') || '';
+  } catch { return ''; }
+})();
+// append the token to a URL that cannot carry headers (EventSource: SSE)
+const withToken = (p) => (CC_TOKEN ? p + (p.indexOf('?') >= 0 ? '&' : '?') + 'token=' + encodeURIComponent(CC_TOKEN) : p);
+
+// Shown once if a write comes back 403 tokenRequired: the page was opened without
+// a token (e.g. a bare http://127.0.0.1:8787 bookmark), so it is read-only.
+function readOnlyBanner() {
+  if (byId('cc-readonly')) return;
+  const bar = document.createElement('div');
+  bar.id = 'cc-readonly';
+  bar.className = 'readonly-banner';
+  bar.setAttribute('role', 'status');
+  bar.textContent = 'READ-ONLY — this page has no session token: write actions (scope, pipeline, terminal) are disabled. Open the tokenized URL printed by the server, or relaunch with ./start-command-center.sh';
+  const rail = byId('status-rail');
+  if (rail && rail.parentNode) rail.parentNode.insertBefore(bar, rail.nextSibling);
+  else document.body.insertBefore(bar, document.body.firstChild);
+}
+
 const esc = (v) => String(v == null ? '' : v)
   .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
   .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
@@ -48,10 +83,15 @@ const proofLevel = (s) => {
 const epBreak = (s) => esc(s).replace(/(\/|\?|=|&amp;|_|-)/g, '$1<wbr>');
 
 async function api(path, opts) {
-  const res = await fetch(path, opts);
+  const o = Object.assign({}, opts);
+  if (CC_TOKEN) o.headers = Object.assign({}, (opts && opts.headers) || {}, { 'X-Stavros-Token': CC_TOKEN });
+  const res = await fetch(path, o);
   let body = null;
   try { body = await res.json(); } catch { /* empty */ }
-  if (!res.ok) throw new Error((body && body.error) || ('HTTP ' + res.status));
+  if (!res.ok) {
+    if (res.status === 403 && body && body.tokenRequired) readOnlyBanner();
+    throw new Error((body && body.error) || ('HTTP ' + res.status));
+  }
   return body;
 }
 
@@ -932,7 +972,7 @@ function openJobModal(jobId, title) {
   doneEl.style.display = 'none';
   doneEl.innerHTML = '';
   modal.classList.remove('hidden');
-  const es = new EventSource('/api/jobs/' + jobId + '/events');
+  const es = new EventSource(withToken('/api/jobs/' + jobId + '/events'));
   es.onmessage = (ev) => {
     let msg;
     try { msg = JSON.parse(ev.data); } catch { return; }
@@ -963,15 +1003,23 @@ function closeJobModal() {
 function cmdkActions() {
   return [
     { kind: 'tab', label: 'Overview', run: () => switchTab('overview') },
+    { kind: 'tab', label: 'Campaign', run: () => switchTab('campaign') },
+    { kind: 'tab', label: 'Mission control', run: () => switchTab('mission') },
+    { kind: 'tab', label: 'Approvals inbox', run: () => switchTab('approvals') },
+    { kind: 'tab', label: 'Ledger', run: () => switchTab('ledger') },
     { kind: 'tab', label: 'Findings', run: () => switchTab('findings') },
     { kind: 'tab', label: 'Pipeline', run: () => switchTab('pipeline') },
-    { kind: 'tab', label: 'Scope', run: () => switchTab('scope') },
     { kind: 'tab', label: 'Sessions', run: () => switchTab('sessions') },
+    { kind: 'tab', label: 'Graph', run: () => switchTab('graph') },
+    { kind: 'tab', label: 'Coverage', run: () => switchTab('coverage') },
+    { kind: 'tab', label: 'Scope', run: () => switchTab('scope') },
+    { kind: 'tab', label: 'Control (config/team/arsenal/knowledge/radar/doctor)', run: () => switchTab('control') },
     { kind: 'tab', label: 'Reports', run: () => switchTab('reports') },
     { kind: 'tab', label: 'Freebuff terminal', run: () => switchTab('freebuff') },
     { kind: 'action', label: 'Refresh current tab', run: () => renderTab(activeTab) },
     { kind: 'action', label: 'Resume incomplete pipeline run', run: cmdkResumePipeline },
     { kind: 'action', label: 'Generate report.html', run: () => startJob('report-html', '/api/reports/generate', 'tools/report-html.js') },
+    { kind: 'action', label: 'Build evidence bundle', run: () => api('/api/cc/ledger/evidence', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' }).then((r) => toast('bundle: ' + (r.tar || r.manifest), '')).catch((e) => toast(String(e.message || e), 'err')) },
   ];
 }
 let cmdkItems = [], cmdkIdx = 0;
@@ -1037,10 +1085,17 @@ function showSkeleton(tab) {
 
 function renderTab(tab) {
   if (tab === 'overview') refreshBadges();
+  else if (tab === 'campaign') { showSkeleton('campaign'); renderCampaign(); }
+  else if (tab === 'mission') { showSkeleton('mission'); renderMission(); }
+  else if (tab === 'approvals') { showSkeleton('approvals'); renderApprovals(); }
+  else if (tab === 'ledger') { showSkeleton('ledger'); renderLedger(); }
   else if (tab === 'findings') { showSkeleton('findings'); fetchFindings(); }
   else if (tab === 'pipeline') { showSkeleton('pipeline'); api('/api/pipeline').then(renderPipeline).catch((e) => toast(String(e.message || e), 'err')); }
-  else if (tab === 'scope') { showSkeleton('scope'); api('/api/scope').then(renderScope).catch((e) => toast(String(e.message || e), 'err')); }
   else if (tab === 'sessions') { showSkeleton('sessions'); api('/api/sessions').then(renderSessions).catch((e) => toast(String(e.message || e), 'err')); }
+  else if (tab === 'graph') { showSkeleton('graph'); renderGraphTab(); }
+  else if (tab === 'coverage') { showSkeleton('coverage'); renderCoverageTab(); }
+  else if (tab === 'scope') { showSkeleton('scope'); api('/api/scope').then(renderScope).catch((e) => toast(String(e.message || e), 'err')); }
+  else if (tab === 'control') { showSkeleton('control'); renderControlTab(); }
   else if (tab === 'reports') { showSkeleton('reports'); api('/api/reports').then(renderReports).catch((e) => toast(String(e.message || e), 'err')); }
   else if (tab === 'freebuff') renderFreebuffTab();
 }
@@ -1352,7 +1407,7 @@ function fbConnect(tab) {
   const st = termState(tab);
   if (st.evt || !st.term) return;
   fbFitSafe(tab);
-  const es = new EventSource('/api/term/stream?name=' + encodeURIComponent(tab));
+  const es = new EventSource(withToken('/api/term/stream?name=' + encodeURIComponent(tab)));
   st.evt = es;
   es.onopen = () => { st.backoff = 1000; };
   // the server replays the screen history on connect: wipe local state so the
