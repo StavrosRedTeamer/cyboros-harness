@@ -1,0 +1,16 @@
+{
+  "label": "Red team full",
+  "description": "Full-scope red team: web + internal + wireless + mobile surfaces, chain-of-attack objectives and full gate set.",
+  "surfaces": ["web", "internal", "wireless", "mobile"],
+  "gates": ["recon", "map", "test", "authed", "chains", "report"],
+  "workflow": "workflows/web.yaml",
+  "classes": ["network", "config", "info-disclosure", "injection", "sqli", "xss", "idor", "authn", "authz", "csrf", "container", "crypto"],
+  "objectives": [
+    "Obtain an initial foothold on an in-scope asset",
+    "Escalate privileges and document the path",
+    "Reach a crown-jewel objective and demonstrate provable impact",
+    "Deliver an evidence-backed report with reproducible findings"
+  ],
+  "team": { "preset": "red-team" },
+  "budget": { "max_requests": 60000, "max_wall_minutes": 1440 }
+}

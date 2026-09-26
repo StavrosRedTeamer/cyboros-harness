@@ -17,17 +17,28 @@
 //
 // Hardening: bound to loopback, Host must be 127.0.0.1/localhost/[::1],
 // Origin checked when present (DNS-rebinding + CSRF), JSON body size capped.
+// Session token: required on every write (POST/DELETE) and on the interactive
+// streams (terminal, job events) — it is printed inside the startup URL. Data
+// reads stay loopback-trusted exactly as before; `--token off` disables the gate.
+// Single instance: `--instance` uses reports/app/server.lock (cc-instance.js); if a
+// live instance already answers the handshake this process prints SCC_ATTACH=<url>
+// and exits 3 instead of becoming a second backend over the same PTYs.
+// `--print-port` prints SCC_PORT=/SCC_URL= once listening (port 0 = ephemeral).
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
 const net = require('net');
 const { spawn, execFile } = require('child_process');
+const crypto = require('crypto');
+const ccInstance = require('./cc-instance');
+const ccRouter = require('./cc-router'); // WP3..WP7 additive /api/cc/* router
 
 const TOOLS_DIR = __dirname;
 const ROOT = path.join(TOOLS_DIR, '..');
 const GUI_DIR = path.join(TOOLS_DIR, 'gui');
 const REPORTS = path.join(ROOT, 'reports');
-const SCOPE_FILE = path.join(ROOT, 'scope.json');
+// SCOPE_JSON is the same override scope-guard.js honors (tests, multi-project setups).
+const SCOPE_FILE = process.env.SCOPE_JSON || path.join(ROOT, 'scope.json');
 const OPSTATE_FILE = path.join(ROOT, 'operation-state.json');
 const SESSIONS_FILE = path.join(REPORTS, 'sessions.json');
 const LOOT_FILE = path.join(REPORTS, 'loot.jsonl');
@@ -38,8 +49,26 @@ function argVal(flag, def) {
   const i = process.argv.indexOf(flag);
   return i >= 0 && process.argv[i + 1] ? process.argv[i + 1] : def;
 }
-const PORT = parseInt(process.env.GUI_PORT || argVal('--port', '8787'), 10) || 8787;
+// port 0 = ephemeral: the real port is known after listen (and written to the lock)
+const PORT = (() => {
+  const n = parseInt(process.env.GUI_PORT || argVal('--port', '8787'), 10);
+  return Number.isFinite(n) && n >= 0 ? n : 8787;
+})();
 const HOST = process.env.GUI_HOST || argVal('--host', '127.0.0.1');
+
+const INSTANCE = process.argv.includes('--instance') || process.env.SCC_INSTANCE === '1';
+const READ_ONLY = process.argv.includes('--read-only') || process.env.SCC_READ_ONLY === '1';
+const PRINT_HANDSHAKE = process.argv.includes('--print-port') || process.env.SCC_PRINT_PORT === '1';
+
+// Session token: `auto` (default) mints one per run, `off` is the deliberate
+// no-auth mode, anything else is used verbatim (scripts/tests).
+const TOKEN_OPT = (() => {
+  const v = process.env.SCC_TOKEN || argVal('--token', 'auto');
+  return String(v || 'auto').startsWith('--') ? 'auto' : String(v || 'auto');
+})();
+const TOKEN = TOKEN_OPT === 'off' ? null : (TOKEN_OPT === 'auto' ? crypto.randomBytes(24).toString('hex') : TOKEN_OPT);
+const STARTED_AT = new Date().toISOString();
+let boundPort = PORT;
 
 // ── tiny helpers ───────────────────────────────────────────────────────────
 const CT = {
@@ -98,6 +127,20 @@ function guardOk(req) {
     } catch { return false; }
   }
   return true;
+}
+
+// ── session token (writes + interactive streams) ────────────────────────────
+function tokenOk(req, query) {
+  if (!TOKEN) return true;
+  const given = String((req.headers && req.headers['x-stavros-token']) || (query && query.token) || '');
+  if (given.length !== TOKEN.length) return false;   // timingSafeEqual needs equal lengths
+  try { return crypto.timingSafeEqual(Buffer.from(given), Buffer.from(TOKEN)); } catch { return false; }
+}
+function denyToken(res) {
+  return sendJson(res, 403, {
+    error: 'session token required — open the tokenized URL printed at startup',
+    tokenRequired: true,
+  });
 }
 
 // ── background jobs (resume / report generation) ──────────────────────────
@@ -683,6 +726,16 @@ const server = http.createServer(async (req, res) => {
       res.writeHead(200, { 'Content-Type': CT[ext] || 'text/plain', 'Cache-Control': 'no-store' });
       return res.end(fs.readFileSync(path.join(GUI_DIR, path.basename(url))));
     }
+    // WP8: progressive view split — extra zero-build assets under tools/gui served by
+    // basename with an extension allowlist (no path traversal: the pattern forbids '/').
+    const assetMatch = url.match(/^\/([\w.-]+)$/);
+    if (assetMatch && ['.js', '.css', '.svg', '.json'].includes(path.extname(assetMatch[1]))) {
+      if (!guardOk(req)) return sendText(res, 403, 'forbidden');
+      const p = path.join(GUI_DIR, assetMatch[1]);
+      if (assetMatch[1].includes('..') || !fs.existsSync(p)) return sendText(res, 404, 'not found');
+      res.writeHead(200, { 'Content-Type': CT[path.extname(p)] || 'application/octet-stream', 'Cache-Control': 'no-store' });
+      return res.end(fs.readFileSync(p));
+    }
     // vendored static assets (xterm.js terminal): /vendor/<file>.{js,css}
     const vendMatch = url.match(/^\/vendor\/([\w.-]+)$/);
     if (vendMatch) {
@@ -711,9 +764,32 @@ const server = http.createServer(async (req, res) => {
     if (!url.startsWith('/api/')) return sendText(res, 404, 'not found');
     if (!guardOk(req)) return sendText(res, 403, 'forbidden');
 
+    // Mutations and interactive streams need the session token; data reads do not.
+    const isMutation = req.method === 'POST' || req.method === 'DELETE';
+    const isStream = url === '/api/term/stream' || /^\/api\/jobs\/job\d+\/events$/.test(url);
+    if ((isMutation || isStream) && !tokenOk(req, query)) return denyToken(res);
+
+    // Additive Command Center modules (WP3..WP7): same guards already applied above
+    // (loopback Host/Origin + token on writes). Never bypasses a guard — writes are
+    // wrappers over the existing tools.
+    if (url.startsWith('/api/cc/')) {
+      const handled = await ccRouter.handle(req, res, {
+        url, query, sendJson, sendText, bodyJson, runJob,
+        root: ROOT, reports: REPORTS, scopeFile: SCOPE_FILE, opstateFile: OPSTATE_FILE,
+        token: TOKEN, readOnly: READ_ONLY,
+      });
+      if (handled !== false) return;
+    }
+
     // ── GET api ─────────────────────────────────────────────────────────
     if (req.method === 'GET') {
-      if (url === '/api/health') return sendJson(res, 200, { ok: true, version: 1, port: PORT });
+      if (url === '/api/health') return sendJson(res, 200, { ok: true, version: 1, port: boundPort });
+      if (url === '/api/instance') {
+        return sendJson(res, 200, {
+          instance: true, version: 1, pid: process.pid, host: HOST, port: boundPort,
+          startedAt: STARTED_AT, tokenRequired: !!TOKEN,
+        });
+      }
       if (url === '/api/overview') return sendJson(res, 200, overviewPayload());
       if (url === '/api/findings') return sendJson(res, 200, findingsPayload(query));
       if (url === '/api/scope') return sendJson(res, 200, loadScope());
@@ -827,6 +903,61 @@ const server = http.createServer(async (req, res) => {
   }
 });
 
-server.listen(PORT, HOST, () => {
-  console.log('Stavros Console  →  http://' + HOST + ':' + PORT + '   (ctrl-c to stop)');
+// ── lifecycle: handshake output, lock ownership, graceful release ───────────
+function releaseLock() {
+  if (!INSTANCE) return;
+  try { ccInstance.clear({ pid: process.pid }); } catch { /* ignore */ }
+}
+function shutdown(code) {
+  releaseLock();
+  process.exit(code);
+}
+process.on('exit', releaseLock);
+process.on('SIGINT', () => shutdown(0));
+process.on('SIGTERM', () => shutdown(0));
+
+function onListening() {
+  const addr = server.address();
+  boundPort = addr && typeof addr === 'object' && addr.port ? addr.port : PORT;
+  const tokenized = 'http://' + HOST + ':' + boundPort + (TOKEN ? '/?token=' + TOKEN : '/');
+  if (INSTANCE) {
+    ccInstance.write({
+      pid: process.pid, host: HOST, port: boundPort, token: TOKEN,
+      url: tokenized, startedAt: STARTED_AT,
+    });
+  }
+  console.log('Stavros Console  →  ' + tokenized + '   (ctrl-c to stop)');
+  if (PRINT_HANDSHAKE) {
+    console.log('SCC_PORT=' + boundPort);
+    console.log('SCC_URL=' + tokenized);
+  }
+}
+
+server.on('error', (e) => {
+  if (e && e.code === 'EADDRINUSE') {
+    console.error('gui-server: porta ' + PORT + ' già in uso (avvia con --instance per l\'attach).');
+    process.exit(3);
+  }
+  console.error('gui-server: ' + String((e && e.message) || e));
+  process.exit(1);
+});
+
+async function start() {
+  if (INSTANCE) {
+    const cur = ccInstance.read();
+    if (cur && ccInstance.isAlive(cur)) {
+      const st = await ccInstance.probe(cur);
+      if (st.ok) {
+        console.log('SCC_ATTACH=' + (cur.url || ccInstance.url(cur)));
+        process.exit(3);
+      }
+    }
+    if (cur) ccInstance.clear({ force: true });   // stale or unresponsive: take over
+  }
+  server.listen(PORT, HOST, onListening);
+}
+
+start().catch((e) => {
+  console.error('gui-server: ' + String((e && e.message) || e));
+  process.exit(1);
 });

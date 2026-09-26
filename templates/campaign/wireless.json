@@ -1,0 +1,15 @@
+{
+  "label": "Wireless",
+  "description": "Wireless assessment against wifi-scope.json: AP/station inventory, handshake capture and cracking.",
+  "surfaces": ["wireless"],
+  "gates": ["recon", "map", "test", "report"],
+  "workflow": "workflows/wireless.yaml",
+  "classes": ["crypto", "config", "authn"],
+  "objectives": [
+    "Inventory in-scope APs and stations",
+    "Assess encryption posture and WPS exposure",
+    "Prove credential recovery where RoE permits"
+  ],
+  "team": { "preset": "red-wireless" },
+  "budget": { "max_requests": 5000, "max_wall_minutes": 240 }
+}

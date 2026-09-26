@@ -1,0 +1,15 @@
+{
+  "label": "Mobile application",
+  "description": "Mobile assessment against mobile-scope.json: static analysis, Frida instrumentation, backend probes.",
+  "surfaces": ["mobile"],
+  "gates": ["recon", "map", "test", "report"],
+  "workflow": "workflows/mobile.yaml",
+  "classes": ["info-disclosure", "authn", "authz", "config", "crypto"],
+  "objectives": [
+    "Static review of the in-scope package/APK",
+    "Instrument the app and test the client-side trust boundary",
+    "Probe the mobile backend within scope"
+  ],
+  "team": { "preset": "red-mobile" },
+  "budget": { "max_requests": 8000, "max_wall_minutes": 360 }
+}

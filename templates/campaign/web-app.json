@@ -1,0 +1,15 @@
+{
+  "label": "Web application",
+  "description": "External web/app engagement: HTTP surfaces, web vuln classes, report gate with evidence quality.",
+  "surfaces": ["web"],
+  "gates": ["recon", "map", "test", "authed", "chains", "report"],
+  "workflow": "workflows/web.yaml",
+  "classes": ["info-disclosure", "injection", "sqli", "xss", "idor", "authn", "authz", "csrf", "path-traversal", "file-upload"],
+  "objectives": [
+    "Map the authenticated and unauthenticated HTTP surface",
+    "Test every web class on the relevant endpoints or record a skip rationale",
+    "Prove at least one high-impact finding with a reproducer"
+  ],
+  "team": { "preset": "red-web" },
+  "budget": { "max_requests": 20000, "max_wall_minutes": 480 }
+}

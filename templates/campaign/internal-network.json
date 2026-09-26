@@ -1,0 +1,15 @@
+{
+  "label": "Internal network",
+  "description": "Internal/assumed-breach engagement: SMB/LDAP/AD surfaces, credential and lateral-movement classes.",
+  "surfaces": ["internal"],
+  "gates": ["recon", "map", "test", "authed", "chains", "report"],
+  "workflow": "workflows/internal.yaml",
+  "classes": ["network", "authn", "config", "info-disclosure", "container"],
+  "objectives": [
+    "Enumerate reachable hosts, ports and services",
+    "Obtain and validate at least one credential path",
+    "Demonstrate a lateral path from foothold to a defined objective"
+  ],
+  "team": { "preset": "red-internal" },
+  "budget": { "max_requests": 30000, "max_wall_minutes": 720 }
+}
