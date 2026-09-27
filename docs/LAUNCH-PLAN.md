@@ -14,7 +14,8 @@
 | Citation fixes | the 87% / 13% / HTB figures attributed, "up to 13%" corrected, a "Citing this project" block |
 | `mcp-guard-proxy.js` | committed and tested. It was untracked while the README documented it |
 | De-identification | tailnet IP, adb serial and login user gone; they are required arguments now |
-| `refs/` provenance | the licensing gap made visible instead of silent |
+| `refs/` provenance | the licensing gap made visible instead of silent, then the directory unpublished until it is recoverable |
+| `tools/ensure-test-scope.js` | a clean clone can now run its own suite: 91 pass, 0 fail, verified from scratch |
 
 ## Strategy correction
 
@@ -43,31 +44,51 @@ existing benchmarks reward. Say that before someone else does.
 
 ## Blockers before the repo goes public
 
-**1. `refs/` licensing — the only hard blocker.**
-The directory contains verbatim reproductions of third-party documents whose
-per-group sources were stripped, so the attribution it needs to be
-redistributable does not exist. One file carries an explicit Tencent copyright
-claim. Three ways out, in order of preference:
+**1. `refs/` licensing — resolved, reversibly.**
+The directory contained verbatim reproductions of third-party documents whose
+per-group sources were stripped, so the attribution it needs in order to be
+redistributable did not exist, and one file carried an explicit Tencent
+copyright claim. It is out of the index and gitignored; the files are on disk and
+`git add -f refs/` brings them back. Nothing in code reads it, so this costs
+public readers a knowledge base and costs the engine nothing.
+`docs/REFS-PROVENANCE.md` keeps the decision legible and names the eight
+documents `refs/README.md` describes as self-written, in case the answer turns
+out to be a clean subset rather than all or nothing.
 
-- recover the sources and record them per file with their licence; or
-- drop the verbatim groups from the public repo and keep them private — nothing
-  in `npm test`, `doctor --check` or any tool reads `refs/`, so this is clean; or
-- state in writing that you hold redistribution rights, naming the licences.
+**2. A fresh clone could not run its own test suite — resolved.**
+`scope.json` is gitignored, correctly, but that left a clean checkout with no
+authorization at all, and the scope-guard is fail-closed, so it blocked the
+loopback targets the offline tests legitimately need. `npm test` failed on
+`test-authn-depth`. `tools/ensure-test-scope.js` now copies a loopback-only
+`scope.example.json` into place when `scope.json` is absent — never touching,
+widening or repairing an existing one. Verified on a clean clone: 91 pass, 0
+fail. Loopback-only is still fail-closed for everything remote.
 
-**2. The `testkit` landmine.**
-`tools/test-attack-coverage.js`, `tools/test-loop-watch.js` and
-`tools/test-reflector.js` all `require('./testkit')`, and `tools/testkit.js` is
-untracked. HEAD is fine today. The moment those three are committed without it,
-`npm test` breaks for everyone who clones. **Commit them together or not at
-all.** This is one `git add`, not a bug.
+**3. The remaining red, which is not ours to commit.**
+`doctor --check` still exits 2 on a clean clone, on one check only:
+`.agents/*.ts (agenti definiti) 1 agenti`. The committed `countAgents()` counts
+only `.agents/*.ts` — one file — while demanding twenty. **The fix is already
+sitting uncommitted in this working tree**, where `countAgents()` iterates
+`AGENT_DIRS` across `local/fleet` and `.agents`. It lands with the rest of that
+coordinated change set. This is why CI on a clean checkout cannot be green until
+that set is committed as a unit.
 
-**3. Decide on `session-prompt-egress-f3.md`.**
-It is untracked and contains only loopback addresses, but it is a runbook for
-one specific phone setup. Add it to `.gitignore` or just never stage it.
+**4. That same change set has a hard coupling.**
+Three tracked tests — `test-attack-coverage.js`, `test-loop-watch.js`,
+`test-reflector.js` — `require('./testkit')`. `tools/testkit.js` was untracked,
+so the moment those three were committed the suite would break for everyone.
+`testkit.js` is now committed on its own, so the coupling is defused and the
+three can land whenever.
+
+Note the other direction of that coupling: `tools/test-repo-invariants.js` (also
+untracked) asserts that every "N tests" in the README equals the number the gate
+runs. It is currently satisfied by the pending README change from 89 to 92.
+Committing the test without that README change turns CI red. **These four files
+and the README move together.**
 
 ## Next, in order
 
-**4. Record the demo.**
+**5. Record the demo.**
 `./tools/demo.sh` is tested and isolated. Two commands:
 ```bash
 asciinema rec -c ./tools/demo.sh demo.cast && agg demo.cast demo.gif
@@ -75,38 +96,39 @@ asciinema rec -c ./tools/demo.sh demo.cast && agg demo.cast demo.gif
 The GIF goes in the README next to the Command Center screenshot, which is
 currently the only visual. `asciinema` and `agg` are not installed here.
 
-**5. Publish the challenge.**
+**6. Publish the challenge.**
 `docs/THREAT-MODEL.md` is written. It needs a bounty amount or a deadline to be
 a challenge rather than a document, and one real answer from you in public to the
 first person who tries. Nothing else in this list has that compounding effect:
 it converts skeptics into contributors, and the people who can break it are
 exactly the people whose opinion you want.
 
-**6. Publish the gap argument.**
+**7. Publish the gap argument.**
 `docs/TOOL-LANDSCAPE.md` is the post. Title is the thesis, not the product —
 something in the shape of *"Severity is still a human decision, and that is why
 your AI pentest numbers are soft."* No link to the repository in the body. The
 link is in the profile and in the footnotes, and the repository arrives as the
 answer to a question the reader already has.
 
-**7. Decide npm.**
-`package.json` is still `private: true`, `0.0.0`. `npx` is the difference
-between "clone, fill in scope.json, read two hundred lines" and "try it in ten
-seconds", and it is the single largest adoption lever available. It also
-commits you to a support surface, so it is a decision rather than a task.
+**8. Decide npm.**
+`package.json` now carries `repository`, `bugs`, `homepage`, a `files` whitelist
+and five verified `bin` entries, so publishing is one flag and one command. It
+is still `private: true` and `0.0.0` — publishing is a decision, not a task, and
+it commits you to a support surface.
 
-**8. The CI one-liner.**
+**9. The CI one-liner.**
 A precision check that runs on a `findings.json` inside someone else's pipeline.
 This is how developer tools actually get adopted, and it is much stronger than a
 link in a thread. `gen-bench.js eval` already does the scoring; what is missing
 is the packaging and a documented output format.
 
-**9. Link the new documents from the README.**
+**10. Link the new documents from the README.**
 `README.md` has uncommitted changes from another thread, so it was left alone
-deliberately. Add `METHODOLOGY`, `TOOL-LANDSCAPE` and `THREAT-MODEL` to the
-Documentation list when that file is next committed by whoever owns it.
+deliberately. Add `METHODOLOGY`, `TOOL-LANDSCAPE`, `THREAT-MODEL`,
+`REFS-PROVENANCE` and `LAUNCH-PLAN` to the Documentation list when that file is
+next committed by whoever owns it.
 
-**10. The three-month part, which is the part that works.**
+**11. The three-month part, which is the part that works.**
 Answer questions on r/netsec, r/security and HN without mentioning the tool.
 When someone eventually asks what you use, answer with a link. It is slow, it
 costs nothing, and it is the only strategy that does not self-destruct at the
@@ -121,4 +143,5 @@ first sign of rejection.
   and worth checking the shell history of whoever edited it.
 - **`git config user.name` / `user.email` are unset**, so every commit needs an
   override. One `git config user.email "..."` in this repo and it stops being a
-  per-command flag.
+  per-command flag. (Not done here on purpose: altering git config is not a thing
+  to do inside someone else's repository without them asking for it explicitly.)
