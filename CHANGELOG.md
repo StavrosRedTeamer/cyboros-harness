@@ -60,6 +60,27 @@ rather than by version number.
   them is exposed.
 
 ### Changed
+- Agent-fleet prompts de-duplicated against their single owner. The eight discipline rules and
+  the RAG recall paragraph were copied verbatim into 19–29 of the 29 `.ts` files in
+  `local/fleet/` + `.agents/`: 86 KB of the fleet's 185 KB, up to 29 byte-identical copies of the
+  same 800-byte line. The copies could not be replaced by a bare reference, because the prompt
+  assembly was measured first: `ops/harness.md` is a *pointer target*, not an injected knowledge
+  file — zero of its bytes reach the assembled prompt (only `<project>/AGENTS.md` and
+  `~/.AGENTS.md` are injected), so the owner never "arrives" on its own. Each prompt therefore
+  keeps a **compressed in-context index** (every rule with its threshold and its command) and the
+  owner keeps the extended text, now including a `## Memoria (RAG)` section it was missing. The
+  authorization block stays byte-identical in all 29 files: it has no external owner, and the
+  failure it prevents — refusing an in-scope task — fires *before* the first file read, so no
+  pointer can prevent it. Class-specific variants (`stavros-llm`, `stavros-exploit`) were left
+  intact rather than flattened. Fleet 184,810 → 154,296 bytes, duplicate blocks 86,086 → 51,986.
+- `tools/test-repo-invariants.js` gained a three-part ratchet on that de-duplication: no line
+  ≥100 characters may repeat in ≥3 fleet files outside the declared canonical allow-list (the
+  authorization block, the harness pointer, the compressed index, the RAG pointer, the MCP
+  config), the canonical blocks must still be present in every file that must carry them (so the
+  first check cannot be passed by deleting them), and every rule compressed out of the prompts
+  must still exist in `ops/harness.md` — "no instruction lost" as a machine check.
+- `README.md` engine-module count corrected 139 → 140: `tools/workspace-gc.js` had been added
+  without updating it, so `test-repo-invariants` was failing on a clean checkout of `master`.
 - `README.md` rewritten in English around the evidence-discipline and guardrail
   positioning, with the previously unstated differentators (zero dependencies,
   air-gapped operation, offline test suite) stated up front. Corrects stale

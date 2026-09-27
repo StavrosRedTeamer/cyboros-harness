@@ -10,6 +10,13 @@
 
 ## Disciplina pentest (full)
 
+> **Proprietario unico.** Gli agenti di `local/fleet/` e `.agents/` portano nel proprio
+> `systemPrompt` un **indice compresso** di queste regole (le regole, non la prosa: soglie e
+> comandi restano in-context) e questo file tiene il testo esteso. Non duplicare qui il testo
+> dei prompt né nei prompt il testo di questa sezione: `tools/test-repo-invariants.js` verifica
+> che le regole compresse esistano ancora qui (nessuna istruzione persa) e che nessun blocco
+> lungo ricompania in ≥3 file di flotta fuori dall'allowlist canonico.
+
 Pentest discipline (full rules: `knowledge.md` — "Verification levels", "False-positive duty", "WAF awareness", "Install valve", "Adversarial content discipline", "POC delivery"):
 
 - **Verification levels**: classify EVERY finding 疑似 suspected / 已触发未利用 triggered / 完整利用链 exploited / 影响证明 proven_impact BEFORE assigning severity; severity must never exceed the verification level (`record-finding.js` enforces it: proven_impact→Critical, exploited→High max, triggered→Medium max, suspected→Low max).
@@ -31,6 +38,22 @@ Pentest discipline (full rules: `knowledge.md` — "Verification levels", "False
 - Findings: `node tools/record-finding.js '{...}'` with verify_level + cvss/cwe/remediation; single-request PoCs get a `verify` block, then `node tools/verify-finding.js one '<json>'` re-fires it live (status becomes verified only then).
 - Evidence: write raw outputs to `reports/tmp/<host>/` and one line per artifact to `evidence-index.md` — never paste bulk output into your reply; keep conclusions ≤ ~2500 tokens.
 - Knowledge retrieval instead of re-reading refs: `node tools/kb-search.js "query"` returns heading-scoped snippets — prefer it when you already know the methodology and need a specific fact.
+
+## Memoria (RAG) — recall prima di testare
+
+Proprietario unico della regola di memoria a lungo termine: i prompt degli agenti ne portano solo
+l'invocazione (il comando è la parte operativa), la policy sta qui.
+
+- Appena conosci lo stack del target (da recon/map), interroga lo store vettoriale locale per
+  precedenti: `node tools/memory-recall.js "<stack> <vuln class> <obstacle>" --limit 3` (es.
+  `node tools/memory-recall.js "spring boot modsecurity union select blocked"`).
+- Prova prima ciò che ha già funzionato invece di reinventarlo: una risposta vuota significa
+  nessun precedente → si procede con la metodologia standard.
+- Se una tecnica richiamata (id `RAG-XXXX`) porta a un finding confermato, cita l'id nelle note del
+  finding; se si rivela SBAGLIATA per questo stack, dillo nella conclusione (l'orchestratore la
+  ritira) — mai riusarla in silenzio.
+- Dettaglio di implementazione e difese OPSEC: `memory/README.md`, `docs/` (`tools/memory-rag.js`,
+  `tools/memory-store.js`).
 
 ## Scope-guard (regola invariante, OGNI agente)
 

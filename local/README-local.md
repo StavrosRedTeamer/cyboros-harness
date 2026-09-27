@@ -444,3 +444,30 @@ li collassa già in 5 fasi (`local/agents-local/index.js`).
 
 MCP `chrome-devtools` omesso dal root di proposito: è una variabile in più su una validazione
 che non è ispezionabile. Per il DOM/CDP usa `tools/dom-check.js` e `tools/verify-finding.js`.
+
+### I prompt della flotta non vengono iniettati, e cosa ne segue (2026-09-28)
+
+Il `systemPrompt` di un file di `local/fleet/` o di `.agents/` è il prompt di **quel** sub-agente
+quando viene spawnato: non entra nel prompt del main agent. Verificato sul prompt assemblato
+(16.704 caratteri, `tools/check-identity.js`): zero byte di `ops/harness.md` e zero menzioni di
+`AUTHORIZED ENGAGEMENT` — i soli due knowledge file iniettati sono `<progetto>/AGENTS.md` e
+`~/.AGENTS.md`. Quindi deduplicare la flotta **non** libera margine nel prompt del main agent, e
+un "rimando" a `ops/harness.md` non è una copia che arriva: arriva solo se l'agente lo legge.
+
+La duplicazione era comunque reale (86 KB su 185 KB, fino a 29 copie della stessa riga). Il taglio
+l'ha fatta così, distinguendo i due casi:
+
+- **Regole di procedura** (8 bullet di disciplina, paragrafo RAG): il proprietario è
+  `ops/harness.md`, quindi il prompt tiene un **indice compresso** — ogni regola, la sua soglia e il
+  suo comando, in-context — e il proprietario tiene il testo esteso (nuova sezione `## Memoria (RAG)`).
+  Nessuna regola è perduta: `test-repo-invariants` verifica che tutte esistano ancora nel proprietario.
+- **Blocco identità/autorizzazione** (`AUTHORIZED ENGAGEMENT: …`, 800 B in 29 file): resta
+  **byte-identico nel prompt**. Non è pigrizia: quel blocco non ha proprietario esterno, e il
+  fallimento che previene (rifiutare un task in-scope) avviene **prima** della prima lettura, quindi
+  nessun puntatore può prevenirlo. Le varianti di classe (es. `stavros-llm`, `stavros-exploit`) sono
+  restate intere.
+
+Risultato: flotta 184.810 → 154.296 byte, duplicazione 86.086 → 51.986 byte (di cui 22.400 il blocco
+di autorizzazione che è deliberato). `tools/test-repo-invariants.js` ha tre ratchet nuovi: nessuna
+riga ≥100 caratteri ripetuta in ≥3 file fuori dall'allowlist canonico dichiarato, i blocchi canonici
+devono essere ancora presenti, e ogni regola compressa deve esistere in `ops/harness.md`.

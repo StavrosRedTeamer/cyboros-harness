@@ -146,7 +146,7 @@ only the processes the harness owns.
 
 | | |
 |---|---|
-| `tools/` | the engine: 139 modules, scope guards, repeater, oracle, pipeline, C2, wifi, GUI, tests |
+| `tools/` | the engine: 140 modules, scope guards, repeater, oracle, pipeline, C2, wifi, GUI, tests |
 | `local/fleet/` | 28 agent definitions (orchestrator + specialists) |
 | `local/` | standalone runner against a local model — no cloud, no Freebuff |
 | `workflows/` | 14 reusable `enum-*` / `attack-*` pipelines |

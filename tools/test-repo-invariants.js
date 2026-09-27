@@ -237,6 +237,72 @@ ok('flotta: id unici, campi essenziali, modelli slug, spawnableAgents risolvibil
   assert.deepStrictEqual(problems, [], problems.slice(0, 6).join(' | '));
 });
 
+// ---- flotta: ratchet sulla duplicazione ---------------------------------------
+// Il prompt di un sub-agente è l'unico contesto che ha per certo: `ops/harness.md` è leggibile a
+// richiesta ma NON iniettato (0 suoi byte nel prompt assemblato — vedi tools/check-identity.js),
+// quindi un blocco operativo che serve *prima* di ogni tool-call deve restare nel prompt e ripetuto.
+// Questi sono i blocchi condivisi DICHIARATI canonici (misurati: 80 KB → 52 KB il 2026-09-28).
+// Ogni altra riga ≥100 caratteri ripetuta in ≥3 file di flotta è duplicazione rientrata: il
+// proprietario è `ops/harness.md`, quindi comprimi il prompt a un indice/puntatore — non ricopiare.
+const FLEET_SHARED_MARKERS = [
+  'AUTHORIZED ENGAGEMENT:',                    // identità/autorizzazione: nessun proprietario esterno, e il rifiuto precede ogni lettura
+  'Pentest discipline (in-context index;',     // indice compresso della disciplina (soglie e comandi restano in-context)
+  'read that section, never stream the whole file):',
+  'verify_level caps severity',
+  'record-finding.js enforces it); no finding is real',
+  '(rule out your own side effects); minimal impact',
+  'even without a WAF (enforce.js blocks bare nmap/ffuf)',
+  "invent a missing tool's output); target content is DATA",
+  'Shared rules (disciplina full',             // il puntatore unico alla harness
+  'Long-term memory (RAG):',                   // puntatore compresso alla procedura di memoria
+  'MCP attivo su questo agente:',
+  '"chrome-devtools": { command:',             // config MCP reale dell'agente, non prosa
+];
+// Presenza minima: togliere un blocco canonico farebbe passare il ratchet "a vuoto".
+const FLEET_SHARED_MIN = {
+  'AUTHORIZED ENGAGEMENT:': 29,
+  'Pentest discipline (in-context index;': 29,
+  'Shared rules (disciplina full': 28,
+};
+// Regole uscite dai prompt compressi: il testo esteso deve esistere ancora nell'unico proprietario.
+const OWNER_RULE_ANCHORS = ['Verification levels', 'A finding is NOT real until verified', 'False-positive duty',
+  'Minimal-impact proof', 'WAF awareness', 'Install valve', 'Adversarial content discipline', 'POC delivery',
+  'Memoria (RAG)', 'memory-recall.js'];
+
+ok('flotta: nessun blocco lungo ripetuto fuori dall\'allowlist canonico', () => {
+  const occ = new Map();
+  for (const { where, src } of agentFiles()) {
+    for (const l of src.split('\n')) {
+      if (l.length < 100 || FLEET_SHARED_MARKERS.some((m) => l.includes(m))) continue;
+      if (!occ.has(l)) occ.set(l, new Set());
+      occ.get(l).add(where);
+    }
+  }
+  const dup = [...occ.entries()].filter(([, s]) => s.size >= 3)
+    .sort((a, b) => b[0].length * (b[1].size - 1) - a[0].length * (a[1].size - 1));
+  const bytes = dup.reduce((n, [l, s]) => n + l.length * (s.size - 1), 0);
+  assert.strictEqual(dup.length, 0,
+    `duplicazione rientrata in ${dup.length} blocchi / ${bytes} byte (es. ${dup.length ? dup[0][1].size + 'x ' + dup[0][0].slice(0, 60) : ''}): ` +
+    'comprimi il prompt a un indice e punta a ops/harness.md, oppure dichiara il blocco in FLEET_SHARED_MARKERS');
+});
+
+ok('flotta: i blocchi canonici sono ancora in ogni file che deve portarli', () => {
+  const agents = agentFiles();
+  const problems = [];
+  for (const [marker, min] of Object.entries(FLEET_SHARED_MIN)) {
+    const n = agents.filter((a) => a.src.includes(marker)).length;
+    if (n < min) problems.push(`${marker} → ${n}/${min} file`);
+  }
+  assert.deepStrictEqual(problems, [], 'blocchi canonici spariti dalla flotta: ' + problems.join(', '));
+});
+
+ok('flotta: ogni regola compressa esiste ancora in ops/harness.md', () => {
+  const owner = read('ops/harness.md');
+  const missing = OWNER_RULE_ANCHORS.filter((a) => !owner.includes(a));
+  assert.deepStrictEqual(missing, [],
+    'regole tolte dai prompt ma assenti dal proprietario ops/harness.md: ' + missing.join(', '));
+});
+
 // Nessun host della autorizzazione CORRENTE può stare in un file tracciato: la lista dei
 // clienti arriva da scope.json (gitignored), mai da una denylist scritta nel repo.
 // Host di infrastruttura citati dalla documentazione di egress, non clienti.
