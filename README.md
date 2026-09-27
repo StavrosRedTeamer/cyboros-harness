@@ -15,10 +15,14 @@ and where the agent cannot violate scope, because the enforcement is beneath it.
 
 Most AI pentest agents are built to *find* things. This one is built to *refuse to
 report things it cannot prove*. That is a different engineering problem, and it is the
-one that keeps the whole field honest: the published lab-to-real gap is brutal — GPT-4
-exploits 87% of one-day CVEs *when handed the advisory description*, but only 13% of
-real CVEs in CVE-Bench, and near 0% of hard HackTheBox boxes. The bottleneck is not
-generation. It is **proof**.
+one that keeps the whole field honest. The published lab-to-real gap is stark: handed
+the advisory text, GPT-4 exploited **87%** of one-day vulnerabilities while *every other
+model tested scored 0%* ([Fan et al. 2024](https://arxiv.org/abs/2404.08144)); pointed
+at real web targets with no description to lean on, the strongest agent framework
+resolved **up to 13%** ([Zhu et al., CVE-Bench, ICML 2025](https://arxiv.org/abs/2503.17332)).
+On hard HackTheBox boxes our own runs sit near zero — that last figure is *our* unreleased
+observation, not a published result, and we label it that way wherever we repeat it. The
+bottleneck is not generation. It is **proof**.
 
 So this harness moves the policy out of the prompt and into the runtime.
 
@@ -183,3 +187,18 @@ same gate CI uses.
 ## License
 
 Apache-2.0. See [LICENSE](LICENSE).
+
+## Citing this project
+
+If you use the harness, the guard architecture, or `gen-bench.js` in published work,
+cite the commit you used rather than `master`:
+
+```
+StavrosRedTeamer — severity-enforced findings and a contamination-proof
+precision benchmark for AI security agents.
+https://github.com/CSI-entitymorton/stavrosredteamer @ <commit-sha>
+```
+
+Scores produced by this harness are only meaningful alongside the seed, the agent
+under test, and the model version. `gen-bench.js eval` writes all three to
+`reports/bench-history.jsonl` — publish that line, not just the percentage.
