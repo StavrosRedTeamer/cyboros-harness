@@ -4,7 +4,7 @@
 // every vulnerability class actually triggers, and eval scoring both ways.
 'use strict';
 
-const { execFileSync, spawn } = require('child_process');
+const { execFileSync, spawn, spawnSync } = require('child_process');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
@@ -203,6 +203,39 @@ async function main() {
     Array.isArray(evNoisy.falsePositiveList) && evNoisy.falsePositiveList.length === 2);
   check('no findings reported → 100% precision (nothing to be false about)',
     ev3.precisionPct === 100 && ev3.reported === 0, 'reported=' + ev3.reported);
+
+  // ── gate: una soglia rende eval utilizzabile in una pipeline ──
+  // La tesi è che la precisione sia un numero verificabile che qualcuno può mettere nel
+  // proprio gate. Qui si pinna l'exit code, non solo che il numero venga stampato.
+  const runEval = (args) => spawnSync(process.execPath, [path.join(TOOLS, 'gen-bench.js'), 'eval', ...args], { encoding: 'utf8' });
+  const gateOk = runEval([outDir, '--findings', goodFindings, '--json', '--no-history', '--fail-under-precision', '90', '--fail-under-recall', '90']);
+  check('gate: clean findings above the thresholds → exit 0', gateOk.status === 0, 'status=' + gateOk.status);
+  const gateOkJson = JSON.parse(gateOk.stdout);
+  check('gate: JSON output carries a schema and a passed gate',
+    gateOkJson.schema === 'bench-eval/1' && gateOkJson.gate.gated === true && gateOkJson.gate.passed === true);
+  const gateBad = runEval([outDir, '--findings', noisyFindings, '--json', '--no-history', '--fail-under-precision', '99']);
+  check('gate: findings below the precision threshold → exit 1', gateBad.status === 1, 'status=' + gateBad.status);
+  check('gate: the failure names the metric and both numbers',
+    JSON.parse(gateBad.stdout).gate.failures.some(f => /precision .* < 99%/.test(f)),
+    JSON.stringify(JSON.parse(gateBad.stdout).gate.failures));
+  check('gate: without a threshold eval still exits 0 (a report, not a gate)',
+    runEval([outDir, '--findings', noisyFindings, '--json', '--no-history']).status === 0);
+  check('gate: a bad threshold value exits 2',
+    runEval([outDir, '--findings', goodFindings, '--fail-under-precision', 'high']).status === 2);
+
+  // ── findings as a JSON array: what most harnesses emit, not JSONL ──
+  const findingsArray = path.join(tmpBase, 'findings.json');
+  fs.writeFileSync(findingsArray, JSON.stringify(manifest.classes.map(c => ({
+    id: 'bench-' + c.id, title: c.title, host: '127.0.0.1', endpoint: c.route,
+    target: 'http://127.0.0.1:' + port, status: 'verified', verify_level: 'proven_impact',
+  })), null, 2));
+  const evArr = JSON.parse(execFileSync(process.execPath, [path.join(TOOLS, 'gen-bench.js'), 'eval', outDir, '--findings', findingsArray, '--json', '--no-history'], { encoding: 'utf8' }));
+  check('eval accepts findings as a JSON array', evArr.detected === manifest.classes.length, 'detected=' + evArr.detected);
+
+  // ── un file mancante è un errore, non uno zero silenzioso: un gate che legge il file
+  // sbagliato e passa (precision 100% su nulla) è peggio di nessun gate ──
+  check('eval with a missing --findings file exits 2',
+    runEval([outDir, '--findings', path.join(tmpBase, 'nope.jsonl'), '--json', '--no-history']).status === 2);
 
   // ── history tracking: una riga jsonl per eval (cwd isolato in tmpBase) ──
   const ev4 = JSON.parse(execFileSync(process.execPath, [path.join(TOOLS, 'gen-bench.js'), 'eval', outDir, '--findings', goodFindings, '--json'], { encoding: 'utf8', cwd: tmpBase }));

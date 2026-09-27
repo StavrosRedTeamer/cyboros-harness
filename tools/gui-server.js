@@ -120,6 +120,12 @@ function atomicWrite(file, data) {
   const tmp = file + '.' + process.pid + '.tmp';
   fs.writeFileSync(tmp, data);
   fs.renameSync(tmp, file);
+  const lf = file.split(path.sep).pop();
+  // L'autorizzazione e i segreti restano leggibili solo dall'operatore (0600), come i file di
+  // engagement creati a mano: un file riscritto dal servizio non deve diventare più permissivo.
+  if (['scope.json', 'wifi-scope.json', 'mobile-scope.json', 'auth.json', 'c2.json'].includes(lf)) {
+    try { fs.chmodSync(file, 0o600); } catch { /* piattaforme senza permessi POSIX */ }
+  }
 }
 
 // ── Host/Origin guard (rebinding + CSRF) ───────────────────────────────────
@@ -488,7 +494,21 @@ function saveScope(body) {
     const line = stamp.slice(0, 10) + ': Stavros Console update — ' + noteBits.join('; ');
     next.notes = (cur.notes ? cur.notes.trimEnd() + '\n' : '') + line;
   }
-  atomicWrite(SCOPE_FILE, JSON.stringify(next, null, 2) + '\n');
+  // L'autorizzazione scritta non si accorcia per sbaglio: togliere host è l'unica modifica che
+  // può rendere inutilizzabile un engagement partito bene, quindi pretende un consenso esplicito.
+  if (removed.length && body.confirm_removals !== true) {
+    return { ok: false, problems: [`rimuoverebbe ${removed.length} host dall'autorizzazione (${removed.join(', ')}): conferma con confirm_removals:true`] };
+  }
+  const serialized = JSON.stringify(next, null, 2) + '\n';
+  try { JSON.parse(serialized); } catch (e) {
+    return { ok: false, problems: ['il risultato non è JSON valido, scrittura annullata: ' + e.message] };
+  }
+  // Una copia di sicurezza prima di ogni scrittura (scope.*.bak.json è gitignored): se qualcosa
+  // dovesse produrre un file inutilizzabile, la versione precedente è ancora sul disco.
+  try {
+    if (fs.existsSync(SCOPE_FILE)) fs.copyFileSync(SCOPE_FILE, SCOPE_FILE + '.bak.json');
+  } catch { /* la copia è un'assicurazione, non un requisito: non blocca la scrittura */ }
+  atomicWrite(SCOPE_FILE, serialized);
   const after = loadScope();
   return { ok: true, failClosed: after.failClosed, added: added.length, removed: removed.length, mtime: after.mtime };
 }

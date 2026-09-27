@@ -1,6 +1,10 @@
 #!/usr/bin/env node
-// Pre-flight: verifica che ogni .agents/*.ts sia compatibile con il BINARIO
+// Pre-flight: verifica che ogni agente locale (*.ts) sia compatibile con il BINARIO
 // Freebuff attualmente installato (che si auto-aggiorna da npm ad ogni avvio).
+// Le cartelle scandite sono DUE: local/fleet/ (i 28 specialisti del runner locale) e
+// .agents/ (l'agente root). Scandire solo .agents/ dopo lo split della flotta faceva
+// passare il vet controllando un file solo, dichiarando "tutti compatibili": se il set
+// esaminato è vuoto o minuscolo, il vet ora fallisce invece di dire OK.
 // Estrae dal binario l'insieme dei toolNames e degli slug-modello CONOSCIUTI e
 // segnala ogni agente che referenzia un tool o un modello non piu' presente.
 // Exit 0 = tutti gli agenti compatibili; exit 1 = almeno un problema.
@@ -11,7 +15,8 @@ const fs = require('fs')
 const path = require('path')
 const { execSync } = require('child_process')
 
-const AGENTS_DIR = path.join(__dirname, '..', '.agents')
+const Ws = path.join(__dirname, '..')
+const AGENTS_DIRS = ['local/fleet', '.agents'].map((d) => path.join(Ws, d))
 const BIN = path.join(
   process.env.HOME || require('os').homedir(),
   '.config/manicode/freebuff',
@@ -58,13 +63,27 @@ const knownModelSlugs = new Set(
 const bundledIds = new Set((s.match(/\bid:"([a-z0-9][a-z0-9._-]*)"/g) || [])
   .map((m) => m.slice(4, -1)))
 
-const files = fs.readdirSync(AGENTS_DIR).filter((n) => n.endsWith('.ts'))
-const parsed = files.map((f) => {
-  const src = fs.readFileSync(path.join(AGENTS_DIR, f), 'utf8')
+const found = AGENTS_DIRS.flatMap((dir) => {
+  try {
+    return fs.readdirSync(dir).filter((n) => n.endsWith('.ts')).map((n) => ({ dir, f: n }))
+  } catch { return [] }
+})
+// Fail-closed: se non c'e' niente da esaminare il vet non puo' dichiarare che va tutto bene.
+if (found.length === 0) {
+  console.error(`[vet] nessun agente trovato in: ${AGENTS_DIRS.join(', ')}`)
+  process.exit(2)
+}
+const parsed = found.map(({ dir, f: name }) => {
+  const f = name
+  const src = fs.readFileSync(path.join(dir, f), 'utf8')
   const spawnBlock = src.match(/spawnableAgents:\s*\[([^\]]*)\]/)
   return {
     f,
     src,
+    // Solo i file in .agents/ vengono caricati come agenti dalla CLI Freebuff: per quelli lo
+    // schema della CLI è vincolante. La flotta in local/fleet/ è caricata dal runner locale,
+    // e i campi che solo la CLI legge (i tre prompt) lì sono un avviso, non un errore.
+    cliLoaded: dir === AGENTS_DIRS[1],
     id: (src.match(/\bid:\s*'([^']+)'/) || [])[1],
     toolNames: [...new Set(
       [...((src.match(/toolNames:\s*\[([^\]]*)\]/) || [, ''])[1]
@@ -78,7 +97,8 @@ const parsed = files.map((f) => {
 const localIds = new Set(parsed.map((p) => p.id).filter(Boolean))
 
 let problems = 0
-for (const { f, src, id, toolNames, spawnableAgents } of parsed) {
+const fleetNotes = []
+for (const { f, src, id, toolNames, spawnableAgents, cliLoaded } of parsed) {
   const modelMatch = src.match(/const model\s*=\s*'([^']+)'/) ||
                      src.match(/model:\s*'([^']+)'/)
   if (modelMatch && !knownModelSlugs.has(modelMatch[1])) {
@@ -94,8 +114,14 @@ for (const { f, src, id, toolNames, spawnableAgents } of parsed) {
   }
 
   // Schema agente: la CLI pretende i tre prompt come stringhe, non opzionali.
+  const missingPrompts = []
   for (const key of ['systemPrompt', 'instructionsPrompt', 'stepPrompt']) {
-    if (!new RegExp(`\\b${key}:\\s*(\`|'|\")`).test(src)) {
+    if (!new RegExp(`\\b${key}:\\s*(\`|'|\")`).test(src)) missingPrompts.push(key)
+  }
+  if (missingPrompts.length && !cliLoaded) {
+    fleetNotes.push(`${f}: ${missingPrompts.join(', ')}`)
+  } else {
+    for (const key of missingPrompts) {
       console.error(`[SCHEMA]  ${f}: manca '${key}' (richiesto dallo schema agente della CLI)`)
       problems++
     }
@@ -117,7 +143,7 @@ for (const { f, src, id, toolNames, spawnableAgents } of parsed) {
   // altrimenti "Invalid agent ID: <id>. Not found."
   for (const ref of spawnableAgents) {
     if (!localIds.has(ref)) {
-      console.error(`[SCHEMA]  ${f}: spawnableAgents referenzia '${ref}', che non e' definito in ${AGENTS_DIR}`)
+      console.error(`[SCHEMA]  ${f}: spawnableAgents referenzia '${ref}', che non e' definito in ${AGENTS_DIRS.join(' o ')}`)
       problems++
     }
   }
@@ -150,6 +176,13 @@ try {
 }
 
 if (problems === 0) {
+  const perDir = AGENTS_DIRS.map((d) => `${path.relative(Ws, d)}: ${found.filter((x) => x.dir === d).length}`).join(', ')
+  console.log(`[vet] agenti esaminati: ${found.length} (${perDir})`)
+  if (fleetNotes.length) {
+    console.log(`[vet] avviso: ${fleetNotes.length}/${found.length} agenti non hanno tutti i prompt della CLI`)
+    console.log(`        (es. ${fleetNotes[0]}) — irrilevante per il runner locale,`)
+    console.log(`        vincolante se li carichi con la CLI Freebuff: vedi local/README-local.md.`)
+  }
   console.log(`[vet] OK — tutti gli agenti sono compatibili con il binario Freebuff installato.`)
   console.log(`[vet] tool validi rilevati: ${[...validTools].sort().join(', ')}`)
   process.exit(0)

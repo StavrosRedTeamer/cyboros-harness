@@ -60,10 +60,27 @@ model is strictly less informed.
 ### The honest gap
 
 The guards cover in-process tool calls. **MCP tools do not go through them** — a
-mounted MCP server runs in its own process with its own tool surface. The harness
-instructs the agent to scope-check those manually, but that is procedural, not
-enforced. This is the one place the architecture leaks, and it is documented rather
-than papered over, in `README.md` and `SECURITY.md`.
+mounted MCP server runs in its own process with its own tool surface. This is the one
+place the architecture leaked, and it is documented rather than papered over, in
+`README.md` and `SECURITY.md`.
+
+There are now two supported answers, one per direction:
+
+- **Inbound (`tools/mcp-guard-proxy.js`).** The MCP client launches the proxy instead of
+the server; the proxy judges each `tools/call` with the *same functions* the in-process
+tools use — `scope-guard.inScope`, then `net.resolveAndGuard` (the DNS-rebinding layer),
+then `ssrf-guard.checkAddress` on the pinned address — and only forwards what passes.
+A blocked call never reaches the server, the agent receives an explicit error, and the
+verdict is appended to `reports/tmp/mcp-guard.jsonl`. Declared limits, because a proxy
+that overclaims is worse than no proxy: the judgement is over targets extracted from the
+arguments (a tool that touches the network without naming it is not judged), and an
+in-scope hostname that cannot be resolved is refused (fail-closed, same as `repeater.js`).
+- **Outbound (`tools/mcp-bridge.js`).** Exposes *our* guarded tools as an MCP server
+(rigid whitelist, `--dry-run` only, no external broker), so an MCP-capable client can
+consume the harness without getting an ungated executor.
+
+What remains procedural is the unsupported case: mounting a third-party server raw, with
+no proxy in front of it. That is still outside the guard, and still the operator's call.
 
 ## L1 — why severity is capped
 

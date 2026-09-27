@@ -6,13 +6,16 @@
 //         il secondo layer nega comunque; state OOB manomesso verso metadata -> rifiutato.
 //   A4-S: tools/listen-audit.js read-only (ss/netstat/proc) con fixture deterministica +
 //         rilevazione REALE di un listener locale + append evidence-index single-writer.
-// Offline tranne lo smoke sul lab autorizzato 192.168.0.94 (come da prassi ondate precedenti).
+// Offline e RICHIUDIBILE: nessun host reale, nessun IP di un laboratorio specifico. Lo smoke
+// "target legittimo in scope -> HTTP 200 reale" usa un server che il test alza da sé su
+// loopback (l'unico indirizzo privato su cui si può bindare portabilmente) con l'opt-in
+// documentato, e ogni check scrive il proprio scope + il proprio PACE_FILE.
 'use strict';
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const http = require('http');
-const { spawnSync } = require('child_process');
+const { spawn, spawnSync } = require('child_process');
 const assert = require('assert');
 
 let pass = 0; let fail = 0;
@@ -35,8 +38,24 @@ function writeScope(dir, obj) {
   return f;
 }
 
+// Async spawn for checks whose target server runs in THIS process: a spawnSync would freeze
+// the event loop while the child waits for its response, guaranteeing a timeout.
+function runCli(args, env) {
+  return new Promise((resolve) => {
+    const child = spawn(process.execPath, args, { env, stdio: ['ignore', 'pipe', 'pipe'] });
+    let out = ''; let err = '';
+    child.stdout.on('data', (d) => { out += d; });
+    child.stderr.on('data', (d) => { err += d; });
+    child.on('error', (e) => resolve({ status: -1, stdout: out, stderr: String(e) }));
+    child.on('close', (status) => resolve({ status, stdout: out, stderr: err }));
+  });
+}
+
 async function main() {
   const T = fs.mkdtempSync(path.join(os.tmpdir(), 'sc1-'));
+  // Hermetic: the global cross-process limiter (tools/.pace.json) is shared with every other
+  // tool and with concurrent runs; this test owns its own pace file.
+  process.env.PACE_FILE = path.join(T, 'pace.json');
 
   // ---------------------------------------------------------------- B9 unit matrix
   console.log('B9 — ssrf-guard unit matrix');
@@ -68,7 +87,7 @@ async function main() {
     assert.strictEqual(sg.checkAddress('10.1.2.3', {}).ok, false);
     assert.strictEqual(sg.checkAddress('172.16.5.5', {}).ok, false);
     assert.strictEqual(sg.checkAddress('192.168.1.10', {}).ok, false);
-    const v = sg.checkAddress('192.168.0.94', { scopeAuthorized: true });
+    const v = sg.checkAddress('192.168.77.94', { scopeAuthorized: true });
     assert.strictEqual(v.ok, true);
     assert.strictEqual(v.tier, 'pass-private-scoped');
   });
@@ -113,13 +132,23 @@ async function main() {
     const r = spawnSync(process.execPath, [path.join(WS, 'tools', 'repeater.js'), '--url', 'http://169.254.169.254/', '--timeout', '1200'], { encoding: 'utf8', env: { ...envBase, ALLOW_METADATA_TARGET: '1' }, timeout: 25000 });
     assert.ok(r.stderr.includes('ALLOW_METADATA_TARGET attivo'), r.stderr.slice(0, 300));
   });
-  ok('lab privato 192.168.0.94 IN scope -> pass-private-scoped + HTTP 200 reale (nessuna rottura)', async () => {
-    const labScope = writeScope(T, { targets: ['192.168.0.94'], exclusions: [], max_requests_per_second: 50 });
-    const r = spawnSync(process.execPath, [path.join(WS, 'tools', 'repeater.js'), '--url', 'http://192.168.0.94/', '--timeout', '6000'], { encoding: 'utf8', env: { ...process.env, SCOPE_JSON: labScope }, timeout: 40000 });
-    assert.strictEqual(r.status, 0, 'stderr: ' + r.stderr.slice(0, 400));
-    assert.ok(r.stderr.includes('pass-private-scoped'), r.stderr.slice(0, 200));
-    assert.ok(r.stdout.includes('"status": 200'), r.stdout.slice(0, 300));
-  }, );
+  await okAsync('target privato in scope e raggiungibile -> pass + HTTP 200 reale (nessuna rottura)', async () => {
+    // Sostituisce lo smoke contro l'host del laboratorio dell'operatore: un test non può
+    // dipendere da un indirizzo che esiste solo su una LAN. L'unico indirizzo privato su cui si
+    // può bindare ovunque è loopback, che B9 tiene nel tier HARD, quindi il caso "target
+    // legittimo continua a funzionare" si esercita con l'opt-in esplicito documentato.
+    const srv = http.createServer((req, res) => { res.writeHead(200, { 'Content-Type': 'text/plain' }); res.end('ok\n'); });
+    await new Promise((res) => srv.listen(0, '127.0.0.1', res));
+    const port = srv.address().port;
+    try {
+      const legitScope = writeScope(T, { allowed_hosts: ['127.0.0.1'], allowed_ips: ['127.0.0.0/8'], max_requests_per_second: 50 });
+      const r = await runCli([path.join(WS, 'tools', 'repeater.js'), '--url', `http://127.0.0.1:${port}/`, '--timeout', '6000'],
+        { ...process.env, SCOPE_JSON: legitScope, ALLOW_METADATA_TARGET: '1' });
+      assert.strictEqual(r.status, 0, 'stderr: ' + r.stderr.slice(0, 400));
+      assert.ok(r.stderr.includes('pass-optin'), r.stderr.slice(0, 200));
+      assert.ok(r.stdout.includes('"status": 200'), r.stdout.slice(0, 300));
+    } finally { await new Promise((res) => srv.close(res)); }
+  });
 
   // ---------------------------------------------------------------- B9 oob.js guard
   console.log('B9 — oob.js public-url/marker guard');
@@ -139,33 +168,33 @@ async function main() {
     assert.ok(r.stderr.includes('link-local'), r.stderr.slice(0, 300));
     assert.strictEqual(fs.readdirSync(oobDir).filter((f) => f !== 'state.json').length, 0, 'nessun marker registrato');
   });
-  ok('public-url normale (host di lab) -> marker emesso normalmente', () => {
+  ok('public-url normale (host pubblico) -> marker emesso normalmente', () => {
     const oobDir = path.join(T, 'oob-c'); fs.mkdirSync(oobDir, { recursive: true });
     const stateFile = path.join(oobDir, 'state.json');
-    fs.writeFileSync(stateFile, JSON.stringify({ pid: 1, port: 9099, public_url: 'http://192.168.0.94:9099/', started: 'now' }));
+    fs.writeFileSync(stateFile, JSON.stringify({ pid: 1, port: 9099, public_url: 'http://203.0.113.10:9099/', started: 'now' }));
     const r = spawnSync(process.execPath, [path.join(WS, 'tools', 'oob.js'), 'marker'], { encoding: 'utf8', env: { ...process.env, OOB_DIR: oobDir, OOB_STATE_FILE: stateFile }, timeout: 15000 });
     assert.strictEqual(r.status, 0, r.stderr);
-    assert.ok(/http:\/\/192\.168\.0\.94:9099\/[0-9a-f]{16}/.test(r.stdout.trim()), r.stdout);
+    assert.ok(/http:\/\/203\.0\.113\.10:9099\/[0-9a-f]{16}/.test(r.stdout.trim()), r.stdout);
   });
 
   // ---------------------------------------------------------------- A4-S listen-audit
   console.log('A4-S — listen-audit read-only');
-  const auditScope = writeScope(T, { targets: ['192.168.0.94'], exclusions: [] });
+  const auditScope = writeScope(T, { targets: ['192.168.77.94'], exclusions: [] });
   const ssFixture = [
     'tcp LISTEN 0 128 0.0.0.0:22 0.0.0.0:*',
     'tcp LISTEN 0 511 127.0.0.1:9099 0.0.0.0:*',
-    'tcp LISTEN 0 40 192.168.0.94:80 0.0.0.0:*',
+    'tcp LISTEN 0 40 192.168.77.94:80 0.0.0.0:*',
     'tcp LISTEN 0 128 10.9.9.9:5985 0.0.0.0:*',
     'udp UNCONN 0 0 0.0.0.0:68 0.0.0.0:*',
     '',
   ].join('\n');
   const ssFile = path.join(T, 'ss.txt'); fs.writeFileSync(ssFile, ssFixture);
   ok('fixture ss: conteggi e classificazioni corrette', () => {
-    const res = la.runOnce({ ssFile, scopeObj: { targets: ['192.168.0.94'], exclusions: [] }, noProc: true });
+    const res = la.runOnce({ ssFile, scopeObj: { targets: ['192.168.77.94'], exclusions: [] }, noProc: true });
     assert.strictEqual(res.total, 5);
     assert.deepStrictEqual(res.counts, { in_scope: 1, wildcard: 2, local_only: 1, out_of_scope: 1 });
     assert.ok(res.out_of_scope.some((l) => l.addr === '10.9.9.9' && l.port === '5985'));
-    assert.ok(res.in_scope.some((l) => l.addr === '192.168.0.94' && l.port === '80'));
+    assert.ok(res.in_scope.some((l) => l.addr === '192.168.77.94' && l.port === '80'));
   });
   ok('parseSsLine robusto: header saltato, udp UNCONN, ipv6 [::]', () => {
     assert.strictEqual(la.parseSsLine('Netid State Recv-Q Send-Q Local Peer'), null);
@@ -184,7 +213,7 @@ async function main() {
     await new Promise((res) => srv.listen(0, '127.0.0.1', res));
     const port = String(srv.address().port);
     try {
-      const res = la.runOnce({ scopeObj: { targets: ['192.168.0.94'], exclusions: [] }, noProc: true });
+      const res = la.runOnce({ scopeObj: { targets: ['192.168.77.94'], exclusions: [] }, noProc: true });
       const hit = res.local_only.find((l) => l.port === port && (l.addr === '127.0.0.1'));
       assert.ok(hit, `listener ${port} non visto: total=${res.total} source=${res.source}`);
     } finally { await new Promise((res) => srv.close(res)); }

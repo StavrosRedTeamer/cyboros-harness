@@ -386,7 +386,7 @@ async function scan(db, target, opts) {
     // authoritative service/version scan
     // -Pn: senza, su host che non rispondono all'host discovery di nmap (ICMP filtrato: cloud,
     // Azure/AWS) nmap conclude "host seems down" e NON scansiona -> 0 porte ingerite con exit 0.
-    // Bug reale osservato su portal.noaitaly.io (20.115.232.11): senza -Pn 0 porte, con -Pn 80+443.
+    // Bug reale osservato su un target di assessment (IP pubblico, TLS su 8443): senza -Pn 0 porte, con -Pn 80+443.
     const nmapR = await runBin('nmap', ['-sC', '-sV', '-Pn', '-oX', '-', t], {});
     if (nmapR && nmapR.status === 0) {
       for (const h of parsers.parseNmapXml(nmapR.stdout || '')) {

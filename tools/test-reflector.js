@@ -16,11 +16,7 @@ const path = require('path');
 
 const TOOL = path.join(__dirname, 'reflector.js');
 
-let pass = 0, fail = 0;
-function ok(name, fn) {
-  try { fn(); pass++; console.log(`  PASS ${name}`); }
-  catch (e) { fail++; console.log(`  FAIL ${name} :: ${String(e.message).split('\n')[0]}`); }
-}
+const { ok, summary } = require('./testkit');
 
 function mkfixture(tag) { return fs.mkdtempSync(path.join(os.tmpdir(), 'dsh-reflector-test-' + tag + '-')); }
 
@@ -189,5 +185,4 @@ console.log('# tools/reflector.js — F3');
   } finally { fs.rmSync(fx, { recursive: true, force: true }); }
 }
 
-console.log(`\nreflector: ${pass} pass, ${fail} fail`);
-process.exit(fail ? 1 : 0);
+summary('test-reflector');

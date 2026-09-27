@@ -37,6 +37,10 @@ function main() {
     return 2;
   }
   fs.copyFileSync(template, SCOPE);
+  // Ingagement files are 0600 by convention (doctor's section 7 checks it): a provisioned scope
+  // must look like a hand-written one, or a clean clone exits `doctor --check` with "secrets
+  // readable by other users" for a file this script wrote. Best-effort on non-POSIX.
+  try { fs.chmodSync(SCOPE, 0o600); } catch { /* platforms without POSIX modes */ }
   process.stderr.write(
     'ensure-test-scope: wrote a loopback-only scope.json for this test run.\n' +
     '  It authorizes 127.0.0.1 and nothing else. Replace it before an engagement:\n' +

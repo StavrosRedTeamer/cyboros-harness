@@ -87,27 +87,27 @@ async function main() {
 
   console.log('C2w — lease per sub-agent');
   ok('acquire -> grant con scadenza; show riporta il lease', () => {
-    const r = cli(['lease', 'acquire', '--resource', 'host-192.168.0.94', '--owner', 'scanner-1', '--ttl', '60'], ENV);
+    const r = cli(['lease', 'acquire', '--resource', 'host-192.168.77.94', '--owner', 'scanner-1', '--ttl', '60'], ENV);
     assert.strictEqual(r.status, 0, r.stderr);
     const s = JSON.parse(cli(['show'], ENV).stdout);
-    assert.strictEqual(s.leases['host-192.168.0.94'].owner, 'scanner-1');
-    assert.strictEqual(s.leases['host-192.168.0.94'].expired, false);
+    assert.strictEqual(s.leases['host-192.168.77.94'].owner, 'scanner-1');
+    assert.strictEqual(s.leases['host-192.168.77.94'].expired, false);
   });
   ok('conflitto: acquire da altro owner mentre trattenuto -> exit 4 con holder', () => {
-    const r = cli(['lease', 'acquire', '--resource', 'host-192.168.0.94', '--owner', 'scanner-2', '--ttl', '60'], ENV);
+    const r = cli(['lease', 'acquire', '--resource', 'host-192.168.77.94', '--owner', 'scanner-2', '--ttl', '60'], ENV);
     assert.strictEqual(r.status, 4, r.stderr);
     assert.ok(r.stderr.includes('"holder":"scanner-1"'), r.stderr.slice(0, 300));
   });
   await okAsync('renew dal titolare estende la scadenza', async () => {
-    const before = JSON.parse(cli(['show'], ENV).stdout).leases['host-192.168.0.94'].expires_at;
+    const before = JSON.parse(cli(['show'], ENV).stdout).leases['host-192.168.77.94'].expires_at;
     await new Promise((res) => setTimeout(res, 30));
-    const r = cli(['lease', 'renew', '--resource', 'host-192.168.0.94', '--owner', 'scanner-1', '--ttl', '120'], ENV);
+    const r = cli(['lease', 'renew', '--resource', 'host-192.168.77.94', '--owner', 'scanner-1', '--ttl', '120'], ENV);
     assert.strictEqual(r.status, 0, r.stderr);
-    const after = JSON.parse(cli(['show'], ENV).stdout).leases['host-192.168.0.94'].expires_at;
+    const after = JSON.parse(cli(['show'], ENV).stdout).leases['host-192.168.77.94'].expires_at;
     assert.ok(Date.parse(after) > Date.parse(before));
   });
   ok('release da NON-titolare (non scaduto) -> rifiutato exit 4', () => {
-    const r = cli(['lease', 'release', '--resource', 'host-192.168.0.94', '--owner', 'scanner-2'], ENV);
+    const r = cli(['lease', 'release', '--resource', 'host-192.168.77.94', '--owner', 'scanner-2'], ENV);
     assert.strictEqual(r.status, 4, r.stderr);
   });
   await okAsync('scadenza pigra: ttl breve -> altro owner acquisisce dopo expiry', async () => {

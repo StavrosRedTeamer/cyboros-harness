@@ -19,17 +19,89 @@ rather than by version number.
   and the deliberate non-goals.
 - `npm run test:ci` — the suite with 2 workers, for CI where determinism of ordering
   matters less than wall time. `npm test` stays sequential by design.
+- `tools/testkit.js` — the test scaffolding the suite kept copying (counter, `ok`,
+  `okAsync`, `summary`, plus `fixture`/`writeScope`/`runCli`/`runCliAsync` helpers).
+  `test-attack-coverage`, `test-loop-watch` and `test-reflector` already use it; the
+  remaining copies are a ratchet in `test-repo-invariants`, so new tests cannot add a
+  thirty-first variant of the same twelve lines.
+- `tools/test-repo-invariants.js` — an offline gate on the repository's claims about
+  itself: the counts declared in `README.md` must match the real test/agent/workflow/module
+  counts, the prompt budget of the knowledge files cannot be exceeded, no CHANGELOG entry
+  may "replace" `X` with `X`, no doc may point at a `tools/*.js` that does not exist, no
+  new engine module may arrive without a line of documentation, the agent fleet must be
+  coherent (unique ids, required fields, resolvable `spawnableAgents`), the test scaffold
+  cannot be re-copied, and no hostname from the current `scope.json` may appear in a file
+  tracked by git. Its two baselines (undocumented modules, copied scaffolding) are
+  ratchets: they can only shrink.
+- `tools/mcp-guard-proxy.js` — the supported way to close the one architectural hole
+  this project documents about itself. Mounting a third-party MCP server behind it puts
+  `scope-guard` and `ssrf-guard` in series with that server: every `tools/call` is judged
+  with the same functions the in-process tools use (`inScope`, `net.resolveAndGuard` for the
+  DNS-rebinding layer, `checkAddress` on the pinned address), blocked calls never reach the
+  server and answer the agent with an explicit error, and every verdict (`allow-scoped`,
+  `allow-unscoped`, `block`) is appended to `reports/tmp/mcp-guard.jsonl`. Limits are
+  declared in the header and in `docs/ARCHITECTURE.md`: targets are extracted from the
+  arguments, and an in-scope hostname that cannot be resolved is refused (fail-closed).
+- `tools/test-mcp-guard-proxy.js` — offline coverage for the proxy: passthrough of
+  non-`tools/call` methods, block outside scope, block of the metadata tier even when
+  `scope.json` authorizes it, allow on an in-scope target, the audit trail, request-order
+  preservation, and the judgement function directly for the rebinding and fail-closed cases.
+- `doctor.js --show-hosts` / `--fix-perms` — the human-readable output redacts the
+  engagement allowlist by default (`N host + M CIDR`), because that output lands in
+  screenshots and reports (`--json` stays complete: the Command Center is its consumer),
+  and a new section 7 reports engagement secrets readable by other users on the same
+  machine, with `--fix-perms` to set them to 0600. `doctor --check` exits 1 while any of
+  them is exposed.
 
 ### Changed
 - `README.md` rewritten in English around the evidence-discipline and guardrail
   positioning, with the previously unstated differentators (zero dependencies,
   air-gapped operation, offline test suite) stated up front. Corrects stale
   structure claims: agents live in `local/fleet/`, and `vendor/` is no longer
-  part of the repository.
+  part of the repository. Its declared numbers now track reality (92 tests executed
+  in ~1 minute, 28 agent definitions, 139 engine modules) and a test keeps them
+  there instead of a stale 89/217.
 - Real client names removed from documentation, scripts and test fixtures
-  (`com.example.fest` → `com.example.fest`, `acme.test` → `acme.test`).
+  (`com.example.fest`, `acme.test`). Three tracked files still carried one client
+  hostname after the previous pass — `local/plan.js`, `tools/stavros.js`,
+  `tools/test-local-plan.js` — and now use RFC 2606 `.example` names.
+- `doctor.js` counts the agent fleet where it actually lives (`local/fleet/` plus the
+  root agent in `.agents/`). It previously required 20 `.agents/*.ts` files, so a
+  healthy checkout — and CI — reported `core rotto=SÌ` on every run. `scope.json` is
+  gitignored by design and no longer counts as a broken cardinal file.
+- `vet-agents-vs-freebuff.js` vets both agent directories (29 agents) instead of the
+  single root file left in `.agents/`, fails closed when it finds nothing to vet, and
+  reports the Freebuff-only prompt fields as one aggregated advisory for `local/fleet/`
+  instead of 28 errors (that schema binds the CLI, not the local runner).
+- `tools/test-authn-depth.js` and `tools/test-sc1.js` are hermetic: own `SCOPE_JSON`,
+  own `PACE_FILE`, no operator lab host, no dependence on the ambient `scope.json`.
+  The race-watch checks in `test-authn-depth` failed intermittently in a full-suite run
+  because the global cross-process limiter (`tools/.pace.json`) spread the `--race`
+  volley out; `test-sc1` asserted a real HTTP 200 from a LAN-only lab address, so the
+  offline gate could not pass anywhere else.
 
 ### Fixed
+- `run-tests.js` now fingerprints the engagement files (`scope.json`, `auth.json`, `c2.json`,
+  `wifi-scope.json`, `mobile-scope.json`) before and after every test: a test that rewrites the
+  operator's written authorization — directly, or through a tool that falls back to the default
+  path instead of an env override — fails loudly with the file names instead of being invisible.
+- `gui-server.js saveScope()` cannot silently shrink the authorization any more: removing
+  hosts requires `confirm_removals:true`, the serialized result is validated before the write,
+  and the previous version is copied to `scope.*.bak.json` (gitignored) first. Writes through
+  the service also re-apply 0600 to the engagement files.
+- `test-sc1.js` no longer contacts an operator lab host (it binds its own loopback
+  server and uses the documented opt-in), and the client lab address is gone from the
+  tracked tests and fixtures.
+- The Freebuff harness-mechanics notes moved from `AGENTS.md` to `ops/harness.md`
+  (identical text, ~7 KB): they are maintenance reference for the wiring, and having them
+  in every system prompt is what pushed the assembled prompt to 24 KB against the ~20 KB
+  budget the workspace sets for itself. `test-repo-invariants` now holds that budget as a
+  gate, and `check-identity.js` distinguishes "prompt too big" from "measurement taken on a
+  snapshot older than the knowledge files" instead of reporting a stale number as a failure.
+- `.gitignore` covers editor swap files (`*.kate-swp`, `*.swp`) and a `local-only/` home for
+  one-off engagement scripts: a swap file of `scope.json` holds the same engagement data as the
+  file itself, and the per-name rules for one-off scripts only catch the names someone thought of.
+  CI asserts the ignore rules still cover the engagement paths, instead of listing them by hand.
 - `.gitignore` never matched `scripts/probe-*.py` against `scripts/probe_ajax.py`,
   letting one-off engagement scripts — containing live session keys — through.
 - `.gitignore` did not cover `temp/` (265 MB of per-engagement work: decompiled

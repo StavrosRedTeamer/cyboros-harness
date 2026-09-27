@@ -12,6 +12,9 @@
 //                   mirror MANIFEST (questi ultimi gitignored: servono per copia-cartella; un
 //                   git clone deve rifare "vendor-mirror.js pull")
 //   6. scope        scope.json presente? allowlist vuota? (fail-closed: vuoto = tutto bloccato)
+//   7. segreti      auth.json/c2.json/scope/... leggibili solo dall'operatore (--fix-perms).
+//                   L'output umano non elenca gli host per default (finisce in screenshot e
+//                   report): --show-hosts li mostra. `--json` resta completo, è l'input del CC.
 //
 // Installazione: SOLO dopo conferma interattiva (o --yes). Best-effort, in gruppi:
 //   runtime (apt) -> arsenal (apt/go/pipx) -> suggerimenti manuali (sliver, cloud CLI).
@@ -36,12 +39,14 @@ const IS_WIN = process.platform === 'win32';
 
 // ---- CLI ----------------------------------------------------------------------
 function parseArgs(argv) {
-  const o = { check: false, yes: false, json: false, help: false };
+  const o = { check: false, yes: false, json: false, help: false, showHosts: false };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a === '--check') o.check = true;
     else if (a === '--yes' || a === '-y') o.yes = true;
     else if (a === '--json') o.json = true;
+    else if (a === '--show-hosts') o.showHosts = true;
+    else if (a === '--fix-perms') o.fixPerms = true;
     else if (a === '-h' || a === '--help') o.help = true;
     else { console.error(`doctor: opzione sconosciuta "${a}" (usa --help)`); process.exit(2); }
   }
@@ -101,7 +106,6 @@ const CORE_FILES = [
   'package.json',
   'knowledge.md',
   'ops/harness.md',
-  'scope.json',
   'tools/tool-registry.json',
   'tools/run.js',
   'tools/scope-guard.js',
@@ -112,11 +116,36 @@ const CORE_FILES = [
   'tools/run-tests.js',
   'install-tools.sh',
 ];
+// La flotta vive in local/fleet/ (28 specialisti) dal commit che ha separato il runner locale
+// da Freebuff; .agents/ tiene solo l'agente root. Contare una sola delle due cartelle fa
+// gridare "core rotto" a un workspace sano.
+const AGENT_DIRS = ['local/fleet', '.agents'];
 function countAgents() {
-  try {
-    return fs.readdirSync(path.join(ROOT, '.agents')).filter((f) => f.endsWith('.ts')).length;
-  } catch { return 0; }
+  const seen = new Set();
+  for (const d of AGENT_DIRS) {
+    try {
+      for (const f of fs.readdirSync(path.join(ROOT, d))) if (f.endsWith('.ts')) seen.add(d + '/' + f);
+    } catch { /* cartella assente */ }
+  }
+  return seen.size;
 }
+// Segreti e autorizzazioni di engagement: gitignorati, ma su disco devono essere leggibili
+// solo dall'operatore. 0755 su auth.json significa che qualunque processo/utente sulla stessa
+// macchina li legge (e che finiscono nelle copie di backup fatte senza guardare i permessi).
+const SECRET_FILES = ['scope.json', 'auth.json', 'c2.json', 'wifi-scope.json', 'mobile-scope.json', 'mcp.json'];
+function checkSecrets() {
+  const rows = [];
+  for (const f of SECRET_FILES) {
+    const p = path.join(ROOT, f);
+    if (!fs.existsSync(p)) continue;
+    let mode = 0;
+    try { mode = fs.statSync(p).mode & 0o777; } catch { continue; }
+    const exposed = (mode & 0o077) !== 0;
+    rows.push({ file: f, mode: mode.toString(8).padStart(3, '0'), ok: !exposed, exposed, path: p });
+  }
+  return rows;
+}
+
 function checkProject() {
   const rows = [];
   for (const f of CORE_FILES) {
@@ -124,7 +153,13 @@ function checkProject() {
     rows.push({ file: f, ok: fs.existsSync(p) });
   }
   const agents = countAgents();
-  rows.push({ file: `.agents/*.ts (agenti definiti)`, ok: agents >= 20, note: `${agents} agenti` });
+  rows.push({ file: `agenti definiti (${AGENT_DIRS.join(' + ')})`, ok: agents >= 20, note: `${agents} agenti` });
+  // scope.json è gitignored per design: su un checkout pulito la sua assenza è ATTESA, non un
+  // workspace rotto (la sezione 6 la segnala già come fail-closed). Quindi non entra in
+  // `core rotto`, altrimenti ogni clone e la CI nascono "rotti".
+  const scopePresent = fs.existsSync(path.join(ROOT, 'scope.json'));
+  rows.push({ file: 'scope.json (autorizzazione scritta)', ok: scopePresent, optional: true,
+    note: 'gitignored: compilalo prima di un engagement (fail-closed fino ad allora)' });
   // validazione schema registry riusando il validatore del progetto (fonte di verità)
   const reg = spawnSync(process.execPath, [path.join(ROOT, 'tools', 'run.js'), '--registry-check'],
     { cwd: ROOT, encoding: 'utf8', timeout: 60000 });
@@ -234,7 +269,7 @@ function checkVendor() {
 }
 
 // ---- 6. scope -------------------------------------------------------------------------
-function checkScope() {
+function checkScope(opts) {
   const p = path.join(ROOT, 'scope.json');
   if (!fs.existsSync(p)) return { exists: false, empty: true, critical: true, note: 'scope.json ASSENTE: il guard fail-closed blocca OGNI azione su target (by design). Compilalo prima di un engagement.' };
   const s = readJson(p);
@@ -242,9 +277,15 @@ function checkScope() {
   const hosts = Array.isArray(s.allowed_hosts) ? s.allowed_hosts : [];
   const ips = Array.isArray(s.allowed_ips) ? s.allowed_ips : [];
   const empty = hosts.length === 0 && ips.length === 0;
+  // L'output umano del doctor finisce in screenshot, log e report di engagement: i nomi dei
+  // clienti restano fuori da lì per default (--show-hosts li mostra). Il --json invece
+  // resta completo perché è l'input del Command Center, che gli host li deve mostrare.
+  const listed = (opts && opts.showHosts)
+    ? `${hosts.concat(ips).slice(0, 6).join(', ')}${hosts.length + ips.length > 6 ? ' …' : ''}`
+    : `${hosts.length} host + ${ips.length} CIDR (redatto: --show-hosts per elencarli)`;
   return { exists: true, empty, critical: false, note: empty
     ? 'allowlist vuota: nessun target autorizzato (fail-closed). Compila scope.json per operare.'
-    : `allowlist: ${hosts.concat(ips).slice(0, 6).join(', ')}${hosts.length + ips.length > 6 ? ' …' : ''}` };
+    : `allowlist: ${listed}` };
 }
 
 // ---- installazione (best-effort, solo dopo consenso) ------------------------------------
@@ -335,7 +376,14 @@ async function main() {
   const registry = checkBins(REGISTRY);
   const extras = checkBins(EXTRAS);
   const vendor = checkVendor();
-  const scope = checkScope();
+  const scope = checkScope(opts);
+  let secrets = checkSecrets();
+  if (opts.fixPerms) {
+    for (const r of secrets.filter((s) => s.exposed)) {
+      try { fs.chmodSync(r.path, 0o600); r.mode = '600'; r.ok = true; r.exposed = false; } catch { /* segnalato sotto */ }
+    }
+    secrets = checkSecrets();
+  }
 
   if (opts.json) {
     // install hints are part of the JSON on purpose: the Command Center builds the
@@ -401,6 +449,14 @@ async function main() {
   else if (scope.empty) console.log(`  ${missS('scope.json vuota')} ${scope.note}`);
   else console.log(`  ${okS('scope.json')} ${dimS(scope.note)}`);
 
+  // 7. segreti di engagement
+  if (secrets.length) {
+    section('7. Segreti di engagement (permessi)');
+    for (const s of secrets) {
+      printRow(s.ok, s.file, s.ok ? `0${s.mode}` : `0${s.mode} — leggibile da altri utenti (node tools/doctor.js --fix-perms)`);
+    }
+  }
+
   // browser/mcp nota
   const browserOk = hasBin('chromium') || hasBin('google-chrome') || hasBin('google-chrome-stable');
   console.log(`\n  ${browserOk ? okS('browser CDP') : missS('browser CDP')} ${dimS(browserOk ? 'chrome-devtools MCP pronto (headless)' : 'chrome-devtools MCP richiede Chrome/Chromium; il pacchetto npx si scarica da solo al primo uso (serve internet)')}`);
@@ -408,9 +464,11 @@ async function main() {
   // summary + exit decision
   const missingRegistry = registry.filter((r) => !r.installed);
   const missingRuntime = runtime.slice(1).filter((r) => !r.installed);
-  const coreBroken = project.some((r) => !r.ok);
+  const coreBroken = project.some((r) => !r.ok && !r.optional);
+  const exposedSecrets = secrets.filter((s) => s.exposed);
   console.log(`\n${C.b}Riepilogo:${C.n} runtime mancanti=${missingRuntime.length}, registry mancanti=${missingRegistry.length}, ` +
-    `vendor mancanti=${vendor.filter((v) => !v.ok).length}, core rotto=${coreBroken ? 'SÌ' : 'no'}`);
+    `vendor mancanti=${vendor.filter((v) => !v.ok).length}, core rotto=${coreBroken ? 'SÌ' : 'no'}` +
+    (secrets.length ? `, segreti esposti=${exposedSecrets.length}` : ''));
 
   if (IS_WIN) {
     console.log(`\n${C.y}Windows: l'installazione nativa non è coperta; usa install-tools.ps1 o WSL + questo script.${C.n}`);
@@ -421,6 +479,11 @@ async function main() {
     return 2;
   }
   if (opts.check) {
+    if (exposedSecrets.length) {
+      console.log(`${C.r}Segreti di engagement leggibili da altri utenti: ${exposedSecrets.map((s) => s.file).join(', ')}` +
+        `\nCorreggi con: node tools/doctor.js --fix-perms${C.n}`);
+      return 1;
+    }
     if (missingRegistry.length || missingRuntime.length) {
       console.log(dimS('\n(--check: solo report. Lancia senza --check per installare.)'));
       return 1;

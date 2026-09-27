@@ -23,7 +23,10 @@ residue.md
 evidence/
 engagements/
 recon/
-# Probe one-off: contengono target/host/session-key reali.
+# Script one-off di engagement: contengono target/host/session-key reali. Il posto giusto è
+# local-only/ (ignorata per intero, nessuna regola da ricordare): le regole per-nome qui sotto
+# restano per i file storici già presenti.
+local-only/
 # Nota: il trattino in "probe-*" non copriva "probe_ajax.py" — da qui il secondo pattern.
 scripts/probe-*.py
 scripts/probe_*.py
@@ -66,6 +69,13 @@ reports/app/
 *.v1-forensic
 *.orig
 *.rej
+
+# Editor: i file di swap contengono il contenuto del file aperto — se è `scope.json`, sono
+# dati di engagement (target, commenti, credenziali) fuori dal .gitignore solo per distrazione.
+*.kate-swp
+*.swp
+*.swo
+.*.swp
 
 # OS
 .DS_Store

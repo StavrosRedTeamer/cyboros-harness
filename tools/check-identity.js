@@ -147,7 +147,22 @@ if (at('Assistant Operating Specification') !== null) {
   fail('la spec lunga e ancora nel prompt: 26 KB di peso che annegano il segnale')
 } else ok('spec lunga fuori dal prompt')
 
-if (sp.length > 20000) fail(`prompt a ${sp.length} caratteri: sopra ~20 KB il segnale si diluisce`)
+// Il prompt misurato e' uno snapshot preso alla creazione della sessione: se un knowledge file
+// e' stato modificato DOPO, questo numero e' storico e non descrive lo stato attuale. Distinguere
+// i due casi e' l'unico modo perche' il check non diventi un allarme che suona sempre.
+const knowledgeFiles = [path.join(__dirname, '..', 'AGENTS.md'), path.join(os.homedir(), '.AGENTS.md')]
+  .filter((f) => fs.existsSync(f))
+const newestKnowledge = knowledgeFiles.length ? Math.max(...knowledgeFiles.map((f) => fs.statSync(f).mtimeMs)) : 0
+const stale = newestKnowledge > fs.statSync(stateFile).mtimeMs
+if (sp.length > 20000) {
+  if (stale) {
+    warn(`prompt a ${sp.length} caratteri, ma lo snapshot e' del ${new Date(fs.statSync(stateFile).mtime).toISOString().slice(0, 16).replace('T', ' ')} ` +
+      `ed e' precedente all\'ultima modifica di un knowledge file (${new Date(newestKnowledge).toISOString().slice(0, 16).replace('T', ' ')}): ` +
+      'misura storica, non lo stato attuale. Serve una sessione nuova per rimisurare.')
+  } else {
+    fail(`prompt a ${sp.length} caratteri: sopra ~20 KB il segnale si diluisce`)
+  }
+}
 
 console.log('')
 if (bad === 0) {

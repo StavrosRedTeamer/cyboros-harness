@@ -82,6 +82,43 @@ Every eval appends to `reports/bench-history.jsonl` with seed, recall, precision
 verification rate and the missed classes — so regressions per class are measurable over
 time rather than asserted once.
 
+## Putting it in a pipeline (the CI one-liner)
+
+A score nobody gates on is a table. `eval` takes thresholds, and fails the process when a
+metric falls below one, so the same instrument runs inside someone else's CI on the
+findings that harness already emits:
+
+```bash
+node tools/gen-bench.js eval "$BENCH_DIR" \
+  --findings findings.jsonl \
+  --fail-under-precision 90 --fail-under-recall 80 --fail-under-verified 50
+```
+
+**Input.** `--findings <file>` accepts either a JSONL file (one finding object per line,
+what `record-finding.js` appends) or a JSON array. Matching uses `id`, `title`, `type`,
+`host`, `target`, `endpoint`, `poc`, `description`, `cwe`; verification uses `status`
+(`verified`) or `verify_level` (`exploited` / `proven_impact`). A finding is attributed to
+the bench when it names the bench's port, or names no port and targets loopback.
+
+**Exit codes.** `0` — no threshold set, or every threshold met. `1` — a threshold was set
+and missed. `2` — usage error or an unreadable `--findings` file. A `--findings` path that
+does not exist is exit 2, never a silent zero: a gate that reads the wrong file and passes
+is worse than no gate.
+
+**Output contract.** `--json` prints the `bench-eval/1` schema. The fields a consumer should
+rely on:
+
+| field | meaning |
+|---|---|
+| `schema` | `"bench-eval/1"` — the format version |
+| `detectedPct` / `verifiedPct` / `precisionPct` | the three metrics, 0–100 |
+| `reported`, `truePositives`, `falsePositives` | the precision counts behind the percentage |
+| `falsePositiveList` | triage list: the findings that mapped to no seeded class (max 20) |
+| `row` | per-class `{ class, severity, status, findings }` |
+| `gate` | `{ gated, passed, thresholds, failures }` — absent thresholds give `gated: false` |
+
+With `--fail-under-*` set, the human output ends with a `gate: PASS` or `FAIL — <metric> <n>% < <m>%` line, and the JSON carries the same list in `gate.failures`.
+
 ## Reproducing the instrument itself
 
 ```bash

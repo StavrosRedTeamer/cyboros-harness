@@ -28,7 +28,9 @@ that is the core claim this project makes:
   to a location the operator did not intend (e.g. inside the repo, or into
   `memory/`).
 - Remote code execution in the harness itself — `gui-server.js`, `repeater.js`,
-  `run.js`, the local runner, or the Command Center API.
+  `run.js`, the local runner, the Command Center API, or `mcp-guard-proxy.js`.
+- A way to make `mcp-guard-proxy.js` forward a `tools/call` whose target is out of
+  scope, or to make it lose a block from the audit log.
 
 **In scope — normal priority.** Correctness and robustness bugs in the tooling:
 crashes, wrong scope decisions, data loss, findings that fail to record.
@@ -64,10 +66,15 @@ The scope guard is enforced in-process, in the tools the agent calls. It is not 
 sandbox and it is not a containment boundary.
 
 Tools reached through **MCP** (`chrome-devtools`, or anything else you mount in
-`mcp.json`) bypass the guard entirely — they run in their own process. The harness
-tells the agent to scope-check those manually, but that is a procedural
-instruction, not enforcement. If you mount an MCP server, you have extended past
-the guard and you are responsible for it.
+`mcp.json`) bypass the guard — they run in their own process. There is a supported
+way to close that: mount the server through `tools/mcp-guard-proxy.js`, which
+judges every `tools/call` with the same `scope-guard` + `ssrf-guard` decision the
+in-process tools get, blocks out-of-scope and rebinding targets before the request
+leaves the machine, and logs every verdict to `reports/tmp/mcp-guard.jsonl`.
+Its declared limits: the judgement is over targets extracted from the call
+arguments (a tool that reaches the network without naming it is not judged), and an
+in-scope hostname must resolve, or the call is refused (fail-closed). Mount a server
+raw and you are outside the guard, responsible for it yourself.
 
 Similarly, the local runner in `local/` talks to a model you choose. Anything that
 reaches a target through it is only as safe as the model's judgment plus whatever

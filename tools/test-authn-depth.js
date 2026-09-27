@@ -6,13 +6,35 @@
 //   authn-oracle  -> routes classification (open/auth-gated/role-gated/hidden-404),
 //                    login clustering (enumeration signal, rate-limit absence), massassign
 //   repeater.js   -> --race-watch observed-mutation diffing
-// Everything runs against a throwaway local server (127.0.0.1 is in scope.json).
+// Everything runs against a throwaway local server, with a scope written by this test itself
+// (no dependence on the operator's scope.json or on the shared pace file).
 'use strict';
 
 const { spawn } = require('child_process');
 const crypto = require('crypto');
+const fs = require('fs');
 const http = require('http');
+const os = require('os');
 const path = require('path');
+
+// Hermetic isolation, set BEFORE any child is spawned (children inherit process.env):
+//   SCOPE_JSON           — this test authors its own scope for 127.0.0.1 instead of relying on
+//                          the operator's scope.json being filled in.
+//   PACE_FILE            — the global cross-process limiter (tools/.pace.json) is shared with
+//                          every other tool and with any concurrent run. Sharing it spreads the
+//                          --race volley out, so `watch` can diff two identical states and the
+//                          race-watch checks fail intermittently in a full-suite run while
+//                          passing standalone. This test owns its own pace file.
+//   ALLOW_METADATA_TARGET — loopback sits in the B9 HARD tier; the tag `loopback` makes the
+//                          runner set this, and we set it here too so the file is runnable on
+//                          its own (`node tools/test-authn-depth.js`) in the documented way.
+const FIXTURE = fs.mkdtempSync(path.join(os.tmpdir(), 'authn-depth-'));
+process.env.PACE_FILE = path.join(FIXTURE, 'pace.json');
+process.env.SCOPE_JSON = path.join(FIXTURE, 'scope.json');
+process.env.ALLOW_METADATA_TARGET = '1';
+fs.writeFileSync(process.env.SCOPE_JSON, JSON.stringify({
+  allowed_hosts: ['127.0.0.1'], allowed_ips: ['127.0.0.0/8'], max_requests_per_second: 100,
+}));
 
 const TOOLS = __dirname;
 let failures = 0;
@@ -174,7 +196,8 @@ async function main() {
     out2[0].watch.mutated === false && Object.keys(out2[0].watch.deltas).length === 0);
 
   server.close();
-  require('fs').rmSync(routesFile, { force: true });
+  fs.rmSync(routesFile, { force: true });
+  fs.rmSync(FIXTURE, { recursive: true, force: true });
 
   console.log(failures ? '\n' + failures + ' FAILURES' : '\nALL PASS');
   process.exit(failures ? 1 : 0);

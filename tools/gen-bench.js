@@ -16,7 +16,14 @@
 //   gen-bench.js start <benchdir>
 //   gen-bench.js stop  <benchdir>
 //   gen-bench.js eval  <benchdir> [--findings reports/findings.jsonl] [--json]
+//                      [--fail-under-precision N] [--fail-under-recall N] [--fail-under-verified N]
 //   gen-bench.js list-classes
+//
+// eval reads the harness's findings (JSONL, one finding per line — or a JSON array) and
+// scores recall, precision and verification rate against the seeded manifest. With a
+// --fail-under-* threshold it becomes a CI gate: exit 1 when the metric is below it, so a
+// harness that starts overstating its findings fails its own pipeline. The `--json` output
+// is a stable contract (schema `bench-eval/1`) documented in BENCHMARK.md.
 //
 // Zero dependencies. Self-tests: node tools/test-benchgen.js
 'use strict';
@@ -771,7 +778,18 @@ function cmdList() {
 // ─── eval ─────────────────────────────────────────────────────────────────────
 function readFindings(file) {
   if (!fs.existsSync(file)) return [];
-  return fs.readFileSync(file, 'utf8').split('\n').filter(Boolean).map(l => { try { return JSON.parse(l); } catch (e) { return null; } }).filter(Boolean);
+  const raw = fs.readFileSync(file, 'utf8').trim();
+  if (!raw) return [];
+  // Due forme accettate, entrambe documentate in BENCHMARK.md: JSONL (una riga per finding,
+  // quello che scrive record-finding.js) e array JSON (quello che emette la maggior parte
+  // degli harness). Un `.json` che non è un array è un ERRORE, non zero finding: in un gate di
+  // pipeline, "non ho letto il file" e "non ho trovato niente" devono fallire in modo diverso.
+  if (raw.startsWith('[')) {
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) throw new Error('findings JSON array atteso');
+    return parsed.filter((f) => f && typeof f === 'object');
+  }
+  return raw.split('\n').filter(Boolean).map(l => { try { return JSON.parse(l); } catch (e) { return null; } }).filter(Boolean);
 }
 // ── matcher helpers ───────────────────────────────────────────────────────────
 // I finding reali registrati con record-finding.js usano `host` (+ `endpoint`)
@@ -802,7 +820,19 @@ function classHit(c, f, port) {
 function cmdEval(dir, opts) {
   const manifest = JSON.parse(fs.readFileSync(path.join(dir, 'manifest.full.json'), 'utf8'));
   const port = manifest.bench.port;
-  const findings = readFindings(opts.findings || path.join(process.cwd(), 'reports', 'findings.jsonl'));
+  // Un --findings esplicito che non esiste è un errore, non un punteggio zero: un gate che
+  // legge il file sbagliato e passa (precision 100% su nulla riportato) è peggio di nessun gate.
+  let findings;
+  try {
+    findings = readFindings(opts.findings || path.join(process.cwd(), 'reports', 'findings.jsonl'));
+  } catch (e) {
+    console.error('eval: findings illeggibili (' + (opts.findings || '') + '): ' + e.message);
+    process.exit(2);
+  }
+  if (opts.findings && !fs.existsSync(opts.findings)) {
+    console.error('eval: --findings ' + opts.findings + ' non esiste');
+    process.exit(2);
+  }
   const rows = [];
   let detected = 0, routeConfirmed = 0, verified = 0;
   // ── precision, not just recall ──────────────────────────────────────────────
@@ -823,6 +853,9 @@ function cmdEval(dir, opts) {
   }
   const total = manifest.classes.length;
   const summary = {
+    // Contratto di output stabile (vedi BENCHMARK.md): i consumer possono assumere questi
+    // campi senza leggere lo human output. Cambiare forma = alzare `schema`.
+    schema: 'bench-eval/1',
     bench: manifest.bench.name,
     port,
     total,
@@ -845,6 +878,19 @@ function cmdEval(dir, opts) {
     falsePositiveList: falsePosList.map(f => f.id || f.title || '(untitled)').slice(0, 20),
     row: rows,
   };
+  // ── CI gate: una soglia sotto cui il processo esce 1 ──────────────────────────
+  // Il valore di questo strumento è che la precisione sia un numero che qualcuno
+  // può mettere nel proprio gate, non una tabella che qualcuno legge una volta.
+  if (opts.thresholds) {
+    const t = opts.thresholds;
+    const failures = [];
+    if (t.precision != null && summary.precisionPct < t.precision) failures.push('precision ' + summary.precisionPct + '% < ' + t.precision + '%');
+    if (t.recall != null && summary.detectedPct < t.recall) failures.push('recall ' + summary.detectedPct + '% < ' + t.recall + '%');
+    if (t.verified != null && summary.verifiedPct < t.verified) failures.push('verification rate ' + summary.verifiedPct + '% < ' + t.verified + '%');
+    summary.gate = { gated: true, passed: failures.length === 0, thresholds: t, failures };
+  } else {
+    summary.gate = { gated: false, passed: true, thresholds: null, failures: [] };
+  }
   // ── trend tracking: una riga per eval → reports/bench-history.jsonl ──────────
   // Storia dei punteggi per seed/modello: permette di misurare le regressioni
   // per-classe nel tempo. `--no-history` la salta.
@@ -886,6 +932,10 @@ function cmdEval(dir, opts) {
   if (summary.falsePositiveList.length) md.push('FP: ' + summary.falsePositiveList.join(', '));
   md.push('');
   md.push('**headline:** recall ' + summary.detectedPct + '% · precision ' + summary.precisionPct + '% · verification rate ' + summary.verifiedPct + '%');
+  if (summary.gate.gated) {
+    md.push('');
+    md.push('**gate:** ' + (summary.gate.passed ? 'PASS' : 'FAIL — ' + summary.gate.failures.join('; ')));
+  }
   const out = path.join(process.cwd(), 'reports', 'bench-' + manifest.bench.name + '-eval.md');
   fs.mkdirSync(path.dirname(out), { recursive: true });
   fs.writeFileSync(out, md.join('\n'));
@@ -903,10 +953,21 @@ function parseArgs(argv) {
     if (a === '--seed' || a === '--classes' || a === '--port' || a === '--out' || a === '--findings') { o[a.slice(2)] = argv[++i]; }
     else if (a === '--json') o.json = true;
     else if (a === '--no-history') o.noHistory = true;
+    else if (THRESHOLD_FLAGS[a]) {
+      const n = Number(argv[++i]);
+      if (!Number.isFinite(n) || n < 0 || n > 100) { console.error('gen-bench: ' + a + ' vuole un numero 0-100'); process.exit(2); }
+      o.thresholds = o.thresholds || {};
+      o.thresholds[THRESHOLD_FLAGS[a]] = n;
+    }
     else o._rest = (o._rest || []).concat(a);
   }
   return o;
 }
+const THRESHOLD_FLAGS = {
+  '--fail-under-precision': 'precision',
+  '--fail-under-recall': 'recall',
+  '--fail-under-verified': 'verified',
+};
 function main() {
   const argv = process.argv.slice(2);
   const cmd = argv[0];
@@ -916,7 +977,12 @@ function main() {
     case 'list': cmdList(); break;
     case 'start': cmdStart(o._rest && o._rest[0]); break;
     case 'stop': cmdStop(o._rest && o._rest[0]); break;
-    case 'eval': cmdEval(o._rest && o._rest[0], o); break;
+    case 'eval': {
+      const s = cmdEval(o._rest && o._rest[0], o);
+      // Il gate è il punto: exit 1 è ciò che lo rende utile in una pipeline.
+      if (s && s.gate && !s.gate.passed) process.exitCode = 1;
+      break;
+    }
     case 'list-classes': console.log(CLASSES.map(c => c.id + ' (' + c.severity + ') ' + c.title).join('\n')); break;
     default:
       console.log('usage: gen-bench.js new|list|start|stop|eval|list-classes [opts]');
@@ -925,4 +991,4 @@ function main() {
 }
 if (require.main === module) main();
 
-module.exports = { CLASSES, cmdNew, cmdEval, makeRng, BENCH_ROOT, findingBlob, matchesBenchPort };
+module.exports = { CLASSES, cmdNew, cmdEval, readFindings, parseArgs, makeRng, BENCH_ROOT, findingBlob, matchesBenchPort };

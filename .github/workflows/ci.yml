@@ -43,8 +43,30 @@ jobs:
             exit 1
           fi
 
-      - name: Self-check (no credentials required)
-        run: node tools/doctor.js || true
+      - name: Self-check (cardini del workspace)
+        # doctor esce 2 quando i cardini del repo sono rotti (file di progetto mancanti,
+        # registry schema invalido): quello è un errore, non un avviso. Un exit 1 significa
+        # "mancano binari/runtime", che su un runner nudo è atteso e non blocca.
+        run: |
+          set +e
+          node tools/doctor.js --check
+          code=$?
+          if [ "$code" -ge 2 ]; then
+            echo "::error::doctor: cardini del workspace rotti (exit $code)"
+            exit 1
+          fi
+          echo "doctor: cardini OK (exit $code; i binari mancanti sul runner non contano)"
+
+      - name: Vet agenti vs binario Freebuff
+        # Il vet confronta gli agenti locali con i tool/modelli del binario Freebuff
+        # installato: senza binario è un pre-flight locale e qui si salta, con un messaggio
+        # esplicito invece di un silenzioso OK.
+        run: |
+          if [ -x "$HOME/.config/manicode/freebuff" ]; then
+            node tools/vet-agents-vs-freebuff.js
+          else
+            echo "binario Freebuff assente sul runner: vet saltato (pre-flight locale)"
+          fi
 
       - name: Test suite (offline)
         # tools/test-*.js, classified offline/loopback/e2e by the runner.
@@ -73,6 +95,23 @@ jobs:
             if [ -n "$hits" ]; then
               echo "::error::tracked files matching '$pat' must not be committed:"
               echo "$hits"
+              bad=1
+            fi
+          done
+          exit $bad
+
+      - name: .gitignore must still cover engagement data
+        # Le regole di .gitignore sono l'unica cosa che tiene i dati cliente fuori da
+        # history: qui si verifica che coprano davvero i path di engagement, invece di
+        # elencarli a mano nel workflow e sperare che restino allineati.
+        run: |
+          bad=0
+          for f in scope.json auth.json c2.json wifi-scope.json mobile-scope.json mcp.json \
+                   scope.acme.bak.json temp/x reports/x artifacts/x campaign.json \
+                   reports/approvals.jsonl scripts/probe_x.py scripts/record-x-findings.js \
+                   tools/.pace.json local-only/one-off.py .scope.json.kate-swp; do
+            if ! git check-ignore -q "$f"; then
+              echo "::error::$f non è ignorato dal .gitignore"
               bad=1
             fi
           done

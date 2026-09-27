@@ -17,11 +17,7 @@ const path = require('path');
 
 const TOOL = path.join(__dirname, 'loop-watch.js');
 
-let pass = 0, fail = 0;
-function ok(name, fn) {
-  try { fn(); pass++; console.log(`  PASS ${name}`); }
-  catch (e) { fail++; console.log(`  FAIL ${name} :: ${String(e.message).split('\n')[0]}`); }
-}
+const { ok, summary } = require('./testkit');
 
 function mkfixture(tag) { return fs.mkdtempSync(path.join(os.tmpdir(), 'dsh-loopwatch-test-' + tag + '-')); }
 
@@ -208,5 +204,4 @@ console.log('# tools/loop-watch.js — F1');
   } finally { fs.rmSync(fx, { recursive: true, force: true }); }
 }
 
-console.log(`\nloop-watch: ${pass} pass, ${fail} fail`);
-process.exit(fail ? 1 : 0);
+summary('test-loop-watch');

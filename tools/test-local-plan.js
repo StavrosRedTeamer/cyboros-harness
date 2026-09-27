@@ -125,16 +125,16 @@ ok('related: host, sottodominio e padre correlati; altri host no', () => {
   assert.strictEqual(plan.related('finto-target.example.com', 'target.example.com'), false); // suffisso non-dominio
 });
 ok('hostOf: URL, URL con porta/path e host nudo -> hostname', () => {
-  assert.strictEqual(plan.hostOf('https://portal.noaitaly.io/'), 'portal.noaitaly.io');
-  assert.strictEqual(plan.hostOf('http://portal.noaitaly.io:8443/a/b?c=1'), 'portal.noaitaly.io');
-  assert.strictEqual(plan.hostOf('portal.noaitaly.io'), 'portal.noaitaly.io');
-  assert.strictEqual(plan.hostOf('Portal.NoaItaly.io.'), 'portal.noaitaly.io');
+  assert.strictEqual(plan.hostOf('https://portal.example.com/'), 'portal.example.com');
+  assert.strictEqual(plan.hostOf('http://portal.example.com:8443/a/b?c=1'), 'portal.example.com');
+  assert.strictEqual(plan.hostOf('portal.example.com'), 'portal.example.com');
+  assert.strictEqual(plan.hostOf('Portal.Example.com.'), 'portal.example.com');
   assert.strictEqual(plan.hostOf(''), '');
 });
 ok('related: un URL in ingresso non deve scartare le azioni del suo host (bug menu vuoto)', () => {
-  assert.ok(plan.related('portal.noaitaly.io', 'https://portal.noaitaly.io/'));
-  assert.ok(plan.related('portal.noaitaly.io', 'https://portal.noaitaly.io/qualcosa?x=1'));
-  assert.strictEqual(plan.related('altro.io', 'https://portal.noaitaly.io/'), false);
+  assert.ok(plan.related('portal.example.com', 'https://portal.example.com/'));
+  assert.ok(plan.related('portal.example.com', 'https://portal.example.com/qualcosa?x=1'));
+  assert.strictEqual(plan.related('altro.example.com', 'https://portal.example.com/'), false);
 });
 ok('renderMenu: mostra motivo, comando, tier e marcatura di conferma', () => {
   const txt = plan.renderMenu(M, { host: 'target.example.com' });

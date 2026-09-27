@@ -76,7 +76,7 @@ ok('releaseBatch(id) releases only the matching batch', () => {
 // --- execution path over a REAL populated model (review fix: tests must cover execute) ---
 const NMAP_XML = `<?xml version="1.0"?>
 <nmaprun><host>
-  <address addr="192.168.0.94" addrtype="ipv4"/>
+  <address addr="192.168.77.94" addrtype="ipv4"/>
   <ports>
     <port protocol="tcp" portid="445"><state state="open"/><service name="microsoft-ds"/></port>
   </ports>
@@ -105,7 +105,7 @@ function withEnv(d, scopeBody, fn) {
 
 ok('populated model -> executable actions carry real guarded cmds (execution path)', () => {
   const d = fs.mkdtempSync(path.join(os.tmpdir(), 'dsh-autopilot-exec-'));
-  withEnv(d, JSON.stringify({ targets: ['192.168.0.94'] }), () => {
+  withEnv(d, JSON.stringify({ targets: ['192.168.77.94'] }), () => {
     const inp = ap.gatherInputs();
     assert.ok(inp.executable.length > 0, 'expected executable actions from a populated model');
     for (const a of inp.executable) assert.match(String(a.cmd), /^node tools\/(run|workflow)\.js /);
@@ -121,10 +121,10 @@ ok('host outside scope.json is planned blocked, NEVER executable (fail-closed sc
 });
 ok('loop-watch signal reaches the driver: audit loop -> gatherInputs loopWatch + SKIP verdict', () => {
   const d = fs.mkdtempSync(path.join(os.tmpdir(), 'dsh-autopilot-lw-'));
-  withEnv(d, JSON.stringify({ targets: ['192.168.0.94'] }), () => {
+  withEnv(d, JSON.stringify({ targets: ['192.168.77.94'] }), () => {
     // 5 nmap esecuzioni IDENTICHE (firma normalizzata) -> loop consecutive
     const rows = [];
-    for (let i = 0; i < 5; i++) rows.push({ ts: '2026-08-31T00:00:0' + i + 'Z', bin: 'nmap', args: ['-p', '80', '192.168.0.94'] });
+    for (let i = 0; i < 5; i++) rows.push({ ts: '2026-08-31T00:00:0' + i + 'Z', bin: 'nmap', args: ['-p', '80', '192.168.77.94'] });
     fs.writeFileSync(process.env.RUN_AUDIT_FILE, rows.map((r) => JSON.stringify(r)).join('\n') + '\n');
 
     const inp = ap.gatherInputs();

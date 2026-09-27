@@ -38,7 +38,7 @@ const PHASE_KEYS = { w: 'web-test', h: 'host', R: 'report' };
 
 // ------------------------------------------------------------------ host filter
 // hostOf(target) — normalizza URL o host nella sola forma hostname. Serve perché l'operatore
-// può passare `https://portal.noaitaly.io/` mentre il grafo tiene `portal.noaitaly.io`: senza
+// può passare `https://portal.example.com/` mentre il grafo tiene `portal.example.com`: senza
 // questa normalizzazione il filtro scarterebbe TUTTE le azioni e il menu uscirebbe vuoto.
 function hostOf(target) {
   const s = String(target == null ? '' : target).trim();

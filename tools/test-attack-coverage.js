@@ -8,11 +8,7 @@
 const assert = require('assert');
 const ac = require('./attack-coverage');
 
-let pass = 0, fail = 0;
-function ok(name, fn) {
-  try { fn(); pass++; console.log(`  PASS ${name}`); }
-  catch (e) { fail++; console.log(`  FAIL ${name} :: ${String(e.message).split('\n')[0]}`); }
-}
+const { ok, summary } = require('./testkit');
 
 // Fixture registry: two classes share T1190; xss adds a sub-technique; authn a credential one;
 // container arrives via extra_surfaces; `other` is deliberately unmapped.
@@ -109,5 +105,4 @@ ok('real registry: every non-other class carries an attack mapping', () => {
   assert.ok(ac.plannedMap(reg).size >= 15, 'registry maps a meaningful set of techniques');
 });
 
-console.log(`\nattack-coverage: ${pass} pass, ${fail} fail`);
-process.exit(fail ? 1 : 0);
+summary('test-attack-coverage');

@@ -5,7 +5,7 @@
 **A penetration-testing harness where a finding is only a finding if code can prove it —
 and where the agent cannot violate scope, because the enforcement is beneath it.**
 
-[Apache-2.0](LICENSE) · zero dependencies · offline-capable · 89 tests in ~3 min
+[Apache-2.0](LICENSE) · zero dependencies · offline-capable · 92 tests in ~1 min
 
 ![Command Center overview](docs/assets/command-center-overview.png)
 
@@ -86,7 +86,7 @@ one verified, or **no report is produced at all**.
   On a client network, `npm install` does nothing.
 - **Runs air-gapped.** `local/` drives the same deterministic engine against a local
   model. No API key, no data leaving the engagement laptop.
-- **89 tests, ~3 minutes, no network.** Offline and loopback tests, classified by the
+- **92 tests, ~1 minute, no network.** Offline and loopback tests, classified by the
   runner; `npm test` is the gate, `npm run test:all` includes the live e2e set.
 - **Evidence memory that compounds.** `memory/` keeps sanitized technique→outcome
   lessons across engagements, with a sanitizer that refuses to store in-scope hosts,
@@ -99,7 +99,7 @@ Requires **Node ≥ 22** (the Command Center backend uses `node:sqlite`).
 ```bash
 git clone https://github.com/CSI-entitymorton/stavrosredteamer.git
 cd stavrosredteamer
-npm test                 # 89 tests, no install, no network
+npm test                 # 92 tests, no install, no network
 ```
 
 Then write your authorization. `scope.json` **is** the written authorization, and the
@@ -146,7 +146,7 @@ only the processes the harness owns.
 
 | | |
 |---|---|
-| `tools/` | the engine: 217 tools, scope guards, repeater, oracle, pipeline, C2, wifi, GUI, tests |
+| `tools/` | the engine: 139 modules, scope guards, repeater, oracle, pipeline, C2, wifi, GUI, tests |
 | `local/fleet/` | 28 agent definitions (orchestrator + specialists) |
 | `local/` | standalone runner against a local model — no cloud, no Freebuff |
 | `workflows/` | 14 reusable `enum-*` / `attack-*` pipelines |
@@ -161,19 +161,36 @@ bounty targets, or a lab. `scope.json` names which hosts may be tested; it does 
 pre-authorize destructive actions, which still need explicit in-session confirmation.
 
 One honest caveat, stated in [`SECURITY.md`](SECURITY.md) too: the guards run
-in-process and are not a sandbox. Tools reached through **MCP** bypass them entirely —
-if you mount one, you are outside the guard and responsible for it yourself.
+in-process and are not a sandbox. Tools reached through **MCP** bypass them — unless you
+mount the server *through* the proxy:
+
+```bash
+node tools/mcp-guard-proxy.js -- npx -y chrome-devtools-mcp@latest --headless --isolated
+```
+
+`mcp-guard-proxy.js` puts `scope-guard` and `ssrf-guard` in series with the server: it
+judges every `tools/call`, refuses out-of-scope or rebinding targets *before* the request
+leaves the machine (the agent gets an explicit error, not a silent failure), and appends
+every decision — `allow-scoped`, `allow-unscoped`, `block` — to `reports/tmp/mcp-guard.jsonl`.
+Mount a third-party server raw and you are outside the guard and responsible for it
+yourself; going through the proxy is the supported path.
 
 ## Documentation
 
 - [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — guard → model → tool, and why
+- [`docs/METHODOLOGY.md`](docs/METHODOLOGY.md) — how this is measured: three metrics, contamination, the severity ceiling (written to apply to any harness)
 - [`BENCHMARK.md`](BENCHMARK.md) — the contamination-proof benchmark, and why recall alone is not a claim
+- [`docs/TOOL-LANDSCAPE.md`](docs/TOOL-LANDSCAPE.md) — where the published AI-pentest benchmarks stop, argued against the strongest existing work
+- [`docs/THREAT-MODEL.md`](docs/THREAT-MODEL.md) — our own attack surface, written down before someone else finds it
 - [`docs/GLOSSARY.md`](docs/GLOSSARY.md) — canonical terminology for levels, status and guards
 - [`knowledge.md`](knowledge.md) — engagement rules and toolbox (the contract)
 - [`docs/toolbox.md`](docs/toolbox.md) — full flags per tool
 - [`docs/methodology-classes.md`](docs/methodology-classes.md) — testing by vulnerability class
 - [`docs/host-exploitation.md`](docs/host-exploitation.md) — post-ex, privesc, C2
 - [`docs/wireless.md`](docs/wireless.md) — wireless assessment, tier model
+- [`docs/RECORDING.md`](docs/RECORDING.md) — how the demo is produced: deterministic, isolated, one command from a GIF
+- [`docs/REFS-PROVENANCE.md`](docs/REFS-PROVENANCE.md) — what the reference corpus is, and its licensing status
+- [`docs/LAUNCH-PLAN.md`](docs/LAUNCH-PLAN.md) — the campaign: thesis, sequence, channels, what to judge it by
 - [`CHANGELOG.md`](CHANGELOG.md) — release history
 - [`SECURITY.md`](SECURITY.md) — disclosure policy, safe harbor, in-scope bugs
 

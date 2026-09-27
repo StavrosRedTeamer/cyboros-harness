@@ -69,6 +69,28 @@ function discover() {
     });
 }
 
+// ---- engagement files: un test non deve toccarli -----------------------------
+// I file di engagement (autorizzazione scritta, credenziali, scope wireless/mobile) sono dati
+// dell'operatore, gitignorati e non riproducibili. Un test che li riscrive — direttamente o via
+// un tool che ricade sul path di default invece di usare un env override — sta distruggendo
+// l'unica autorizzazione che esiste: qui diventa un FAIL esplicito, non un silenzio.
+const ENGAGEMENT_FILES = ['scope.json', 'auth.json', 'c2.json', 'wifi-scope.json', 'mobile-scope.json'];
+function engagementFingerprint() {
+  const crypto = require('crypto');
+  const out = {};
+  for (const f of ENGAGEMENT_FILES) {
+    const p = path.join(__dirname, '..', f);
+    try {
+      const st = fs.statSync(p);
+      out[f] = st.size + ':' + crypto.createHash('sha1').update(fs.readFileSync(p)).digest('hex');
+    } catch { out[f] = null; }
+  }
+  return out;
+}
+function engagementChanged(before, after) {
+  return Object.keys(before).filter((f) => before[f] !== after[f]);
+}
+
 // ---- single-test execution (async, with hard timeout) ------------------------
 function runOne(t, timeoutMs) {
   return new Promise((resolve) => {
@@ -76,6 +98,7 @@ function runOne(t, timeoutMs) {
     if (t.group === 'loopback') env.ALLOW_METADATA_TARGET = '1';
     else delete env.ALLOW_METADATA_TARGET; // offline tests must not silently rely on the opt-in
     const started = Date.now();
+    const engBefore = engagementFingerprint();
     const child = spawn(process.execPath, [t.full], { cwd: path.join(TOOLS_DIR, '..'), env });
     let out = '';
     let timedOut = false;
@@ -88,7 +111,12 @@ function runOne(t, timeoutMs) {
     });
     child.on('close', (code) => {
       clearTimeout(timer);
-      resolve({ ...t, ok: !timedOut && code === 0, code, ms: Date.now() - started, output: out, timedOut });
+      const touched = engagementChanged(engBefore, engagementFingerprint());
+      if (touched.length) {
+        out += `\n[run-tests] VIOLAZIONE: il test ha modificato ${touched.join(', ')} — i file di engagement non sono fixture.` +
+          `\n[run-tests] Se il colpevole non è il test, qualcosa d'altro in questa cartella (un'altra sessione, un'istanza della Console) sta scrivendo mentre la suite gira.`;
+      }
+      resolve({ ...t, ok: !timedOut && code === 0 && touched.length === 0, code, ms: Date.now() - started, output: out, timedOut, engagementTouched: touched });
     });
   });
 }
