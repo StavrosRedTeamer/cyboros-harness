@@ -7,6 +7,8 @@ and where the agent cannot violate scope, because the enforcement is beneath it.
 
 [Apache-2.0](LICENSE) · zero dependencies · offline-capable · 89 tests in ~3 min
 
+![Command Center overview](docs/assets/command-center-overview.png)
+
 </div>
 
 ---
@@ -121,6 +123,21 @@ The full operator surface — gateway launchers, the desktop Command Center, the
 runner — is documented in [`docs/command-center-desktop.md`](docs/command-center-desktop.md)
 and the harness contract in [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
 
+## The surface
+
+The Command Center is a desktop app over the same engine (`stavros-cc`, PyQt6, falling
+back to Chromium in app-mode). It is a **surface, not a gate**: it bypasses no guard, and
+every write it performs is a wrapper over an existing tool.
+
+Campaign → mission → approval → execution → verification → report → evidence bundle. The
+approval inbox is where the consent tokens live: a confirm-tier action cannot start
+without a granted, single-use, host-bound grant from the operator. `cc-panic.js` stops
+only the processes the harness owns.
+
+
+*Screenshot: synthetic dataset (RFC 2606 `.example` hosts), captured against an isolated
+`CC_ROOT` so no engagement data is involved.*
+
 ## What is in here
 
 | | |
@@ -146,6 +163,8 @@ if you mount one, you are outside the guard and responsible for it yourself.
 ## Documentation
 
 - [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — guard → model → tool, and why
+- [`BENCHMARK.md`](BENCHMARK.md) — the contamination-proof benchmark, and why recall alone is not a claim
+- [`docs/GLOSSARY.md`](docs/GLOSSARY.md) — canonical terminology for levels, status and guards
 - [`knowledge.md`](knowledge.md) — engagement rules and toolbox (the contract)
 - [`docs/toolbox.md`](docs/toolbox.md) — full flags per tool
 - [`docs/methodology-classes.md`](docs/methodology-classes.md) — testing by vulnerability class

@@ -790,21 +790,31 @@ function matchesBenchPort(blob, f, port) {
   const hosts = [f.host, f.target].filter(Boolean).map(String);
   return hosts.some(loopback);                     // nessuna porta citata + host loopback → bench locale
 }
+// Does this finding correspond to this seeded class? (keyword/class-id AND route)
+function classHit(c, f, port) {
+  const blob = findingBlob(f);
+  if (!matchesBenchPort(blob, f, port)) return false;
+  const kw = c.keywords.some(k => blob.includes(k.toLowerCase()));
+  const idMatch = blob.includes('bench-' + c.id);
+  const route = c.route ? blob.includes(c.route.toLowerCase()) : true;
+  return (kw || idMatch) && route;
+}
 function cmdEval(dir, opts) {
   const manifest = JSON.parse(fs.readFileSync(path.join(dir, 'manifest.full.json'), 'utf8'));
   const port = manifest.bench.port;
   const findings = readFindings(opts.findings || path.join(process.cwd(), 'reports', 'findings.jsonl'));
   const rows = [];
   let detected = 0, routeConfirmed = 0, verified = 0;
+  // ── precision, not just recall ──────────────────────────────────────────────
+  // A finding attributed to this bench that maps to no seeded class is a FALSE
+  // POSITIVE. Counting only `detected` (recall) would let a harness that reports
+  // everything score 100% — the exact failure mode this project claims to fix,
+  // and the metric every peer project advertises but none of them measures.
+  const attributed = findings.filter(f => matchesBenchPort(findingBlob(f), f, port));
+  const truePos = attributed.filter(f => manifest.classes.some(c => classHit(c, f, port)));
+  const falsePosList = attributed.filter(f => !manifest.classes.some(c => classHit(c, f, port)));
   for (const c of manifest.classes) {
-    const hits = findings.filter(f => {
-      const blob = findingBlob(f);
-      if (!matchesBenchPort(blob, f, port)) return false;
-      const kw = c.keywords.some(k => blob.includes(k.toLowerCase()));
-      const idMatch = blob.includes('bench-' + c.id);
-      const route = c.route ? blob.includes(c.route.toLowerCase()) : true;
-      return (kw || idMatch) && route;
-    });
+    const hits = findings.filter(f => classHit(c, f, port));
     const routeHits = hits.filter(f => c.route && JSON.stringify({ target: f.target, endpoint: f.endpoint, poc: f.poc }).includes(c.route));
     const verHits = hits.filter(f => f.status === 'verified' || f.verify_level === 'proven_impact' || f.verify_level === 'exploited');
     const status = hits.length ? 'DETECTED' : 'MISSED';
@@ -820,6 +830,19 @@ function cmdEval(dir, opts) {
     routeConfirmed,
     verified,
     detectedPct: total ? Math.round(100 * detected / total) : 0,
+    // Of the classes found, how many produced a finding that actually reached
+    // verified/proven_impact. This is the metric that separates a harness that
+    // finds things from one that proves things, and it is the only reason this
+    // project exists. It is bounded by recall, never above it.
+    verifiedPct: detected ? Math.round(100 * verified / detected) : 0,
+    // Recall (detectedPct) says "did you find it". Precision says "was anything
+    // you said real, actually real?" Only the two together are a finding-quality
+    // score; neither alone is worth publishing.
+    reported: attributed.length,
+    truePositives: truePos.length,
+    falsePositives: falsePosList.length,
+    precisionPct: attributed.length ? Math.round(100 * truePos.length / attributed.length) : 100,
+    falsePositiveList: falsePosList.map(f => f.id || f.title || '(untitled)').slice(0, 20),
     row: rows,
   };
   // ── trend tracking: una riga per eval → reports/bench-history.jsonl ──────────
@@ -837,6 +860,10 @@ function cmdEval(dir, opts) {
       port,
       total, detected, routeConfirmed, verified,
       detectedPct: summary.detectedPct,
+      verifiedPct: summary.verifiedPct,
+      reported: summary.reported,
+      falsePositives: summary.falsePositives,
+      precisionPct: summary.precisionPct,
       missed: rows.filter(r => r.status === 'MISSED').map(r => r.class),
     }) + '\n');
     historyNote = 'history appended: reports/bench-history.jsonl (#' + (prev + 1) + ')';
@@ -854,6 +881,11 @@ function cmdEval(dir, opts) {
   for (const r of rows) md.push('| ' + r.class + ' | ' + r.severity + ' | ' + r.status + ' | ' + (r.findings.join(', ') || '—') + ' |');
   md.push('');
   md.push('detected ' + detected + '/' + total + ' (' + summary.detectedPct + '%) · route-confirmed ' + routeConfirmed + ' · verified ' + verified);
+  md.push('');
+  md.push('precision ' + summary.truePositives + '/' + summary.reported + ' (' + summary.precisionPct + '%) · false positives ' + summary.falsePositives);
+  if (summary.falsePositiveList.length) md.push('FP: ' + summary.falsePositiveList.join(', '));
+  md.push('');
+  md.push('**headline:** recall ' + summary.detectedPct + '% · precision ' + summary.precisionPct + '% · verification rate ' + summary.verifiedPct + '%');
   const out = path.join(process.cwd(), 'reports', 'bench-' + manifest.bench.name + '-eval.md');
   fs.mkdirSync(path.dirname(out), { recursive: true });
   fs.writeFileSync(out, md.join('\n'));

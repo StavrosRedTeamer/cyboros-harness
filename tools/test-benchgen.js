@@ -180,6 +180,30 @@ async function main() {
   check('route-confirmed ≥ all classes', ev1.routeConfirmed >= manifest.classes.length, 'routeConfirmed=' + ev1.routeConfirmed);
   check('verified ≥ all classes', ev1.verified >= manifest.classes.length, 'verified=' + ev1.verified);
 
+  // ── precision: findings on the bench that map to no seeded class are FPs ──
+  // The failure mode the whole project exists to prevent is a harness that
+  // reports everything. A recall-only benchmark cannot see it, so pin it here:
+  // perfect recall plus junk findings must score <100% precision.
+  check('correct findings → 100% precision (0 FP)',
+    ev1.falsePositives === 0 && ev1.precisionPct === 100,
+    'fp=' + ev1.falsePositives + ' precision=' + ev1.precisionPct + '%');
+  const noisyFindings = path.join(tmpBase, 'noisy.jsonl');
+  fs.writeFileSync(noisyFindings,
+    lines.join('\n') + '\n' + [
+      { id: 'fp-1', title: 'Reflected XSS in nonexistent banner param', host: '127.0.0.1', endpoint: '/totally/unknown/route', target: 'http://127.0.0.1:' + port, severity: 'High', status: 'verified', verify_level: 'proven_impact' },
+      { id: 'fp-2', title: 'SQL injection in admin report export', host: '127.0.0.1', endpoint: '/another/fake/route', target: 'http://127.0.0.1:' + port, severity: 'Critical', status: 'verified', verify_level: 'proven_impact' },
+    ].map(o => JSON.stringify(o)).join('\n') + '\n');
+  const evNoisy = JSON.parse(execFileSync(process.execPath, [path.join(TOOLS, 'gen-bench.js'), 'eval', outDir, '--findings', noisyFindings, '--json', '--no-history'], { encoding: 'utf8' }));
+  check('junk findings on-target are counted as false positives',
+    evNoisy.falsePositives === 2, 'fp=' + evNoisy.falsePositives);
+  check('recall still 100% while precision drops below 100%',
+    evNoisy.detected === manifest.classes.length && evNoisy.precisionPct < 100,
+    'detected=' + evNoisy.detected + ' precision=' + evNoisy.precisionPct + '%');
+  check('false-positive list is reported for triage',
+    Array.isArray(evNoisy.falsePositiveList) && evNoisy.falsePositiveList.length === 2);
+  check('no findings reported → 100% precision (nothing to be false about)',
+    ev3.precisionPct === 100 && ev3.reported === 0, 'reported=' + ev3.reported);
+
   // ── history tracking: una riga jsonl per eval (cwd isolato in tmpBase) ──
   const ev4 = JSON.parse(execFileSync(process.execPath, [path.join(TOOLS, 'gen-bench.js'), 'eval', outDir, '--findings', goodFindings, '--json'], { encoding: 'utf8', cwd: tmpBase }));
   const histPath = path.join(tmpBase, 'reports', 'bench-history.jsonl');

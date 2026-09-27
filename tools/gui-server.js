@@ -41,7 +41,14 @@ const { augmentPath } = require('./tool-path');
 augmentPath(process.env);
 
 const TOOLS_DIR = __dirname;
-const ROOT = path.join(TOOLS_DIR, '..');
+// CC_ROOT is honored by every other cc-* tool (cc-campaign, cc-mission, cc-ledger,
+// cc-approvals, cc-panic). The server has to agree: with ROOT pinned to the repo,
+// an isolated root still served the real reports/, so `demo-command-center.sh`
+// -- documented as never touching real data -- showed real findings, and the
+// tunneled-client runbook exposed them to whoever held the token.
+// Unset => unchanged behaviour (the repo root). GUI_DIR stays on the repo because
+// the SPA assets ship with the code, not with the engagement data.
+const ROOT = process.env.CC_ROOT ? path.resolve(process.env.CC_ROOT) : path.join(TOOLS_DIR, '..');
 const GUI_DIR = path.join(TOOLS_DIR, 'gui');
 const REPORTS = path.join(ROOT, 'reports');
 // SCOPE_JSON is the same override scope-guard.js honors (tests, multi-project setups).
