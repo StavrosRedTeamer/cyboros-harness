@@ -81,10 +81,13 @@ so the moment those three were committed the suite would break for everyone.
 three can land whenever.
 
 Note the other direction of that coupling: `tools/test-repo-invariants.js` (also
-untracked) asserts that every "N tests" in the README equals the number the gate
-runs. It is currently satisfied by the pending README change from 89 to 92.
-Committing the test without that README change turns CI red. **These four files
-and the README move together.**
+untracked) asserts that every number the README declares equals reality — the test
+count, the agent count, the module count. It is a genuinely good gate: it caught
+this repository declaring 140 modules the moment `ensure-test-scope.js` made it
+141. **Re-derive the README numbers at the moment that test lands**, because
+anything added since the pending README edit shifts them. Committing the test
+against stale numbers turns CI red for a reason that has nothing to do with the
+test being wrong.
 
 ## Next, in order
 
