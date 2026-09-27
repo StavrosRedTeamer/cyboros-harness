@@ -47,8 +47,11 @@
     "LICENSE"
   ],
   "scripts": {
+    "pretest": "node tools/ensure-test-scope.js",
     "test": "node tools/run-tests.js",
+    "pretest:ci": "node tools/ensure-test-scope.js",
     "test:ci": "node tools/run-tests.js --jobs 2",
+    "pretest:all": "node tools/ensure-test-scope.js",
     "test:all": "node tools/run-tests.js --e2e",
     "test:list": "node tools/run-tests.js --list",
     "console": "node tools/gui-server.js",

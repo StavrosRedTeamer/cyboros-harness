@@ -1,0 +1,12 @@
+{
+  "_comment": "EXAMPLE / TEST FIXTURE — not an authorization. scope.json is the written authorization and is gitignored because it names real targets. tools/ensure-test-scope.js copies this file to scope.json when scope.json is absent, so that `npm test` works on a fresh clone: the offline tests need loopback, and the scope-guard is fail-closed without it. Loopback-only is still fail-closed for everything remote. Copy it, then name the hosts you are actually authorized to test.",
+  "allowed_hosts": [
+    "127.0.0.1",
+    "localhost"
+  ],
+  "allowed_ips": [
+    "127.0.0.1/32",
+    "::1/128"
+  ],
+  "max_requests_per_second": 2
+}
