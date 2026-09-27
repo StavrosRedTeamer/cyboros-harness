@@ -168,7 +168,7 @@ class LocalLLM {
   // attiva, usa il path SSE (_postStream) e invoca onToken/onTimings/onFirstToken in tempo
   // reale. Senza questi parametri il comportamento è IDENTICO a prima (run-local.js, --check,
   // fasi autonome con GBNF): single/multi-shot non-stream, nessun callback nuovo invocato.
-  async runAgent({ system, task, tools, dispatch, onStep, grammar, history, stream, onToken, onTimings, onFirstToken }) {
+  async runAgent({ system, task, tools, dispatch, onStep, grammar, history, stream, onToken, onTimings, onFirstToken, onTrace }) {
     const messages = Array.isArray(history) ? history.slice() : [];
     if (system && !messages.some((m) => m.role === 'system')) messages.push({ role: 'system', content: system });
     messages.push({ role: 'user', content: task });
@@ -250,6 +250,13 @@ class LocalLLM {
       }
       if (!msg) throw new Error('Risposta LLM vuota/malformata.');
 
+      // onTrace: osservazione PURA, nessun effetto sul loop. Emette cosa ha detto il
+      // modello a ogni giro, cosi' un run in un'altra finestra (tail -f) mostra la
+      // conversazione per intero. Non tocca grammatica, streaming o dispatch: se
+      // cambiasse qualcosa, un benchmark misurerebbe una configurazione diversa da
+      // quella che si spedisce.
+      if (onTrace) onTrace({ type: 'model', iter, text: msg.content || '' });
+
       // 1) tool_calls nativi
       if (msg.tool_calls && msg.tool_calls.length) {
         messages.push({ role: 'assistant', content: msg.content || '', tool_calls: msg.tool_calls });
@@ -275,6 +282,7 @@ class LocalLLM {
             seenActions.set(normKey(tc.function.name, args), { count: 0, lastOutput: out, args });
           }
           messages.push({ role: 'tool', tool_call_id: tc.id, content: clip(out, clipN) });
+          if (onTrace) onTrace({ type: 'tool', iter, tool: tc.function.name, args, out });
         }
         continue;
       }
@@ -300,10 +308,12 @@ class LocalLLM {
           seenActions.set(normKey(act.tool, act.args), { count: 0, lastOutput: out, args: act.args });
         }
         messages.push({ role: 'user', content: `OBSERVATION (${act.tool}):\n${clip(out, clipN)}\nContinua, oppure concludi con FINAL: <riassunto>.` });
+        if (onTrace) onTrace({ type: 'tool', iter, tool: act.tool, args: act.args, out, viaText: true });
         continue;
       }
 
       // 3) nessun tool: e' la risposta finale
+      if (onTrace) onTrace({ type: 'final', iter, text: stripFinal(text) });
       return { text: stripFinal(text), messages };
     }
     return { text: '[max iterazioni tool raggiunte]', messages };

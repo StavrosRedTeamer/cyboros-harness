@@ -43,6 +43,30 @@ const CFG = JSON.parse(fs.readFileSync(path.join(__dirname, 'config.local.json')
 function log(...a) { console.log('[local]', ...a); }
 function die(msg) { console.error('[local] ERRORE:', msg); process.exit(1); }
 
+// ── --watch: rendering della conversazione per il terminale di monitoraggio ────────────
+// Scrive su stdout gia' flushato riga per riga, cosi' `tail -f` mostra subito il giro
+// corrente invece di aspettare il buffering a 4 KB. Nessun timestamp: in un log da
+// confrontare fra seed, l'orario e' rumore e fa divergere i diff.
+function makeWatcher(opts) {
+  const clamp = opts.watchClamp || 600;
+  const w = (s) => process.stdout.write(s);
+  const cut = (s, n) => {
+    const t = String(s == null ? '' : s);
+    return t.length > n ? t.slice(0, n) + `\n… [+${t.length - n} caratteri tagliati]` : t;
+  };
+  return (ev) => {
+    if (ev.type === 'model') {
+      w(`\n── giro ${ev.iter + 1}: modello ──\n`);
+      w(cut(ev.text, clamp) + '\n');
+    } else if (ev.type === 'tool') {
+      w(`  ▸ ${ev.tool}${ev.viaText ? ' (protocollo testuale)' : ''} ${cut(JSON.stringify(ev.args), 400)}\n`);
+      w('    ↳ ' + cut(String(ev.out).replace(/\n/g, '\n      '), clamp) + '\n');
+    } else if (ev.type === 'final') {
+      w(`\n══ FINAL (giro ${ev.iter + 1}) ══\n${cut(ev.text, clamp * 2)}\n`);
+    }
+  };
+}
+
 function parseArgs(argv) {
   const a = { _: [], autoRecon: true };
   for (let i = 0; i < argv.length; i++) {
@@ -55,6 +79,8 @@ function parseArgs(argv) {
     else if (t === '--phase') a.phase = argv[++i];
     else if (t === '--class') a.klass = argv[++i];
     else if (t === '--yes') a.yes = true;
+    else if (t === '--watch') a.watch = true;
+    else if (t === '--watch-clamp') a.watchClamp = parseInt(argv[++i], 10) || 600;
     else a._.push(t);
   }
   a.host = a._[0];
@@ -117,6 +143,12 @@ async function runPhaseAgent(llm, agentId, ctx, opts = {}) {
   const res = await llm.runAgent({
     system: agent.system, task, tools, dispatch, grammar,
     onStep: (s) => log(`  · ${s.tool}${s.viaText ? ' (text)' : ''} ${JSON.stringify(s.args).slice(0, 120)}`),
+    // --watch stampa la conversazione completa, giro per giro, man mano che avviene.
+    // Pensato per `... | tee /tmp/bench-live.log` + `tail -f` in un secondo terminale:
+    // serve a vedere PERCHE' un finding non e' stato trovato, che e' la domanda che il
+    // punteggio finale non risponde. Osserva solo: non cambia grammatica, streaming,
+    // dispatch o loop, quindi un run --watch resta confrontabile con uno senza.
+    onTrace: opts.watch ? makeWatcher(opts) : undefined,
   });
   log(`── fase ${agentId} FINAL:\n${res.text}\n`);
   return res;

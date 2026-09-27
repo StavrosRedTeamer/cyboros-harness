@@ -45,6 +45,37 @@ node local/run-local.js <host> --phase report
 
 # stampa system+task senza chiamare l'LLM (debug dei prompt)
 node local/run-local.js <host> --dry
+
+# --watch: stampa la conversazione completa, giro per giro, in tempo reale
+node local/run-local.js <host> --phase web-test --class sqli --watch
+node local/run-local.js <host> --phase web-test --class sqli --watch --watch-clamp 2000
+```
+
+### `--watch` — guardare l'assessment mentre avviene
+
+`--watch` stampa su stdout cosa dice il modello a ogni giro, quale tool chiama con quali
+argomenti, e **cosa il tool ha risposto**, poi il `FINAL`. Serve a capire *perché* un finding
+non è stato trovato, che è la domanda che il punteggio finale non risponde mai.
+
+Per seguirlo in un secondo terminale:
+
+```bash
+# terminale 1 (Freebuff)
+node local/run-local.js 127.0.0.1:3001 --phase web-test --class sqli --watch 2>&1 | tee /tmp/bench-live.log
+
+# terminale 2 (monitoraggio)
+tail -f /tmp/bench-live.log
+```
+
+`--watch-clamp N` tronca ogni blocco a N caratteri (default 600); per output di tool
+voluminosi conviene alzarlo, o abbassarlo se ti interessa solo la forma delle azioni.
+
+**`--watch` è puramente osservativo**: non cambia grammatica, streaming, dispatch né
+terminazione del loop, quindi un run con `--watch` resta confrontabile con uno senza. Il
+test che lo garantisce è `tools/test-local-watch.js`. Nota che **non** è lo streaming
+token-per-token: quello (`stream`/`onToken` in `local/llm.js`) esiste ed è usato dal REPL,
+ma è incompatibile con la grammatica GBNF, e disattivarla cambierebbe la configurazione
+misurata dal benchmark.
 ```
 
 ### Modalità `--plan` — recon autonomo → opzioni → **attesa dell'operatore**
