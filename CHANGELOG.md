@@ -9,6 +9,12 @@ rather than by version number.
 ## [Unreleased]
 
 ### Added
+- `tools/test-repo-history.js` — a gate on the git **history**, which nothing checked before:
+  every ref must be free of engagement paths (`refs/`, `temp/`, `reports/`, `evidence/`,
+  `*.bak.json`, `scope.json`…), every pair of refs must share an ancestor, and no blob may exceed
+  1 MiB. It runs in CI as the `history` job, which checks out with `fetch-depth: 0` because a
+  shallow clone cannot answer any of those questions (the tool says so loudly instead of passing).
+  An index-only gate was what let the two problems below survive for months.
 - Apache-2.0 license and a `SECURITY.md` with a safe-harbor policy, a private
   disclosure channel, and an explicit statement of which vulnerability classes
   count as guardrail bypasses.
@@ -108,6 +114,22 @@ rather than by version number.
   APKs, captured target HTML, caches, real hosts) or `scope.*.bak.json`.
 - New stray backup files (`*.bak`, `*.v1-forensic`, `*.orig`, `*.rej`) are now
   ignored.
+
+### Security
+- The git history was rewritten to remove two things that a published clone would have exposed,
+  neither of which is visible from the working tree or the index. **`refs/`** — the corpus with
+  the licensing gap documented in `docs/REFS-PROVENANCE.md` — had been taken out of the index and
+  gitignored, but was still present in 131 blobs (2.3 MB) across the history of `master`;
+  `git filter-repo` rewrote all 31 commits without it. **`perf/pacing-and-cache`** was a lineage
+  with no common ancestor with `master` (25 commits, root 2026-08-22) that carried ~70 MB of
+  uncompressed engagement material — a 37 MB `arduino-cli`, a client source map
+  (`evidence/noa4-synaptic/joinnoa-main.map`), a captured page (`evidence/raw/kela_succ.html`) —
+  and was pushed to `origin`. A history with no common ancestor never reaches `master` through a
+  merge, so no review of this repository would have shown it. It was deleted from `origin` and
+  locally, along with `command-center-redesign` (an ancestor of `master`, nothing unique). The
+  repository is one lineage again: pack 49.49 MiB → 2.08 MiB, objects 5,317 → 722, `.git`
+  52 MB → 2.3 MB, refs/ blobs in history 131 → 0. Every commit got a new SHA, and the pre-rewrite
+  state is preserved in a `git bundle --all` kept outside the repository and never pushed.
 
 ## 2026-09-26 — Command Center (WP2–WP9)
 

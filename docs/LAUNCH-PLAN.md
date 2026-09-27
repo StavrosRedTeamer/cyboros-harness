@@ -49,7 +49,7 @@ field or in this repository.
 | `docs/TOOL-LANDSCAPE.md` | where the published benchmarks stop. The narrow gap, argued against the strongest existing work rather than around it |
 | `docs/THREAT-MODEL.md` | our own attack surface, written down before someone else finds it. Framed as a challenge |
 | `docs/RECORDING.md` + `docs/demo.tape` + `tools/demo.sh` | the README demo: deterministic, isolated, one command from a GIF |
-| `tools/ensure-test-scope.js` | a clean clone can run its own suite: 91 pass, 0 fail, verified from scratch |
+| `tools/ensure-test-scope.js` | a clean clone can run its own suite: 93 pass, 0 fail, verified from scratch |
 | `tools/mcp-guard-proxy.js` | committed and tested. It was untracked while the README documented it |
 | `tools/testkit.js` | landed alone, so the three tests that require it can land safely |
 | `tools/gen-bench.js` | the contamination-proof generator and evaluator, instrument ready, no scores published yet |
@@ -57,6 +57,7 @@ field or in this repository.
 | De-identification | tailnet IP, adb serial and login user gone; they are required arguments now |
 | `refs/` provenance | the licensing gap made visible, then the directory unpublished until it is recoverable |
 | `package.json` | `repository`, `bugs`, `homepage`, `files` whitelist, five verified `bin` entries |
+| History rewrite + `tools/test-repo-history.js` | the engagement data and the `refs/` corpus are out of the git history, not just out of the tree, and a gate on every ref keeps them out (job CI `history`) |
 
 ## Strategy correction
 
@@ -91,45 +92,60 @@ because it is a cost we are volunteering to pay.
 
 ## Blockers
 
-**1. `refs/` licensing — resolved, reversibly.**
+**1. `refs/` licensing — resolved, and no longer recoverable from history.**
 Verbatim reproductions of third-party documents with the per-group sources
-stripped, plus an explicit Tencent copyright claim. Out of the index and
-gitignored; files on disk; `git add -f refs/` brings them back. Nothing in code
-reads it. `docs/REFS-PROVENANCE.md` keeps it legible and names the eight
+stripped, plus an explicit Tencent copyright claim. Out of the index, gitignored,
+and since 2026-09-28 out of the git history as well: `git filter-repo` rewrote
+all 31 commits without it. The corpus is no longer reachable with `git log -p` on
+a published clone — it survives in the maintainer's working copy on disk and in
+the pre-rewrite bundle. Nothing in code reads it.
+`docs/REFS-PROVENANCE.md` keeps the decision legible and names the eight
 documents `refs/README.md` calls self-written, in case the answer is a clean
 subset rather than all or nothing.
 
-**2. A clean clone could not run its own suite — resolved.**
+**2. A second lineage carried the engagement data — resolved.**
+`perf/pacing-and-cache` (25 commits, root `f46e781` of 2026-08-22) had **no
+common ancestor with `master`**: it was the pre-restructure snapshot of this
+project, and it carried ~70 MB of uncompressed engagement material — a 37 MB
+`arduino-cli`, a client source map, a captured HTML page — and it was already
+pushed to `origin`. A history with no common ancestor never arrives in `master`
+through a merge, so no review of this repository would ever have shown it: the
+only thing between it and a public repository was that the visibility switch had
+not been flipped yet. Deleted from `origin` and locally, together with
+`command-center-redesign` (an ancestor of `master`, nothing unique), so the
+repository is one lineage again. The pre-rewrite state, both lineages included,
+is preserved in a `git bundle --all` kept outside the repository and never
+pushed.
+
+**3. A clean clone could not run its own suite — resolved.**
 `scope.json` is gitignored, correctly, which left a clean checkout with no
 authorization, and the fail-closed guard blocked the loopback the offline tests
 legitimately need. `tools/ensure-test-scope.js` provisions a loopback-only scope
 when none exists, and never touches one that does. Loopback-only is still
 fail-closed for everything remote.
 
-**3. The remaining red, which is not ours to commit.**
-`doctor --check` exits 2 on a clean clone on one check only: `.agents/*.ts
-(agenti definiti) 1 agenti`. The committed `countAgents()` counts one file while
-demanding twenty. **The fix is already in the working tree, uncommitted.** It
-lands with the rest of that change set; until then CI on a clean checkout cannot
-be green.
+**4. `doctor --check` on a clean clone — resolved.**
+`countAgents()` looked for the fleet in `.agents/`, which the fleet split had
+emptied, so a healthy checkout reported `core rotto=SÌ`. It counts
+`local/fleet/` plus the root agent now, and `doctor --check` exits 0 on a clean
+clone (verified). The binary-only check still exits 1 on a bare runner, which is
+expected and does not fail CI.
 
-**4. That change set is coupled and must move as one.**
-`tools/test-repo-invariants.js` asserts every number the README declares is real —
-test count, agent count, module count. It earns its keep: it caught this
-repository claiming 140 modules the moment `tools/ensure-test-scope.js` made it
-141. It is satisfied only by the pending README edit, and those numbers are
-already stale in one place. **Re-derive them when the test lands.** The three
-tests that require `tools/testkit.js` must land with it already in place, which
-it now is.
+**5. Every commit SHA here is pre-rewrite.**
+The rewrite of 2026-09-28 gave all 31 commits new ids, so a commit quoted in an
+older issue, note or draft no longer resolves. Nothing was published yet, so no
+external clone is broken by it; the README's citation advice ("cite the commit
+you used") applies from the rewrite onward.
 
 ## The sequence
 
 Nothing is published before the thing it depends on exists.
 
 **Week 0 — make it publishable.**
-Land the pending change set as one unit. Record the demo. Link the new documents
-from the README. `npm test` green from a clean clone, 92/0 or 91/0 depending on
-whether `test-repo-invariants` has landed. Nothing goes public this week.
+The pending change set has landed as one unit (the tip of `master`), the README
+counts are re-derived and held there by `tools/test-repo-invariants.js`, and
+`npm test` is green from a clean clone: 93 pass, 0 fail. What is left in this
+week is the demo recording and the README links. Nothing goes public this week.
 
 **Week 1 — measure, do not write.**
 Run the A/B: N seeds, same model, guard on and guard off, populating
@@ -146,7 +162,10 @@ the venues below.
 
 **Week 3 — the repository goes public.**
 Visibility is a separate switch from pushing, and it is deliberate: everything
-the anchor references is already true and public by then. Show HN as **Show HN**
+the anchor references is already true and public by then. Before flipping it,
+re-run the history gate (`node tools/test-repo-history.js`, also the CI job
+`history`) and confirm it is green: it is the check that the two things above —
+the `refs/` corpus and the second lineage — have not come back in some other ref. Show HN as **Show HN**
 (not a link — a three-day-old repository with no issues fails validity), Tue to
 Thu, 8–9am ET. Then stay in the thread for the first two hours answering
 everything. Comment activity and freshness is what actually moves the ranking, not

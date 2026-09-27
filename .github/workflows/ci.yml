@@ -116,3 +116,20 @@ jobs:
             fi
           done
           exit $bad
+
+  history:
+    name: repo history
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # `hygiene` controlla l'indice, questo job controlla la STORIA: è la storia che
+          # viene pubblicata insieme al repository. Il gate interroga path e lineage di ogni
+          # ref, quindi il default (fetch-depth: 1) lo farebbe uscire in SKIP e non vedrebbe
+          # nulla: le evidenze di engagement e il corpus `refs/` sono rimasti in storia
+          # esattamente perché nessun gate la guardava.
+          fetch-depth: 0
+          fetch-tags: true
+
+      - name: Nessun materiale di engagement o corpus nella storia
+        run: node tools/test-repo-history.js

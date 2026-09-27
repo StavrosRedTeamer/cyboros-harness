@@ -43,16 +43,33 @@ any tool under `tools/`. It is read on demand by the agent at engagement time,
 from the working copy. Removing it from the repository costs the public
 readers the knowledge base and costs the engine nothing.
 
-The files are untouched on disk in the maintainer's working copy. They are
-removed from the git index only.
+The files are untouched on disk in the maintainer's working copy. They were
+removed from the git index first, and on 2026-09-28 from the git **history** as
+well: `git filter-repo` rewrote every commit without `refs/`, so the corpus is
+not recoverable with `git log -p` on a published clone. That distinction is the
+whole point — the index is what the next commit contains, the history is what a
+reader gets when they clone, and only the second one is a redistribution.
+
+The rewrite also moved every commit to a new SHA and deleted two lineages that
+the repository did not need (one of them carried engagement evidence and had no
+common ancestor with `master` at all). `tools/test-repo-history.js` is the gate
+that keeps all of this from coming back: it checks every ref, not the working
+tree, and it runs in CI as the `history` job. The pre-rewrite state of the
+repository is preserved in a `git bundle --all` kept outside the repository, and
+is never pushed.
 
 ## How to put it back
 
-Once the sources are recovered, one command:
+Once the sources are recovered, one command re-adds the corpus to the *working
+tree and the next commit*:
 
 ```bash
 git add -f refs/
 ```
+
+That does not restore it to history, and it is not supposed to: if the corpus is
+ever published it will be published from that commit onward, with no earlier
+blob to leak. The historical copy lives only in the pre-rewrite bundle.
 
 The three routes, in order of preference:
 
