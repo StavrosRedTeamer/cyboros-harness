@@ -28,6 +28,21 @@
       "detect": [["SeImpersonatePrivilege\\s+Enabled", "seimpersonate-potato", "Critical"], ["SeAssignPrimaryTokenPrivilege\\s+Enabled", "seassignprimarytoken-potato", "Critical"], ["SeBackupPrivilege\\s+Enabled", "sebackup-shadowcopy", "High"], ["SeDebugPrivilege\\s+Enabled", "sedebug-inject", "High"], ["SeLoadDriverPrivilege\\s+Enabled", "seloaddriver", "Medium"]] },
     { "id": "win-aie", "os": "windows", "title": "AlwaysInstallElevated (MSI as SYSTEM)", "cmds": ["reg query HKLM\\SOFTWARE\\Policies\\Microsoft\\Windows\\Installer /v AlwaysInstallElevated 2>&1 & reg query HKCU\\SOFTWARE\\Policies\\Microsoft\\Windows\\Installer /v AlwaysInstallElevated 2>&1"],
       "detect": [["0x1", "always-install-elevated", "Critical"]] },
+
+    { "id": "ctr-identity", "os": "container", "title": "container markers (dockerenv / cgroup / pid-ns view)", "cmds": ["ls /.dockerenv 2>&1; cat /proc/1/cgroup 2>&1 | head -5; ps -p 1 -o comm= 2>&1"],
+      "detect": [["systemd|\\binit\\b", "ctr-pidns-shared", "High"], ["kubepods|docker|containerd|lxc|podman", "ctr-cgroup", "Info"], ["dockerenv", "ctr-dockerenv", "Info"]] },
+    { "id": "ctr-docker-sock", "os": "container", "title": "container runtime sockets mounted (docker/containerd/crio)", "cmds": ["ls -la /var/run/docker.sock /run/docker.sock /var/run/containerd/containerd.sock /var/run/crio/crio.sock 2>&1"],
+      "detect": [["srwx|rw[r-][wx-]", "ctr-runtime-socket", "Critical"]] },
+    { "id": "ctr-privileged", "os": "container", "title": "privileged mode / full capabilities (CapEff)", "cmds": ["grep -i cap /proc/self/status 2>&1"],
+      "detect": [["CapEff:\\s*0000003fffffffff", "ctr-privileged-mode", "Critical"], ["CapEff:\\s*000000[1-9a-f]", "ctr-caps-partial", "Medium"]] },
+    { "id": "ctr-caps", "os": "container", "title": "dangerous POSIX capabilities (sys_admin/sys_module/dac/ptrace)", "cmds": ["capsh --print 2>&1 | head -8"],
+      "detect": [["cap_sys_admin", "ctr-cap-sysadmin", "Critical"], ["cap_sys_module", "ctr-cap-sysmodule", "Critical"], ["cap_dac_read_search|cap_dac_override", "ctr-cap-dac", "High"], ["cap_sys_ptrace", "ctr-cap-ptrace", "High"]] },
+    { "id": "ctr-host-mount", "os": "container", "title": "host filesystem / runtime dirs mounted writable", "cmds": ["cat /proc/mounts 2>&1; ls -ld /host /rootfs /mnt/host 2>&1"],
+      "detect": [["/dev/(sd|nvme|vd|xvd)[a-z0-9]*\\s+/(host|rootfs|mnt/host)", "ctr-host-device-mount", "Critical"], ["/var/lib/docker|/var/lib/kubelet", "ctr-runtime-dir-mount", "High"]] },
+    { "id": "ctr-k8s-sa", "os": "container", "title": "Kubernetes service-account token + API env", "cmds": ["ls -la /var/run/secrets/kubernetes.io/serviceaccount/ 2>&1; env 2>&1 | grep -i kube"],
+      "detect": [["token", "ctr-k8s-sa-token", "High"], ["KUBERNETES_SERVICE", "ctr-k8s-api-env", "Medium"]] },
+    { "id": "ctr-cgroup-release", "os": "container", "title": "cgroup v1 release_agent exposure (host command as root)", "cmds": ["ls -la /sys/fs/cgroup/release_agent /sys/fs/cgroup/*/release_agent 2>&1; cat /proc/self/cgroup 2>&1 | head -3"],
+      "detect": [["release_agent", "ctr-cgroup-release-agent", "High"]] },
     { "id": "win-services", "os": "windows", "title": "SYSTEM services (unquoted/writable paths)", "cmds": ["powershell -nop -c \"Get-CimInstance Win32_Service | Where-Object {$_.StartName -match 'LocalSystem'} | Select-Object Name,PathName | Format-List\""],
       "detect": [["\"\\s", "unquoted-service-path", "Medium"], ["Program Files \\(x86\\)", "service-path-review", "Info"]] },
     { "id": "win-tasks", "os": "windows", "title": "scheduled tasks (SYSTEM context)", "cmds": ["schtasks /query /fo LIST 2>&1 | findstr /i \"TaskName Run As User\""],
@@ -49,6 +64,12 @@
     "win-potato":      { "os": "windows", "technique": "T1134", "cve": null, "success": "S-1-16-12288|SYSTEM", "note": "SeImpersonate/SeAssignPrimaryToken -> potato family (GodPotato/SweetPotato). Operator-supplied binary." },
     "win-msi-aie":     { "os": "windows", "technique": "T1053", "cve": null, "success": "S-1-16-12288|SYSTEM", "note": "AlwaysInstallElevated: craft MSI + msiexec /qn /i. Requires HKLM AND HKCU values = 0x1." },
     "win-savecred":    { "os": "windows", "technique": "T1003", "cve": null, "success": "S-1-16-12288", "note": "runas /savecred against a stored credential to launch an elevated process." },
-    "win-custom":      { "os": "windows", "technique": "T1068", "cve": null, "success": "S-1-16-12288", "note": "agent-derived escalation from check output (service path, task hijack, autorun key)." }
+    "win-custom":      { "os": "windows", "technique": "T1068", "cve": null, "success": "S-1-16-12288", "note": "agent-derived escalation from check output (service path, task hijack, autorun key)." },
+    "ctr-docker-sock-escape": { "os": "container", "technique": "T1611", "cve": null, "success": "\\buid=0\\b", "note": "runtime socket mounted rw -> docker run -v /:/host = host root. Spawns a container on the HOST daemon: CONFIRM-tier, present the exact plan first." },
+    "ctr-privileged-escape": { "os": "container", "technique": "T1611", "cve": null, "success": "\\buid=0\\b", "note": "privileged container -> mount host block device or cgroup release_agent. Operator-supplied steps only; verify host uid 0, not container root." },
+    "ctr-mount-escape":     { "os": "container", "technique": "T1611", "cve": null, "success": "\\buid=0\\b", "note": "writable host mount -> host cron/ssh-key write. This is HOST PERSISTENCE: CONFIRM-tier per action, cleanup plan mandatory." },
+    "ctr-k8s-sa-abuse":     { "os": "container", "technique": "T1610", "cve": null, "success": "secrets listed|pod scheduled", "note": "service-account token -> K8s API: read-only enum is auto (list secrets = impact proof); scheduling a privileged pod (T1610) is CONFIRM-tier." },
+    "ctr-cgroup-release":   { "os": "container", "technique": "T1611", "cve": null, "success": "\\buid=0\\b", "note": "cgroup v1 release_agent write -> host command as root. Destructive on the host scheduler: CONFIRM-tier." },
+    "ctr-pidns-escape":     { "os": "container", "technique": "T1611", "cve": null, "success": "\\buid=0\\b", "note": "shared PID namespace -> /proc/<hostpid>/root = host fs, nsenter path. Read-only host-fs probe is the PoC; nsenter execution is CONFIRM-tier." }
   }
 }

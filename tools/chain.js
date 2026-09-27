@@ -14,7 +14,7 @@ const CLASS = [
   // findings (the authz rule below deliberately owns generic 'escalation'/'priv-esc'/'takeover').
   [/\b(remote code execution|deserial|meterpreter|reverse shell|initial access|foothold)\b/i, 'foothold'],
   [/\b(suid|sudo|unquoted service|alwaysinstallelevated|getsystem|linpeas|winpeas|kernel exploit|writable service)\b|local privilege escalation/i, 'privesc'],
-  [/\b(lateral|pass-the-hash|pass the hash|psexec|kerberoast|dcsync|pivot to|domain admin)\b/i, 'lateral'],
+  [/\b(lateral|pass-the-hash|pass the hash|psexec|kerberoast|dcsync|pivot to|domain admin)\b|\b(ntlm relay|relay|coerce|coercion|rbcd|delegation)\b/i, 'lateral'],
   [/idor|bola|broken access|missing auth|unauth|authori[sz]ed|escalat|priv-?esc|impersonat|takeover|token mint|sso|auth bypass/i, 'authz'],
   [/login|rate limit|lockout|brute|spray|enumerat|reset|otp|fixation|session/i, 'authn'],
   [/leak|hardcoded|secret|api[ _-]?key|credential|source map|bundle|expos|private key|access[ _-]?token/i, 'leak'],
@@ -87,6 +87,16 @@ function buildChains(findings) {
         name: 'Unauthenticated impersonation',
         reasoning: 'A token-minting / identity-binding flaw reachable without (or with any) auth turns other access-control findings into full impersonation.',
         findings: pick(unauthMint),
+      });
+    // P0.5 handoff: an MSSQL login with IMPERSONATE rights can trigger outbound authentications
+    // (xp_dirtree/OPENROWSET) toward the operator's listener — feeding the confirm-tier relay
+    // chain (ad.js enum-relay -> relay). The chain is PROPOSED here; execution stays confirm-tier.
+    const mssqlImp = fs.filter((f) => /mssql/i.test(f.title + ' ' + (f.poc || '') + ' ' + (f.template_id || '')) && /impersonat/i.test(f.title + ' ' + (f.poc || '') + ' ' + (f.template_id || '')));
+    if (mssqlImp.length)
+      chains.push({
+        name: 'MSSQL impersonation to NTLM relay chain',
+        reasoning: 'An MSSQL account with IMPERSONATE (xp_dirtree/OPENROWSET) can coerce machine authentications toward a listener; pair with enum-relay hosts (SMB signing off) for the confirm-tier relay chain (node tools/ad.js enum-relay / relay).',
+        findings: pick(mssqlImp),
       });
     const crits = fs.filter((f) => sevRank(f) >= 5);
     if (crits.length >= 2)

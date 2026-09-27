@@ -39,6 +39,7 @@ const SURFACE_CLASSES = {
   ldap: ['authn', 'info-disclosure', 'config'],
   db: ['authn', 'config', 'injection', 'info-disclosure'],
   ssh: ['authn', 'config', 'crypto'],
+  container: ['container', 'config', 'info-disclosure'],
 };
 
 // A concrete probe suggestion per class — the "how" to close a gap (goes through run.js).
@@ -56,6 +57,7 @@ const GAP_PROBE = {
   'path-traversal': 'node tools/run.js ffuf -u <url>/FUZZ -w <wordlist> ; nuclei -tags lfi',
   'file-upload': 'manual: testare upload non ristretti (repeater)',
   crypto: 'node tools/run.js nuclei -u <url> -tags ssl,tls -jsonl',
+  container: 'node tools/workflow.js run workflows/enum-container.yaml -t <host>',
 };
 
 function relevantClasses(target) {
@@ -68,6 +70,7 @@ function relevantClasses(target) {
   if (has([389, 636, 3268], /ldap/i)) SURFACE_CLASSES.ldap.forEach((c) => set.add(c));
   if (has([21, 3306, 1433, 5432, 6379, 27017, 1521], /ftp|mysql|mssql|postgres|redis|mongo|oracle/i)) SURFACE_CLASSES.db.forEach((c) => set.add(c));
   if (has([22], /ssh/i)) SURFACE_CLASSES.ssh.forEach((c) => set.add(c));
+  if (has([2375, 2376, 10250, 10255], /container|docker|kubelet|k8s/i)) SURFACE_CLASSES.container.forEach((c) => set.add(c));
   return [...set];
 }
 
@@ -82,10 +85,15 @@ function hostEntities(target) {
 function computeGaps(target, opts) {
   opts = opts || {};
   const relevant = relevantClasses(target);
+  // ports are passed so coverage.js materializes the 'container' row ONLY for hosts that really
+  // expose a container/K8s port — otherwise the matrix would silently omit (or falsely claim)
+  // that surface.
+  const ports = (target.hosts || []).flatMap((h) => h.ports || []);
   const m = coverage.buildMatrix(target.host, {
     entities: hostEntities(target),
     reportsDir: opts.reportsDir || reportsDir(),
     findingsFile: opts.findingsFile || findingsFile(),
+    ports,
   });
   const statusByClass = {};
   m.rows.forEach((r) => { statusByClass[r.class] = r.status; });

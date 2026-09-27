@@ -1,0 +1,23 @@
+# Workflow seed — enum-redis (dialetto workflow, Ondata servizi P1.2)
+# Sola lettura: INFO + CONFIG (configurazione esposta). Nessuna scrittura, nessuna chiave.
+# Unauth INFO che risponde = finding (config, severity Medium max, verify_level triggered).
+name: enum-redis
+description: Enumerazione Redis autorizzata (INFO + CONFIG GET, unauth check read-only)
+vars:
+  out: reports
+requires:
+  - redis-cli
+steps:
+  - id: redis-info-unauth
+    cmd: node tools/run.js redis-cli -h {target} -p 6379 INFO
+    on_error: continue
+    artifacts:
+      - path: "{out}/enum-{target}-redis.txt"
+        surface: scan
+  - id: redis-config-unauth
+    cmd: node tools/run.js redis-cli -h {target} -p 6379 CONFIG GET "*"
+    when:
+      exit_code: [0]
+    artifacts:
+      - path: "{out}/enum-{target}-redis-config.txt"
+        surface: scan

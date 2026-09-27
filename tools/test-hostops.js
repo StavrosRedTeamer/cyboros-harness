@@ -55,12 +55,25 @@ assert.ok(P.findCheck('win-privs').detect.some((d) => d[1] === 'seimpersonate-po
 // every detect triple is [regex, id, severity]
 for (const c of checks) for (const d of c.detect) { assert.strictEqual(d.length, 3); new RegExp(d[0]); }
 
+// ---------- privesc: container escape catalog (T4a) ----------
+const ctrChecks = P.loadCatalog('container').checks;
+assert.ok(ctrChecks.some((c) => c.id === 'ctr-docker-sock'), 'container catalog has runtime-socket check');
+assert.ok(ctrChecks.some((c) => c.id === 'ctr-privileged'), 'container catalog has privileged-mode check');
+assert.ok(ctrChecks.some((c) => c.id === 'lin-sudo'), 'container run ALSO runs the linux set');
+assert.ok(P.loadCatalog('linux').checks.every((c) => c.os === 'linux'), 'linux run stays linux-only');
+assert.ok(P.findCheck('ctr-privileged').detect.some((d) => d[1] === 'ctr-privileged-mode'));
+assert.strictEqual(P.findRef('ctr-docker-sock-escape').technique, 'T1611');
+assert.strictEqual(P.findRef('ctr-k8s-sa-abuse').technique, 'T1610');
+assert.ok(P.POSTCHECK.container, 'container post-check defined');
+
 // ---------- privesc: OS detection (auto-safe probes) ----------
 const linuxRunner = async (_t, cmd) => cmd.startsWith('cat /etc/os-release') ? { status: 0, output: 'ID=ubuntu\nNAME="Ubuntu"' } : { status: 1, output: '' };
 assert.strictEqual(await P.detectOs(linuxRunner, 's1'), 'linux');
 const winRunner = async (_t, cmd) => cmd === 'dir C:\\' ? { status: 0, output: 'Volume in drive C has no label.\n Directory of C:\\' } : { status: 1, output: '' };
 assert.strictEqual(await P.detectOs(winRunner, 's1'), 'windows');
 assert.strictEqual(await P.detectOs(async () => ({ status: 1, output: '' }), 's1'), null);
+const ctrRunner = async (_t, cmd) => cmd.includes('/proc/1/cgroup') ? { status: 0, output: '12:memory:/docker/abc123def' } : { status: 1, output: '' };
+assert.strictEqual(await P.detectOs(ctrRunner, 's1'), 'container');
 
 // ---------- privesc: runChecks (by-ID checks, ranked vectors, transcript+audit) ----------
 assert.rejects(() => P.runChecks('s1', {}), /checkRunner/); // fail closed without runner

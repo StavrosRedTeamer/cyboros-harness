@@ -1,0 +1,37 @@
+# Workflow offensivo — attack-graphql (dialetto workflow)
+# Superficie GraphQL: introspection (attiva = finding, methodology-classes), dump dei tipi e
+# lettura campi per la preparazione dei probe BOLA sui campi utente (il probe vero si chiude
+# con attack-authz o repeater --as). Auto tier: introspection/query sono letture.
+# Uso: node tools/workflow.js run workflows/attack-graphql.yaml -t <url> --var tag=<nome> \
+#        [--var typename=<TypeName>]
+name: attack-graphql
+description: Superficie GraphQL — introspection + dump tipi + campi per probe BOLA
+vars:
+  tag: target
+  outdir: reports
+  typename: Query
+steps:
+  - id: introspect
+    cmd: node tools/graphql.js introspect {target}
+    artifacts:
+      - path: "{outdir}/attack-{tag}-graphql-introspection.json"
+        surface: scan
+        from: stdout
+  - id: types
+    cmd: node tools/graphql.js types {target}
+    on_error: continue
+    when:
+      exit_code: 0
+    artifacts:
+      - path: "{outdir}/attack-{tag}-graphql-types.txt"
+        surface: scan
+        from: stdout
+  - id: fields
+    cmd: node tools/graphql.js fields {target} {typename}
+    on_error: continue
+    when:
+      exit_code: 0
+    artifacts:
+      - path: "{outdir}/attack-{tag}-graphql-fields-{typename}.txt"
+        surface: scan
+        from: stdout

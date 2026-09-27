@@ -1,0 +1,54 @@
+# Workflow offensivo — attack-http-surface (dialetto workflow)
+# Sweep della superficie HTTP di attacco su {target}: header/cookie, CORS, CSP, desync
+# (CL.TE/TE.CL/TE.TE), cache poisoning (unkeyed input + cache deception).
+# Tutto auto/read tier: nessun step è intrusivo, nessuna conferma richiesta.
+# Ogni step cattura stdout+stderr su disco via artifacts.from: stdout.
+# Uso: node tools/workflow.js run workflows/attack-http-surface.yaml -t <url> --var tag=<nome>
+name: attack-http-surface
+description: Sweep superficie HTTP di attacco (header/cookie + CORS + CSP + desync + cache poison)
+vars:
+  tag: target
+  outdir: reports
+steps:
+  - id: header-cookie
+    cmd: node tools/header-check.js {target} --json
+    on_error: continue
+    artifacts:
+      - path: "{outdir}/attack-{tag}-headers.json"
+        surface: scan
+        from: stdout
+  - id: cors
+    cmd: node tools/cors.js --url {target}
+    on_error: continue
+    artifacts:
+      - path: "{outdir}/attack-{tag}-cors.txt"
+        surface: scan
+        from: stdout
+  - id: csp
+    cmd: node tools/csp.js --url {target}
+    on_error: continue
+    artifacts:
+      - path: "{outdir}/attack-{tag}-csp.txt"
+        surface: scan
+        from: stdout
+  - id: desync-probe
+    cmd: node tools/desync.js {target}
+    on_error: continue
+    artifacts:
+      - path: "{outdir}/attack-{tag}-desync.txt"
+        surface: scan
+        from: stdout
+  - id: cache-poison
+    cmd: node tools/cachepoison.js probe {target}
+    on_error: continue
+    artifacts:
+      - path: "{outdir}/attack-{tag}-cache.txt"
+        surface: scan
+        from: stdout
+  - id: cache-deception
+    cmd: node tools/cachepoison.js deception {target}
+    on_error: continue
+    artifacts:
+      - path: "{outdir}/attack-{tag}-deception.txt"
+        surface: scan
+        from: stdout

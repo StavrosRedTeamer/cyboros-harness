@@ -1,0 +1,13 @@
+{
+  "bssids":  ["AA:BB:CC:DD:EE:FF"],
+  "essids":  ["MyLabWiFi"],
+  "stations":["11:22:33:44:55:66"],
+  "channels":[1, 6, 11],
+  "monitor_iface": "wlan0",
+  "max_requests_per_second": 1,
+  "wireless_ops": {
+    "auto":    ["scan", "crack", "sniff", "cleanup"],
+    "confirm": ["deauth", "capture", "wps", "automated", "join", "mac_spoof", "rogue_ap", "portal_serve"]
+  },
+  "notes": "TEMPLATE versionato: copia in wifi-scope.json (gitignorato) e compila. Modello di scope DIVERSO da scope.json (che e IP/host): qui si autorizzano BSSID (MAC degli AP), ESSID (nomi rete), stations (MAC dei client, per deauth/cattura) e channels. Solo reti/punti per cui hai autorizzazione scritta. Finche bssids+essids+stations sono vuote, il wifi-guard BLOCCA TUTTO. wireless_ops definisce il tier: scan/open (passivo), sniff, crack (offline) e cleanup (rollback del nostro rogue) girano; deauth/capture(PMKID)/wps/automated(wifite2)/join/mac_spoof/rogue_ap/portal_serve richiedono conferma esplicita in-sessione. Per il captive portal: join autorizza l'associazione a un SSID aperto, mac_spoof il cambio MAC (bypass di autorizzazione basata su MAC); rogue_ap mette in piedi l'AP (hostapd+dnsmasq) e portal_serve ospita il portale/raccolta credenziali (opt-in, loggato, solo awareness con autorizzazione). NOTA: il captive portal HTTP (tools/portal.js) usa scope.json (IP/host), NON questo file."
+}

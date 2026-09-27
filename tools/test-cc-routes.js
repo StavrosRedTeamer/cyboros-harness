@@ -16,6 +16,7 @@ const TOKEN = 'a'.repeat(48);
 
 const env = Object.assign({}, process.env, {
   CC_STATE_DIR: path.join(T, 'app'),
+  GUI_PORT: '0', // ephemeral port: never collide with a Command Center the operator has open
   SCC_TOKEN: TOKEN,
   CC_ROOT: T,
   STATE_DB: path.join(T, 'state.db'),
@@ -114,6 +115,16 @@ async function req(port, method, p, body, withToken) {
   // dispatch refuses a tool outside the allowlist even with a token
   const badDispatch = await req(port, 'POST', '/api/cc/dispatch', { argv: ['/bin/sh', '-c', 'id'] }, true);
   assert.strictEqual(badDispatch.status, 400, 'non-allowlisted dispatch refused');
+
+  // Arsenal install is gated by mode + a typed confirmation, checked server-side. None of
+  // these start a job (that would install software from a test).
+  const noConfirm = await req(port, 'POST', '/api/cc/arsenal/install', { mode: 'run' }, true);
+  assert.strictEqual(noConfirm.status, 400, 'install without typed confirmation refused');
+  assert.strictEqual(noConfirm.json.expected, 'INSTALL');
+  const noMode = await req(port, 'POST', '/api/cc/arsenal/install', { confirm: 'INSTALL' }, true);
+  assert.strictEqual(noMode.status, 400, 'install without a mode refused');
+  const badMode = await req(port, 'POST', '/api/cc/arsenal/install', { mode: 'run; rm -rf /', confirm: 'INSTALL' }, true);
+  assert.strictEqual(badMode.status, 400, 'mode is a closed set');
 
   // WP8 static allowlist: known view assets are served, unknown ones are not.
   const viewJs = await req(port, 'GET', '/views-engagement.js');

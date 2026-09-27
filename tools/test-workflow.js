@@ -95,7 +95,8 @@ steps:
 
 (async () => {
   console.log('workflow: functional');
-  const seeds = ['recon-baseline.yaml', 'enum-http.yaml', 'enum-smb.yaml', 'enum-ldap.yaml'];
+  const seeds = ['recon-baseline.yaml', 'enum-http.yaml', 'enum-smb.yaml', 'enum-ldap.yaml',
+    'attack-http-surface.yaml', 'attack-authz.yaml', 'attack-graphql.yaml', 'attack-jwt.yaml', 'attack-blind-ssrf.yaml'];
   for (const s of seeds) {
     ok(`validate seed ${s}`, () => {
       const r = runWf(['validate', path.join(WS, 'workflows', s)], process.env);
@@ -248,6 +249,39 @@ steps:
     const m = require(WF.replace(/\.js$/, ''));
     const errs = m.validateDoc({ name: 'bad', steps: [{ id: 'x', cmd: 'nmap -sn t' }] });
     assert.ok(errs.some((e) => /MUST start with/.test(e)));
+  });
+  ok('guard wrapper oltre run.js accettato (repeater/jwt/ad/…)', () => {
+    const m = require(WF.replace(/\.js$/, ''));
+    const errs = m.validateDoc({ name: 'okw', steps: [
+      { id: 'a', cmd: 'node tools/repeater.js --url http://t --show-body' },
+      { id: 'b', cmd: 'node tools/jwt.js decode abc.def.ghi' },
+      { id: 'c', cmd: 'node tools/ad.js enum dc.t' },
+    ] });
+    assert.deepStrictEqual(errs, [], JSON.stringify(errs));
+  });
+  ok('cmd di tool NON in allowlist (es. saml.js, offline helper) -> reject', () => {
+    const m = require(WF.replace(/\.js$/, ''));
+    const errs = m.validateDoc({ name: 'bad', steps: [{ id: 'x', cmd: 'node tools/saml.js forge x' }] });
+    assert.ok(errs.some((e) => /guard wrapper/.test(e)), JSON.stringify(errs));
+  });
+  ok('artifacts.from: stdout accettato; valori diversi -> reject', () => {
+    const m = require(WF.replace(/\.js$/, ''));
+    const ok1 = m.validateDoc({ name: 'okf', steps: [{ id: 'a', cmd: 'node tools/run.js echo hi', artifacts: [{ path: 'out.txt', from: 'stdout' }] }] });
+    assert.deepStrictEqual(ok1, [], JSON.stringify(ok1));
+    const bad = m.validateDoc({ name: 'bad', steps: [{ id: 'a', cmd: 'node tools/run.js echo hi', artifacts: [{ path: 'out.txt', from: 'stderr' }] }] });
+    assert.ok(bad.some((e) => /from must be/.test(e)), JSON.stringify(bad));
+  });
+  await okAsync('from: stdout cattura stdout+stderr su disco ed entra in evidence-index', async () => {
+    const c2 = tmpCtx();
+    const capFile = path.join(c2.dir, 'captured.txt');
+    const fx2 = path.join(c2.dir, 'capture.yaml');
+    fs.writeFileSync(fx2, `name: wf-capture\nvars:\n  out: "${capFile}"\nrequires:\n  - echo\nsteps:\n  - id: echo-cap\n    cmd: node tools/run.js echo marker-stdout {target}\n    artifacts:\n      - path: "{out}"\n        surface: demo\n        from: stdout\n`);
+    const r = runWf(['run', fx2, '-t', 'target.example'], c2.env);
+    assert.strictEqual(r.status, 0, `exit=${r.status} err=${r.stderr}`);
+    const body = fs.readFileSync(capFile, 'utf8');
+    assert.ok(body.includes('marker-stdout'), 'stdout catturato su disco: ' + body.slice(0, 80));
+    const ev = fs.readFileSync(c2.env.EVIDENCE_INDEX_FILE, 'utf8');
+    assert.ok(ev.includes('`' + capFile + '`'), 'capture registrato come evidenza');
   });
   ok('duplicate step ids -> reject', () => {
     const m = require(WF.replace(/\.js$/, ''));

@@ -59,7 +59,7 @@ stavrosredteamer/
 ├── reports/            # output run: findings.jsonl, state.db, report HTML (storico incluso)
 ├── scope.json          # COMPILA QUESTO: fail-closed finché non autorizzi i target
 ├── auth.json           # (opzionale) identità per il pass autenticato
-├── wifi-scope.json     # (opzionale) modalità wireless separata
+├── wifi-scope.example.json  # (opzionale) template scope wireless — copia in wifi-scope.json (gitignorato)
 ├── c2.json             # (opzionale) profili listener host exploitation
 └── install-tools.sh    # installer binari (Parrot OS/Debian; equivalente .ps1 per Windows)
 ```
@@ -78,7 +78,9 @@ Compila `scope.json`:
 
 Verifica: `node tools/scope-guard.js check https://target.com` (exit 0 = consentito).
 Vale anche per `auth.json` (verifica identità: `node tools/login.js <identità>`) e
-`wifi-scope.json` (`node tools/wifi-guard.js check <BSSID>`).
+`wifi-scope.json` (`node tools/wifi-guard.js check <BSSID>`). Per la modalità wireless copia il
+template versionato `wifi-scope.example.json` in `wifi-scope.json` (gitignorato) e compila BSSID/
+ESSID/stations/channels — il modello wireless è separato da `scope.json` (IP/host).
 
 ## Test
 
@@ -103,3 +105,40 @@ browser/DOM. Config di riferimento: `mcp.example.json`.
 > ⚠️ **Sicurezza**: i tool MCP NON passano dai guard in-process (`repeater.js`/`run.js`).
 > L'agente è istruito a scope-checkare manualmente (`node tools/scope-guard.js check <url>`)
 > prima di usare un tool MCP su un target, e a preferire run.js/repeater.js per il tampering.
+
+## Command Center (desktop)
+
+Il Command Center è un programma desktop (`stavros-cc`) che governa l'harness a 360°: campagna →
+missione → approvazione → esecuzione → verifica → report → prova. È una **superficie**, non un gate:
+non bypassa nessun guard, ogni scrittura resta wrapper sui tool esistenti.
+
+```bash
+./install-scc-launcher.sh      # installa launcher + .desktop (idempotente)
+stavros-cc                     # finestra nativa PyQt6 con la SPA dentro
+bash scripts/demo-command-center.sh   # demo end-to-end di 2 minuti (root temporaneo)
+```
+
+Fallback: se PyQt6/QtWebEngine non c'è, `stavros-cc` apre Chromium in app-mode, poi il browser
+(`--web` per il browser diretto, es. telefono via tunnel). Backend unico: `tools/gui-server.js`
+con lockfile in `reports/app/server.lock` (un secondo avvio fa **attach**, non spawn).
+Finestra unica: cliccando di nuovo l'icona il secondo processo chiede alla finestra viva di
+sollevarsi e **aspetta la conferma**; se il peer non risponde (istanza vecchia o bloccata) il nome
+del socket viene scavalcato e si apre comunque una finestra — il launcher non muore più in
+silenzio. Se il backend non parte, l'errore compare in un dialog invece che solo nel log.
+Token di sessione obbligatorio su ogni write e sugli stream interattivi; senza token la SPA mostra
+il banner read-only.
+
+Comandi utili:
+
+| | |
+|---|---|
+| `node tools/cc-campaign.js show` | campagna attiva + validazione + drift di scope |
+| `node tools/cc-mission.js show` | next-actions/coverage/gate/budget con perché e tier |
+| `node tools/request-approval.js --host H --action C --command "..."` | l'agente chiede il consenso |
+| `node tools/cc-approvals.js grant <id>` | l'operatore lo concede (pannello Approvals) |
+| `node tools/run.js ... --approval <id>` | esecuzione con token (policy `host_ops.require_approval`) |
+| `node tools/cc-ledger.js evidence` | evidence bundle tar.gz + manifest con hash |
+| `node tools/cc-panic.js` | ferma SOLO i processi posseduti dall'harness (idempotente) |
+
+Doc: `docs/command-center-desktop.md` (piano e stato WP), `docs/f3-client-runbook.md` §9 (client
+desktop di un backend tunnelato). Test: `tools/test-cc-*.js` dentro `npm test`.

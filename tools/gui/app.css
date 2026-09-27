@@ -744,6 +744,21 @@ th.sortable:focus-visible { outline: 2px solid var(--cyan); outline-offset: -2px
 .cc-form label { display: grid; gap: 3px; font: 11px/1.4 var(--mono); color: var(--muted); }
 .cc-form input, .cc-form select { padding: 5px 7px; background: var(--bg2); color: var(--ink); border: 1px solid var(--line-2); border-radius: var(--r2); font: 12px/1.4 var(--sans); }
 .cc-pre { max-height: 320px; overflow: auto; margin: 0; padding: 8px; background: var(--bg2); border: 1px solid var(--line); border-radius: var(--r2); font: 11px/1.5 var(--mono); color: var(--muted); white-space: pre-wrap; }
+/* ── Arsenal install box + Graph section (WP7+ additions, additive) ── */
+.cc-install { border: 1px solid var(--line-2); background: var(--surface-2); border-radius: var(--r2); padding: 10px; display: grid; gap: 8px; }
+.cc-install input[type="text"] { padding: 6px 9px; min-width: 170px; background: var(--bg2); color: var(--ink); border: 1px solid var(--line-2); border-radius: var(--r2); font: 12px/1.4 var(--mono); letter-spacing: .1em; text-transform: uppercase; }
+.cc-install input[type="text"]:focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; }
+.btn:disabled { opacity: .42; cursor: not-allowed; }
+.cc-graph { overflow: auto; background: var(--bg2); border: 1px solid var(--line); border-radius: var(--r2); }
+.cc-graph svg { display: block; }
+.cc-graph .cc-edge { stroke: var(--line-2); stroke-width: 1; }
+.cc-graph .cc-node-label { font: 9px var(--mono); fill: var(--muted); }
+.cc-legend { display: flex; flex-wrap: wrap; gap: 5px 8px; }
+.cc-legend-btn { display: inline-flex; align-items: center; gap: 6px; padding: 2px 8px; border: 1px solid var(--line-2); border-radius: 999px; background: var(--surface-2); color: var(--muted); font: 10px/1.6 var(--mono); text-transform: uppercase; letter-spacing: .08em; }
+.cc-legend-btn:hover { color: var(--ink); border-color: var(--cyan); }
+.cc-legend-btn i { display: inline-block; width: 9px; height: 9px; border-radius: 50%; }
+.cc-legend-btn.off { opacity: .45; text-decoration: line-through; }
+.cc-legend-btn.off i { background: var(--faint) !important; }
 .chip.ok  { color: var(--green); border-color: var(--green); }
 .chip.warn { color: var(--yellow); border-color: var(--yellow); }
 .chip.crit { color: var(--crit); border-color: var(--crit); }

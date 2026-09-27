@@ -3,7 +3,15 @@
 > Dettaglio completo della fase "Testing by class"; knowledge.md tiene solo l'elenco classi one-line.
 > Cerchiabile con `node tools/kb-search.js "bola ssrf ssti"`.
 
-**Testing by class:** taxonomy aligned to OWASP Top 10:2025 — A01 now explicit BOLA/BFLA; new 2025
+**Class names for `record-finding.js`** are the canonical keys of `tools/test-registry.json` —
+use the dedicated key where one exists: `race`, `ws`, `cache-poison`, `saml`, `jwt`, `cors` for the
+respective web classes; `cred-dump` (dcsync/secretsdump), `lateral` (relay/PtH/remote services) and
+`privesc` (elevation vectors) for host/AD outcomes; `takeover`/`dns`/`email-auth`/`crypto` for the
+DNS/TLS surfaces. Unknown keys are rejected fail-closed.
+
+**Testing by class:** every class in `tools/test-registry.json` also carries a MITRE ATT&CK mapping
+(`attack`: technique ids) — `node tools/attack-coverage.js --write` turns it into `reports/attack-matrix.md`
+(planned coverage by class vs techniques executed on findings.jsonl). Taxonomy aligned to OWASP Top 10:2025 — A01 now explicit BOLA/BFLA; new 2025
 classes `supply-chain` (A03) and `exceptional` (A10, error-handling) are in `tools/test-registry.json`
 and tracked by `coverage.js`.
 

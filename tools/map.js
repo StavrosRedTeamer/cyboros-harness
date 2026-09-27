@@ -15,8 +15,9 @@
 const fs = require('fs');
 const path = require('path');
 
-const CLASSES = ['sqli', 'xss', 'idor', 'bola', 'bfla', 'authn', 'authz', 'ssrf', 'smuggling', 'llm', 'mcp', 'other'];
-const REQUIRED = ['host', 'path'];
+// Fallback taxonomy: used ONLY when test-registry.json is missing/corrupt, so the map keeps
+// validating against a sane list instead of accepting anything.
+const BASE_CLASSES = ['sqli', 'xss', 'idor', 'bola', 'bfla', 'authn', 'authz', 'ssrf', 'smuggling', 'llm', 'mcp', 'mobile', 'container', 'other'];
 
 // Standards registry (REDflare-pattern, repo-vet plan QW7): stable per-class pointers to
 // WSTG / ASVS / CWE / OWASP API Top 10. Loaded lazily so a missing/corrupt file degrades
@@ -30,14 +31,27 @@ function loadRegistry() {
   }
 }
 
+// G3: ONE source of truth — the accepted candidate classes ARE the test-registry classes, so a
+// class emitted by a tool (e.g. portal.js's `redirect`/`session`, or the new `wireless`) is
+// never rejected here. 'mobile'/'container' are added back because coverage.js tracks them as
+// EXTRA_CLASSES (P1.4/M.4) but the registry does not list them. Falls back to BASE_CLASSES only
+// when the registry file is unavailable.
+const CLASSES = (() => {
+  const fromRegistry = Object.keys(loadRegistry()).filter((k) => !k.startsWith('_'));
+  const base = fromRegistry.length ? fromRegistry : BASE_CLASSES;
+  return [...new Set(base.concat(['mobile', 'container']))];
+})();
+const REQUIRED = ['host', 'path'];
+
 function refsFor(cls) {
   const r = loadRegistry()[cls];
   if (!r) return null;
   return { class: cls, wstg: r.wstg || [], asvs: r.asvs || [], cwe: r.cwe || [], owasp_api: r.owasp_api || [], owasp_llm: r.owasp_llm || [], owasp_agentic: r.owasp_agentic || [] };
 }
 
+// STAVROS_MAP_DIR lets tests (and out-of-tree runs) avoid the live reports/ dir.
 function mapFile(host) {
-  return path.join(__dirname, '..', 'reports', host + '-map.json');
+  return path.join(process.env.STAVROS_MAP_DIR || path.join(__dirname, '..', 'reports'), host + '-map.json');
 }
 
 function load(host) {

@@ -7,9 +7,27 @@
 //   node tools/mobile.js check <package|serial|sha256>   scope verdict (exit 0 = in scope)
 //   node tools/mobile.js status                           scope + adb devices summary
 //   node tools/mobile.js static <app.apk>                 apktool + jadx (auto, offline)
+//   node tools/mobile.js fetch-apk <pkg> [--out f] | fetch-apk <pkg> --verify-only <file>
+//                                                         M.2: download from an apk_sources URL
+//                                                         (mobile-scope.json) + sha256 pinned; --verify-only
+//                                                         hashes a provided file instead (auto, fail-closed)
+//   node tools/mobile.js surface <pkg> [--reports-dir d]     M.4: exported/deeplinks from the static
+//                                                         manifest -> reports/<pkg>-map.json + mobile
+//                                                         coverage row (auto, offline)
+//   node tools/mobile.js firebase-audit <pkg> [--record] [--reports-dir d]
+//                                                         M.3: extract config from the static pass,
+//                                                         ONE read-only existence probe per asset (auto)
 //   node tools/mobile.js install <app.apk> --package <pkg>  adb install (auto, needs package+serial scope)
 //   node tools/mobile.js shell <serial> <package> -- <adb args...>   read-only adb shell (auto)
-//   node tools/mobile.js frida <serial> <package> [-l hook.js] [--confirm "reason"]  (confirm)
+//   node tools/mobile.js frida <serial> <package> [-l hook.js] [--framework flutter|pairip] [--confirm "reason"]  (confirm)
+//     M.1: without -l, the hook is chosen from the static pass (flutter → disable-flutter-tls.js,
+//     PairIP → hint to repack, else unpin.js). STAVROS_FRIDA_SCRIPT still overrides.
+//   node tools/mobile.js frida-server up|down|status [serial] [--port N] [--confirm "reason"]  (confirm)
+//     P1: gestisce frida-server SUL DEVICE (root, /data/local/tmp), versione allineata a `frida --version`
+//     locale. up scarica il binario dal device (via Tor: GlobalProxyApplication già instrada le app;
+//     il binario va scaricato UNA volta, es. con il downloader del telefono) e lo avvia su
+//     127.0.0.1:STAVROS_FRIDA_PORT (default 4747, porta NON standard), poi adb forward tcp:4747.
+//     down = pkill (la superficie resta chiusa quando non serve). status = pid + forward.
 //   node tools/mobile.js intercept <serial> [--write <dir>] [--confirm "reason"]     mitmproxy dump (write=confirm)
 //   node tools/mobile.js ca-install <serial> [--confirm "reason"]  push mitmproxy CA as system cert (confirm)
 //   node tools/mobile.js reset [--confirm "reason"]       redroid reset (confirm, destructive)
@@ -59,6 +77,7 @@ const RULES = [
 
 function classifyRaw(bin, args, sub) {
   if (sub === 'frida') return 'frida';
+  if (sub === 'frida-server') return 'frida'; // P1: stessa classe confirm di un attach frida
   if (sub === 'ca-install') return 'unpin';
   if (sub === 'reset') return 'reset';
   if (sub === 'static') return 'static';
@@ -99,7 +118,10 @@ function auditMobile(entry) {
 }
 
 // ---- pure command builders (no exec; tested offline) ----
-const DEFAULT_SERIAL = '127.0.0.1:5555';
+// Default adb target. ReDroid loopback historically; override with STAVROS_ADB_SERIAL to
+// point at a physically-attached authorized device (e.g. Poco F3 USB serial "bb83609b").
+// The serial is still scope-checked by mobile-guard.js regardless of this default.
+const DEFAULT_SERIAL = process.env.STAVROS_ADB_SERIAL || '127.0.0.1:5555';
 
 function staticCommands(apk, opts) {
   opts = opts || {};
@@ -120,15 +142,193 @@ function shellCommands(serial, args) {
   return [{ bin: 'adb', args: ['-s', serial || DEFAULT_SERIAL, 'shell'].concat(args) }];
 }
 
+// ---- M.1: framework-aware Frida script selection -------------------------------------
+// The static pass (apktool/jadx into reports/mobile/<pkg>-apktool|-jadx) leaves the evidence
+// needed to pick the RIGHT hook instead of always defaulting to the objection-style unpin:
+//   - libflutter.so / libapp.so present  -> Flutter app: disable-flutter-tls.js (BoringSSL hook)
+//   - pairipcore / com.pairip present    -> PairIP-protected: repack first (always confirm)
+//   - otherwise                          -> unpin.js (objection-style)
+// Detection is OFFLINE + fail-soft: a missing directory just means "no signal", never an error.
+function dirHasMatch(dir, re, depth) {
+  depth = depth == null ? 4 : depth;
+  let entries;
+  try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch { return false; }
+  for (const e of entries) {
+    if (re.test(e.name)) return true;
+    if (e.isDirectory() && depth > 0 && dirHasMatch(path.join(dir, e.name), re, depth - 1)) return true;
+  }
+  return false;
+}
+
+// detectFramework(pkg, opts) -> { framework, flutter, pairip, reactNative, unity, xamarin,
+// webapp, rootguard }. `opts.staticDirs` overrides the default output dirs (tests/fixtures);
+// `opts.framework` short-circuits detection entirely. P3: oltre a flutter/pairip, riconosce
+// react-native (index.android.bundle), unity (libunity.so), xamarin (libmonodroid.so),
+// app web/hybrid (assets/www, cordova.js) e hint di root-guard (rootbeer) per scegliere
+// (o suggerire) l'hook giusto invece del default unpin.
+function frameworkResult(fw) {
+  return {
+    framework: fw, flutter: fw === 'flutter', pairip: fw === 'pairip',
+    reactNative: fw === 'react-native', unity: fw === 'unity', xamarin: fw === 'xamarin',
+    webapp: fw === 'webapp', rootguard: fw === 'rootguard', unknown: fw === 'unknown',
+  };
+}
+
+function detectFramework(pkg, opts) {
+  opts = opts || {};
+  if (opts.framework) return frameworkResult(opts.framework);
+  const base = path.join(__dirname, '..', 'reports', 'mobile');
+  const dirs = opts.staticDirs || [path.join(base, `${pkg}-jadx`), path.join(base, `${pkg}-apktool`)];
+  const sig = { flutter: false, pairip: false, reactNative: false, unity: false, xamarin: false, webapp: false, rootguard: false };
+  for (const d of dirs) {
+    if (!sig.flutter && dirHasMatch(d, /^libflutter\.so$|^libapp\.so$/)) sig.flutter = true;
+    if (!sig.pairip && (dirHasMatch(d, /^pairipcore|^libpairipcore\.so$/) || dirHasMatch(path.join(d, 'com'), /^pairip$/))) sig.pairip = true;
+    if (!sig.reactNative && dirHasMatch(d, /^index\.android\.bundle$/)) sig.reactNative = true;
+    if (!sig.unity && (dirHasMatch(d, /^libunity\.so$/) || dirHasMatch(path.join(d, 'assets'), /^bin$/))) sig.unity = true;
+    if (!sig.xamarin && (dirHasMatch(d, /^libmonodroid\.so$/) || dirHasMatch(d, /^assemblies$/))) sig.xamarin = true;
+    if (!sig.webapp && (dirHasMatch(path.join(d, 'assets'), /^www$/) || dirHasMatch(d, /^cordova\.js$/))) sig.webapp = true;
+    if (!sig.rootguard && (dirHasMatch(path.join(d, 'com', 'scottyab'), /^rootbeer$/) || dirHasMatch(d, /^librootchecker\.so$/))) sig.rootguard = true;
+    if (Object.keys(sig).every((k) => sig[k])) break;
+  }
+  const framework = sig.pairip ? 'pairip'
+    : sig.flutter ? 'flutter'
+    : sig.reactNative ? 'react-native'
+    : sig.xamarin ? 'xamarin'
+    : sig.webapp ? 'webapp'
+    : sig.unity ? 'unity'
+    : 'unknown';
+  return Object.assign({ framework }, sig);
+}
+
+// P3: scelta dello script in base al framework rilevato. flutter -> BoringSSL hook;
+// tutto cio' che parla Java/okhttp (react-native, xamarin, webapp, unity-IL2CPP parziale)
+// parte dal trust-all di unpin.js; pairip resta sul route repack (fridaHint).
+function hookScriptFor(det) {
+  if (det && det.flutter) return path.join(__dirname, 'frida', 'disable-flutter-tls.js');
+  return path.join(__dirname, 'frida', 'unpin.js');
+}
+
+// fridaCommands is the default FRAMEWORK-AWARE hook (M.1). Precedence: explicit -l/--script
+// (opts.script) > STAVROS_FRIDA_SCRIPT env (back-compat override) > framework default > unpin.js.
 function fridaCommands(pkg, opts) {
   opts = opts || {};
   const serial = opts.serial || DEFAULT_SERIAL;
   const a = ['-U', '-n', pkg];
-  // Default unpin script is in-repo; override with -l/--script or STAVROS_FRIDA_SCRIPT.
-  if (opts.script) a.push('-l', opts.script);
-  else a.push('-l', process.env.STAVROS_FRIDA_SCRIPT || path.join(__dirname, 'frida', 'unpin.js'));
+  let script = opts.script || process.env.STAVROS_FRIDA_SCRIPT;
+  if (!script) script = hookScriptFor(detectFramework(pkg, opts));
+  a.push('-l', script);
   if (opts.extra) a.push(...opts.extra);
   return [{ bin: 'frida', args: a.concat(['--device', serial]) }];
+}
+
+// fridaHint(pkg, opts) -> null | { repack_suggested, hint }. PairIP needs the repack path
+// (tools/mobile-pairip-repack.sh, ALWAYS confirm) — surfacing it here keeps the operator on
+// the supported route instead of fighting the packer with the generic unpin hook.
+function fridaHint(pkg, opts) {
+  const det = detectFramework(pkg, opts);
+  if (det.pairip) {
+    return {
+      repack_suggested: true,
+      hint: 'PairIP detected: repack with tools/mobile-pairip-repack.sh (always confirm) and re-run frida on the unpacked build',
+    };
+  }
+  if (det.rootguard) {
+    return {
+      anti_anti_suggested: true,
+      hint: 'root-check library detected (rootbeer): prepend tools/frida/anti-anti.js to neutralize root/emulator/anti-frida checks',
+    };
+  }
+  return null;
+}
+
+// ---- P1: frida-server lifecycle ON THE DEVICE ---------------------------------------
+// Senza frida-server sul telefono, `frida` non puo' attaccare nessuna app terza: e' il
+// collo di bottiglia #1 (roadmap P1). Il server gira come root in /data/local/tmp (su
+// MIUI-rooted: `su 0`), su UNA porta non standard e solo su loopback; il PC lo raggiunge
+// con adb forward. down lo uccide: quando non serve, la superficie e' chiusa (P7).
+// La versione e' quella del frida LOCALE (frida --version): client e server devono coincidere.
+const FRIDA_DEVICE_PATH = '/data/local/tmp/frida-server';
+const FRIDA_PORT_DEFAULT = process.env.STAVROS_FRIDA_PORT || '4747';
+
+function fridaPort(opts) {
+  const p = (opts && opts.port) || FRIDA_PORT_DEFAULT;
+  if (!/^\d{1,5}$/.test(String(p)) || Number(p) < 1024 || Number(p) > 65535) {
+    throw blockedError(`frida-server port invalid: ${p} (use a TCP port >= 1024)`);
+  }
+  return String(p);
+}
+
+// Pure builder. 'up' assumes the binary is already in /data/local/tmp (downloaded once
+// via the phone's Tor, see f3bot/frida-server-fetch.sh): every `up` is idempotent —
+// chmod, kill di un eventuale vecchio processo, avvio nohup detached, forward adb.
+function fridaServerCommands(action, opts) {
+  opts = opts || {};
+  const serial = opts.serial || DEFAULT_SERIAL;
+  const port = fridaPort(opts);
+  const adb = ['-s', serial, 'shell'];
+  if (action === 'up') {
+    return [{ bin: 'adb', args: adb.concat([
+      'su', '0', 'sh', '-c',
+      `chmod 755 ${FRIDA_DEVICE_PATH} 2>/dev/null; killall frida-server 2>/dev/null; ` +
+      `nohup ${FRIDA_DEVICE_PATH} -l 127.0.0.1:${port} >/dev/null 2>&1 & sleep 1; pidof frida-server`,
+    ]) }];
+  }
+  if (action === 'down') {
+    // kill di frida-server E della catena che lo ha lanciato (su/sh nohup): senza,
+    // restano figli orfani che riassorbono la porta al prossimo up
+    return [{ bin: 'adb', args: adb.concat([
+      'su', '0', 'sh', '-c',
+      `pkill -TERM frida-server; sleep 1; pkill -KILL frida-server 2>/dev/null; ` +
+      `pkill -KILL -f 'sh -c.*frida-server' 2>/dev/null; pidof frida-server || echo STOPPED`,
+    ]) }];
+  }
+  if (action === 'status') {
+    return [{ bin: 'adb', args: adb.concat([
+      'su', '0', 'sh', '-c',
+      `pidof frida-server || echo NOT-RUNNING; ls -l ${FRIDA_DEVICE_PATH} 2>/dev/null || echo NO-BINARY`,
+    ]) }];
+  }
+  if (action === 'forward') {
+    return [{ bin: 'adb', args: ['-s', serial, 'forward', `tcp:${port}`, `tcp:${port}`] }];
+  }
+  throw blockedError(`frida-server action unknown: ${action} (use up|down|status|forward)`);
+}
+
+// Executor: confirm-tier (classe 'frida') + forward dopo un up riuscito.
+async function fridaServer(action, opts) {
+  opts = opts || {};
+  const runMobile = opts.runMobile || defaultRunMobile;
+  const cmds = fridaServerCommands(action, opts);
+  const results = [];
+  for (const c of cmds) {
+    const r = await runMobile(c.bin, c.args, Object.assign({ sub: 'frida-server', serial: opts.serial }, opts));
+    results.push({ cmd: c.bin, status: r && r.status, stdout: String((r && r.stdout) || '').trim() });
+  }
+  const out = { action, serial: opts.serial || DEFAULT_SERIAL, port: fridaPort(opts), results };
+  if (action === 'up') {
+    const running = results.some((r) => /^\d+/.test(r.stdout));
+    out.running = running;
+    if (running) {
+      const f = fridaServerCommands('forward', opts)[0];
+      const rf = await runMobile(f.bin, f.args, Object.assign({ sub: 'frida-server', serial: opts.serial }, opts));
+      out.forward = `tcp:${out.port} -> device 127.0.0.1:${out.port} (status ${rf && rf.status})`;
+      out.connect = `frida -H 127.0.0.1:${out.port} ...  (o STAVROS_ADB_SERIAL per -U)`;
+    } else {
+      out.hint = `binario mancante o non avviato: scaricalo UNA volta sul device ` +
+        `(es. f3bot/frida-server-fetch.sh via Tor) con la versione $(frida --version) = ` +
+        `${localFridaVersion()}, poi riprova`;
+    }
+  }
+  if (action === 'down') out.stopped = results.some((r) => /STOPPED|^\s*$/.test(r.stdout) || !/^\d+/.test(r.stdout));
+  return out;
+}
+
+function localFridaVersion() {
+  try {
+    const { spawnSync } = require('child_process');
+    const r = spawnSync('frida', ['--version'], { encoding: 'utf8', timeout: 5000 });
+    return (r.stdout || '').trim() || 'unknown';
+  } catch { return 'unknown'; }
 }
 
 function interceptCommands(serial, opts) {
@@ -140,6 +340,437 @@ function interceptCommands(serial, opts) {
 
 function sha256File(file) {
   return crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex');
+}
+
+function sha256Buffer(buf) {
+  return crypto.createHash('sha256').update(buf).digest('hex');
+}
+
+// ---- M.2: authorized APK renewal (fetch-apk) ----------------------------------------
+// Re-aligns static/dynamic when the app publishes a new build, WITHOUT trusting the network:
+//   - the source URL must be declared in mobile-scope.json `apk_sources` (URL allowlist),
+//   - its host must pass scope-guard against scope.json (the app backend is already in scope),
+//   - the downloaded bytes must match a known sha256 (apk_sources[].sha256 or allowed_apk_sha256).
+// Any mismatch/absence is a REFUSE (fail-closed, anti-tampering), never a warning. Downloads
+// and refusals are appended to reports/mobile-apk-log.jsonl for the audit trail. The fetch is
+// injectable so tests run fully offline.
+const APK_LOG = () => process.env.MOBILE_APK_LOG || path.join(__dirname, '..', 'reports', 'mobile-apk-log.jsonl');
+
+function apkLog(entry) {
+  try {
+    const p = APK_LOG();
+    fs.mkdirSync(path.dirname(p), { recursive: true });
+    fs.appendFileSync(p, JSON.stringify(entry) + '\n');
+  } catch {}
+}
+
+function loadApkSources(scope) {
+  const list = scope && scope.apk_sources;
+  return Array.isArray(list) ? list.filter((s) => s && typeof s.url === 'string' && s.url.trim()) : [];
+}
+
+// First source that applies to the package (a source with no `pkg` applies to any allowed pkg).
+function apkSourceFor(pkg, scope) {
+  const srcs = loadApkSources(scope).filter((s) => !s.pkg || s.pkg === pkg);
+  return srcs.length ? srcs[0] : null;
+}
+
+// Minimal zero-dependency GET -> Buffer with bounded redirects. Injectable via opts.fetchImpl.
+function httpGetBuffer(url, opts) {
+  opts = opts || {};
+  const https = require('https');
+  const http = require('http');
+  const maxRedirects = opts.maxRedirects == null ? 5 : opts.maxRedirects;
+  return new Promise((resolve, reject) => {
+    const go = (u, n) => {
+      let parsed;
+      try { parsed = new URL(u); } catch { return reject(new Error('invalid url: ' + u)); }
+      const mod = parsed.protocol === 'https:' ? https : (parsed.protocol === 'http:' ? http : null);
+      if (!mod) return reject(new Error('unsupported protocol: ' + parsed.protocol));
+      const req = mod.get(u, { timeout: opts.timeout || 30000, headers: opts.headers || {} }, (res) => {
+        if ([301, 302, 303, 307, 308].includes(res.statusCode) && res.headers.location) {
+          res.resume();
+          if (n <= 0) return reject(new Error('too many redirects'));
+          return go(new URL(res.headers.location, u).toString(), n - 1);
+        }
+        if (res.statusCode !== 200) { res.resume(); return reject(new Error('http ' + res.statusCode)); }
+        const chunks = [];
+        res.on('data', (c) => chunks.push(c));
+        res.on('end', () => resolve(Buffer.concat(chunks)));
+        res.on('error', reject);
+      });
+      req.on('timeout', () => req.destroy(new Error('timeout')));
+      req.on('error', reject);
+    };
+    go(url, maxRedirects);
+  });
+}
+
+function blockedError(message) {
+  const e = new Error(message);
+  e.blocked = true;
+  return e;
+}
+
+// fetchApk(pkg, opts) -> { ok, pkg, sha256, expected, source, path, bytes }
+// opts: { out?, verifyOnly?, fetchImpl?, checkSourceInScope?, scopePath? }
+async function fetchApk(pkg, opts) {
+  opts = opts || {};
+  let scope;
+  try {
+    scope = mg.loadMobileScope(opts.scopePath);
+  } catch (e) {
+    throw blockedError(e && e.code === 'MOBILE_SCOPE_INVALID_JSON' ? e.message : 'mobile-scope.json missing - nothing is authorized yet');
+  }
+  if (mg.scopeEmpty(scope)) throw blockedError('mobile-scope.json empty - nothing is authorized yet');
+  const pk = mg.packageInScope(pkg, scope);
+  if (!pk.ok) throw blockedError(pk.reason);
+
+  const src = apkSourceFor(pkg, scope);
+  const allowedHashes = ((scope && scope.allowed_apk_sha256) || []).map((x) => String(x).toLowerCase());
+  const expected = (src && src.sha256 ? String(src.sha256).toLowerCase() : null) || allowedHashes[0] || null;
+  if (!expected) {
+    apkLog({ ts: new Date().toISOString(), pkg, verdict: 'refused', reason: 'no sha256 to verify against' });
+    throw blockedError('no sha256 to verify against: set allowed_apk_sha256 or apk_sources[].sha256 (fail-closed)');
+  }
+
+  // --verify-only <file>: no network at all; just hash the operator-supplied file.
+  if (opts.verifyOnly) {
+    const file = opts.verifyOnly;
+    const sha = sha256File(file); // throws ENOENT if missing -> surfaces as an error
+    if (sha !== expected) {
+      apkLog({ ts: new Date().toISOString(), pkg, file, sha256: sha, expected, verdict: 'refused', reason: 'sha256 mismatch' });
+      throw blockedError(`sha256 mismatch for ${file}: got ${sha}, expected ${expected}`);
+    }
+    apkLog({ ts: new Date().toISOString(), pkg, file, sha256: sha, verdict: 'verify-only-ok' });
+    return { ok: true, pkg, sha256: sha, expected, source: 'operator-file', path: file, bytes: fs.statSync(file).size };
+  }
+
+  if (!src) {
+    apkLog({ ts: new Date().toISOString(), pkg, verdict: 'refused', reason: 'no apk_sources declared' });
+    throw blockedError('no apk_sources declared for this package in mobile-scope.json (fail-closed)');
+  }
+  // The source host must be authorized by scope.json (same guard as every other target).
+  const check = opts.checkSourceInScope || ((url) => require('./scope-guard').inScope(url, require('./scope-guard').loadScope()));
+  const sc = check(src.url);
+  if (!sc || !sc.ok) {
+    apkLog({ ts: new Date().toISOString(), pkg, url: src.url, verdict: 'refused', reason: (sc && sc.reason) || 'source not in scope' });
+    throw blockedError('apk source not in scope.json: ' + ((sc && sc.reason) || 'denied'));
+  }
+
+  const fetchFn = opts.fetchImpl || httpGetBuffer;
+  let buf;
+  try {
+    buf = await fetchFn(src.url, opts);
+  } catch (e) {
+    apkLog({ ts: new Date().toISOString(), pkg, url: src.url, verdict: 'refused', reason: 'download failed: ' + (e.message || e) });
+    throw blockedError('apk download failed: ' + (e.message || e));
+  }
+  if (!Buffer.isBuffer(buf)) buf = Buffer.from(buf);
+  const sha = sha256Buffer(buf);
+  if (sha !== expected) {
+    apkLog({ ts: new Date().toISOString(), pkg, url: src.url, sha256: sha, expected, verdict: 'refused', reason: 'sha256 mismatch' });
+    throw blockedError(`sha256 mismatch: got ${sha}, expected ${expected} (possible tampering - refusing to write)`);
+  }
+  const out = opts.out || path.join(__dirname, '..', 'reports', 'mobile', `${pkg}-${sha.slice(0, 8)}.apk`);
+  fs.mkdirSync(path.dirname(out), { recursive: true });
+  fs.writeFileSync(out, buf);
+  apkLog({ ts: new Date().toISOString(), pkg, url: src.url, sha256: sha, path: out, bytes: buf.length, verdict: 'fetched' });
+  return { ok: true, pkg, sha256: sha, expected, source: src.url, path: out, bytes: buf.length };
+}
+
+// ---- M.3: Firebase surface audit (detection-only, read-only EXISTENCE checks) -------
+// The static pass leaves the Firebase config (google-services.json / res/values/strings.xml).
+// We extract it, then issue ONE existence probe per asset and treat only a 200 as a finding:
+//   401/403 = locked (expected, no finding) · 404 = absent · 200 = exposed-firebase (Medium max).
+// Probes reuse cloud-enum.probeUrl (scope-guard + resolveAndGuard + fail-closed) — no duplicate
+// network path. The claim is single-request so verify_level = 'triggered'.
+const FIREBASE_KEYS = {
+  api_key: 'google_api_key',
+  database_url: 'firebase_database_url',
+  storage_bucket: 'google_storage_bucket',
+  project_id: 'project_id',
+  app_id: 'google_app_id',
+};
+
+// Pure: parse res/values/strings.xml for the google-services values.
+function parseFirebaseStrings(xml) {
+  const out = {};
+  const s = String(xml || '');
+  for (const [key, name] of Object.entries(FIREBASE_KEYS)) {
+    const m = s.match(new RegExp(`<string[^>]*name="${name}"[^>]*>([^<]*)</string>`, 'i'));
+    if (m && m[1] && m[1].trim()) out[key] = m[1].trim();
+  }
+  return out;
+}
+
+// Pure: parse assets/google-services.json (authoritative when present).
+function parseGoogleServicesJson(text) {
+  let o;
+  try { o = JSON.parse(String(text || '')); } catch { return {}; }
+  if (!o || typeof o !== 'object') return {};
+  const p = o.project_info && typeof o.project_info === 'object' ? o.project_info : {};
+  const client = (Array.isArray(o.client) ? o.client : []).find((c) => c && c.client_info) || null;
+  const ci = client ? client.client_info : {};
+  const out = {};
+  if (p.project_id) out.project_id = String(p.project_id);
+  if (p.storage_bucket) out.storage_bucket = String(p.storage_bucket);
+  if (p.firebase_url) out.database_url = String(p.firebase_url);
+  if (ci.mobilesdk_app_id) out.app_id = String(ci.mobilesdk_app_id);
+  const key = Array.isArray(ci.api_key) && ci.api_key[0] && ci.api_key[0].current_key;
+  if (key) out.api_key = String(key);
+  return out;
+}
+
+// Recursive file finder (bounded depth), fail-soft on unreadable dirs.
+function findFiles(dir, re, depth) {
+  depth = depth == null ? 6 : depth;
+  const out = [];
+  let entries;
+  try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch { return out; }
+  for (const e of entries) {
+    const full = path.join(dir, e.name);
+    if (e.isFile() && re.test(e.name)) out.push(full);
+    else if (e.isDirectory() && depth > 0) out.push(...findFiles(full, re, depth - 1));
+  }
+  return out;
+}
+
+// extractFirebaseConfig(pkg, opts) -> partial config ({} when nothing found). Offline, fail-soft.
+function extractFirebaseConfig(pkg, opts) {
+  opts = opts || {};
+  const base = path.join(__dirname, '..', 'reports', 'mobile');
+  const dirs = opts.staticDirs || [path.join(base, `${pkg}-jadx`), path.join(base, `${pkg}-apktool`)];
+  const cfg = {};
+  for (const d of dirs) {
+    for (const f of findFiles(d, /^google-services\.json$/)) {
+      try { Object.assign(cfg, parseGoogleServicesJson(fs.readFileSync(f, 'utf8'))); } catch {}
+    }
+    for (const f of findFiles(d, /^strings\.xml$/)) {
+      try {
+        const v = parseFirebaseStrings(fs.readFileSync(f, 'utf8'));
+        for (const k of Object.keys(v)) if (!cfg[k]) cfg[k] = v[k];
+      } catch {}
+    }
+  }
+  return cfg;
+}
+
+// The project id can come from project_id or from the database_url host prefix.
+function firebaseProject(cfg) {
+  if (cfg.project_id) return String(cfg.project_id);
+  const m = String(cfg.database_url || '').match(/^https?:\/\/([^.]+)\.firebaseio\.com/i);
+  return m ? m[1] : null;
+}
+
+// Pure: probe list from a config.
+function firebaseProbes(cfg) {
+  const probes = [];
+  const project = firebaseProject(cfg || {});
+  if (project) probes.push({ id: 'rtdb', url: `https://${project}.firebaseio.com/.json?shallow=true` });
+  if (cfg && cfg.storage_bucket) probes.push({ id: 'storage', url: `https://firebasestorage.googleapis.com/v0/b/${cfg.storage_bucket}/o?maxResults=1` });
+  return probes;
+}
+
+// Pure: status -> verdict. ONLY a 200 is an exposure; 401/403 is the locked (good) state.
+function classifyFirebaseProbe(id, res) {
+  if (!res || res.blocked) return { state: 'skipped', reason: (res && res.blocked) || 'no response' };
+  const s = res.status;
+  if (s === 200) return { state: 'exposed', severity: 'Medium' };
+  if (s === 401 || s === 403) return { state: 'protected' };
+  if (s === 404) return { state: 'absent' };
+  return { state: 'unknown', status: s };
+}
+
+// Mask the API key before persisting the config in a report (the key is a credential).
+function redactConfig(cfg) {
+  const c = Object.assign({}, cfg || {});
+  if (c.api_key) c.api_key = String(c.api_key).slice(0, 6) + '…(redacted)';
+  return c;
+}
+
+function recordFirebaseFindings(findings) {
+  let rf;
+  try { rf = require('./record-finding'); } catch { return 0; }
+  let n = 0;
+  for (const f of findings) {
+    try {
+      const res = rf.record(JSON.stringify({
+        title: `Exposed Firebase ${f.endpoint_id}: ${f.endpoint}`.slice(0, 160),
+        host: f.host, endpoint: f.endpoint, class: 'cloud', cwe: 'CWE-284',
+        severity: 'Medium', verify_level: 'triggered', status: 'confirmed',
+        poc: `GET ${f.endpoint} → HTTP 200 (read-only existence probe)`, technique: 'T1530',
+        remediation: 'Applicare le Firebase Security Rules / restringere l\'accesso anonimo al DB e al bucket.',
+        notes: 'tools/mobile.js firebase-audit (detection-only, single-request verify).',
+      }));
+      if (res && res.ok) n++;
+    } catch {}
+  }
+  return n;
+}
+
+// firebaseAudit(pkg, opts) -> { pkg, config, probes, findings, recorded, _file? }
+// opts: { config?, staticDirs?, probe?, reportsDir?, record? , timeoutMs? }
+async function firebaseAudit(pkg, opts) {
+  opts = opts || {};
+  const cfg = opts.config || extractFirebaseConfig(pkg, opts);
+  const probes = firebaseProbes(cfg);
+  const probe = opts.probe || ((url) => require('./cloud-enum').probeUrl(url, opts.timeoutMs));
+  const results = [];
+  const findings = [];
+  for (const p of probes) {
+    const res = await probe(p.url);
+    const verdict = classifyFirebaseProbe(p.id, res);
+    results.push(Object.assign({ id: p.id, url: p.url, status: res && res.status }, verdict));
+    if (verdict.state === 'exposed') {
+      findings.push({
+        host: pkg, endpoint: p.url, endpoint_id: p.id, class: 'cloud', verify_level: 'triggered', severity: 'Medium',
+        reason: `Firebase ${p.id} reachable without authentication (HTTP 200)`, endpoint_state: verdict.state,
+        evidence: { status: res.status, sample: String((res && res.body) || '').slice(0, 120) },
+      });
+    }
+  }
+  const report = { pkg, generated_at: new Date().toISOString(), config: redactConfig(cfg), probes: results, findings };
+  const outDir = opts.reportsDir || process.env.STAVROS_REPORTS_DIR || path.join(__dirname, '..', 'reports');
+  try {
+    fs.mkdirSync(outDir, { recursive: true });
+    const f = path.join(outDir, `mobile-firebase-${pkg}.json`);
+    fs.writeFileSync(f, JSON.stringify(report, null, 2));
+    report._file = f;
+  } catch { /* non-fatal */ }
+  const recorded = (opts.record === false || findings.length === 0) ? 0 : recordFirebaseFindings(findings);
+  return Object.assign(report, { recorded });
+}
+
+// ---- M.4: exported components / deeplinks -> map + mobile coverage class -------------
+// The static pass leaves AndroidManifest.xml (apktool/jadx). We extract the EXPORTED surface
+// (activities/services/receivers/providers with android:exported="true" + their deeplinks),
+// record it as candidate rows in reports/<pkg>-map.json (method ANDROID/DEEPLINK, class mobile),
+// and register the 'mobile' class in the coverage matrix so an UNTESTED mobile surface shows as
+// a gap instead of silently counting as covered.
+function parseAndroidManifest(xml) {
+  const s = String(xml || '');
+  if (!s || !/<manifest\b/.test(s)) return null;
+  const pkg = (s.match(/<manifest[^>]*\bpackage="([^"]+)"/) || [])[1] || null;
+  const exported = [];
+  const deeplinks = [];
+  // Match the OPENING tag, then (when not self-closing) take the content up to the matching
+  // close tag. A naive non-greedy block regex would stop at the first self-closing child
+  // (<action .../>) and lose the <data> deeplinks that follow inside the same intent-filter.
+  const openRe = /<(activity|activity-alias|service|receiver|provider)\b([^>]*?)(\/?)>/g;
+  let m;
+  while ((m = openRe.exec(s))) {
+    const type = m[1];
+    const attrs = m[2] || '';
+    let inner = '';
+    if (!m[3]) {
+      const closeRe = new RegExp(`</${type}\\s*>`, 'g');
+      closeRe.lastIndex = openRe.lastIndex;
+      const cm = closeRe.exec(s);
+      if (cm) { inner = s.slice(openRe.lastIndex, cm.index); openRe.lastIndex = cm.index + cm[0].length; }
+    }
+    const name = (attrs.match(/\bandroid:name="([^"]+)"/) || [])[1] || null;
+    if (!name) continue;
+    if (!/\bandroid:exported="true"/i.test(attrs)) continue; // only explicitly exported = surface
+    const hasFilter = /<intent-filter\b/i.test(inner);
+    const block = inner;
+    const compDeeplinks = [];
+    const dataRe = /<data\b([^>]*)\/>/g;
+    let dm;
+    while ((dm = dataRe.exec(block))) {
+      const attrs = dm[1];
+      const scheme = (attrs.match(/\bandroid:scheme="([^"]+)"/) || [])[1];
+      if (!scheme) continue;
+      const host = (attrs.match(/\bandroid:host="([^"]+)"/) || [])[1] || '';
+      const p = (attrs.match(/\bandroid:path(?:Prefix|Pattern|AdvancedPattern)?="([^"]+)"/) || [])[1] || '';
+      const dl = `${scheme}://${host}${p}`;
+      compDeeplinks.push(dl);
+      if (!deeplinks.includes(dl)) deeplinks.push(dl);
+    }
+    exported.push({ type, name, filter: hasFilter, deeplinks: compDeeplinks });
+  }
+  return { package: pkg, exported, deeplinks };
+}
+
+// Locate + parse the manifest in the static output dirs (fail-soft -> null).
+function extractManifest(pkg, opts) {
+  opts = opts || {};
+  const base = path.join(__dirname, '..', 'reports', 'mobile');
+  const dirs = opts.staticDirs || [path.join(base, `${pkg}-jadx`), path.join(base, `${pkg}-apktool`)];
+  for (const d of dirs) {
+    for (const f of findFiles(d, /^AndroidManifest\.xml$/)) {
+      try {
+        const parsed = parseAndroidManifest(fs.readFileSync(f, 'utf8'));
+        if (parsed) return { manifest: parsed, file: f };
+      } catch {}
+    }
+  }
+  return null;
+}
+
+// Pure: manifest -> map.js candidate entries (class 'mobile').
+function manifestMapEntries(pkg, manifest) {
+  const entries = [];
+  if (!manifest) return entries;
+  for (const c of manifest.exported) {
+    entries.push({
+      host: pkg, path: `/manifest/${c.type}/${String(c.name).split('.').pop()}`, method: 'ANDROID',
+      params: [], auth_required: false,
+      notes: `${c.type} exported${c.filter ? ' with intent-filter' : ''}${c.deeplinks.length ? ' — deeplinks: ' + c.deeplinks.join(', ') : ''}`,
+      candidates: { mobile: [c.type] },
+    });
+  }
+  for (const dl of manifest.deeplinks) {
+    entries.push({
+      host: pkg, path: dl, method: 'DEEPLINK', params: [], auth_required: false,
+      notes: 'deeplink intent-filter (exported component)', candidates: { mobile: ['deeplink'] },
+    });
+  }
+  // Zero exported surface is itself a result: record an explicit empty candidate so the matrix
+  // shows 'n-a' (audited, nothing to test) instead of a silent absence.
+  if (!entries.length) {
+    entries.push({ host: pkg, path: '/manifest', method: 'ANDROID', params: [], auth_required: false,
+      notes: 'no exported components/deeplinks found', candidates: { mobile: [] } });
+  }
+  return entries;
+}
+
+// Write the manifest surface into reports/<pkg>-map.json (via map.js; STAVROS_MAP_DIR override).
+function writeMobileMap(pkg, manifest) {
+  const mapLib = require('./map');
+  let added = 0; const errors = [];
+  for (const e of manifestMapEntries(pkg, manifest)) {
+    const r = mapLib.add(JSON.stringify(e));
+    if (r.ok) added++;
+    else errors.push(r.error);
+  }
+  const file = path.join(process.env.STAVROS_MAP_DIR || path.join(__dirname, '..', 'reports'), `${pkg}-map.json`);
+  return { added: added, file: file, errors: errors };
+}
+
+// mobileSurface(pkg, opts) -> manifest surface + map rows + the 'mobile' coverage row.
+// opts: { manifest?, staticDirs?, reportsDir?, findingsFile? }
+function mobileSurface(pkg, opts) {
+  opts = opts || {};
+  const found = opts.manifest ? { manifest: opts.manifest, file: null } : extractManifest(pkg, opts);
+  const manifest = found ? found.manifest : null;
+  const mapInfo = writeMobileMap(pkg, manifest);
+  let coverage = null;
+  try {
+    const cov = require('./coverage');
+    const m = cov.buildMatrix(pkg, { reportsDir: opts.reportsDir, findingsFile: opts.findingsFile, mobile: true });
+    const row = m.rows.find((r) => r.class === 'mobile');
+    coverage = { host: pkg, row: row || null };
+  } catch { /* coverage is advisory */ }
+  return {
+    pkg,
+    manifest_file: found ? found.file : null,
+    exported: manifest ? manifest.exported.length : 0,
+    deeplinks: manifest ? manifest.deeplinks.length : 0,
+    details: manifest ? { exported: manifest.exported, deeplinks: manifest.deeplinks } : null,
+    map: mapInfo,
+    coverage,
+  };
 }
 
 // ---- defaultRunMobile: injectable, default = scope-check + tier-check + audit + runBinary ----
@@ -255,7 +886,23 @@ async function staticApk(apk, opts) {
     const r = await runMobile(c.bin, c.args, Object.assign({ sub: 'static' }, opts));
     results.push({ cmd: c.bin, status: r && r.status });
   }
-  return { apk, results };
+  // M.3 post-pass: only when explicitly asked (network) AND the package is known.
+  let firebase = null;
+  if (opts.firebase && opts.package) {
+    firebase = await firebaseAudit(opts.package, {
+      staticDirs: opts.staticDirs, reportsDir: opts.reportsDir, record: opts.record,
+      config: opts.config, probe: opts.probe,
+    });
+  }
+  // M.4 post-pass: offline (manifest -> map + mobile coverage row).
+  let surface = null;
+  if (opts.surface && opts.package) {
+    surface = mobileSurface(opts.package, { staticDirs: opts.staticDirs, reportsDir: opts.reportsDir });
+  }
+  const out = { apk, results };
+  if (firebase) out.firebase = firebase;
+  if (surface) out.surface = surface;
+  return out;
 }
 
 async function installApk(apk, opts) {
@@ -277,7 +924,7 @@ async function shell(serial, shellArgs, opts) {
 // ---- CLI ----
 function usage() {
   console.error(
-    'usage: node tools/mobile.js check <target> | status | static <apk> | install <apk> --package <pkg> [--serial S] | shell <serial> <pkg> -- <args...> | frida <serial> <pkg> [-l hook.js] [--confirm "r"] | intercept <serial> [--write dir] [--confirm "r"] | ca-install <serial> [--confirm "r"] | reset [--confirm "r"]'
+    'usage: node tools/mobile.js check <target> | status | static <apk> [--package <pkg> --firebase --surface] | surface <pkg> | fetch-apk <pkg> [--out f | --verify-only file] | firebase-audit <pkg> [--record] | install <apk> --package <pkg> [--serial S] | shell <serial> <pkg> -- <args...> | frida-server up|down|status [serial] [--port N] [--confirm "r"] | frida <serial> <pkg> [-l hook.js] [--confirm "r"] | intercept <serial> [--write dir] [--confirm "r"] | ca-install <serial> [--confirm "r"] | reset [--confirm "r"]'
   );
   process.exit(2);
 }
@@ -293,6 +940,13 @@ function parseArgs(rest) {
     else if (a === '--out') opts.out = rest[++i];
     else if (a === '-l' || a === '--script') opts.script = rest[++i];
     else if (a === '--confirm') opts.confirm = rest[++i];
+    else if (a === '--framework') opts.framework = rest[++i];
+    else if (a === '--port') opts.port = rest[++i];
+    else if (a === '--verify-only') opts.verifyOnly = rest[++i];
+    else if (a === '--firebase') opts.firebase = true;
+    else if (a === '--surface') opts.surface = true;
+    else if (a === '--record') opts.record = true;
+    else if (a === '--reports-dir') opts.reportsDir = rest[++i];
     else if (a === '--') opts.shellArgs = rest.slice(i + 1), i = rest.length;
     else pos.push(a);
   }
@@ -339,10 +993,17 @@ async function main() {
         break;
       case 'frida': {
         if (!pos[1]) usage();
-        const c = fridaCommands(pos[1], { serial: pos[0], script: opts.script })[0];
+        const det = detectFramework(pos[1], opts);
+        const c = fridaCommands(pos[1], { serial: pos[0], script: opts.script, framework: opts.framework, staticDirs: opts.staticDirs })[0];
         const { runBinary: rb, ...o } = opts;
         const r = await defaultRunMobile(c.bin, c.args, Object.assign({ sub: 'frida', package: pos[1], serial: pos[0] }, o));
-        out = { package: pos[1], status: r && r.status };
+        out = Object.assign({ package: pos[1], framework: det.framework, script: path.basename(c.args[c.args.indexOf('-l') + 1] || ''), status: r && r.status }, fridaHint(pos[1], opts) || {});
+        break;
+      }
+      case 'frida-server': {
+        const action = pos[0];
+        if (!action || !['up', 'down', 'status', 'forward'].includes(action)) usage();
+        out = await fridaServer(action, Object.assign({}, opts, { serial: pos[1] || opts.serial }));
         break;
       }
       case 'intercept': {
@@ -357,6 +1018,21 @@ async function main() {
         if (!pos[0]) usage();
         const r = await defaultRunMobile('adb', ['-s', pos[0], 'shell', 'su', '0', 'ls', '/system/etc/security/cacerts'], Object.assign({ sub: 'ca-install', serial: pos[0] }, opts));
         out = { serial: pos[0], status: r && r.status, note: 'push mitmproxy CA via adb root, then ca-install completes (confirm-tier)' };
+        break;
+      }
+      case 'fetch-apk': {
+        if (!pos[0]) usage();
+        out = await fetchApk(pos[0], { out: opts.out, verifyOnly: opts.verifyOnly, scopePath: opts.scopePath });
+        break;
+      }
+      case 'firebase-audit': {
+        if (!pos[0]) usage();
+        out = await firebaseAudit(pos[0], { record: opts.record, reportsDir: opts.reportsDir, staticDirs: opts.staticDirs });
+        break;
+      }
+      case 'surface': {
+        if (!pos[0]) usage();
+        out = mobileSurface(pos[0], { staticDirs: opts.staticDirs, reportsDir: opts.reportsDir });
         break;
       }
       case 'reset': {
@@ -377,7 +1053,13 @@ async function main() {
 if (require.main === module) main();
 
 module.exports = {
-  staticCommands, installCommands, shellCommands, fridaCommands, interceptCommands,
+  staticCommands, installCommands, shellCommands, fridaCommands, fridaHint, detectFramework,
+  fridaServerCommands, fridaServer, fridaPort, FRIDA_DEVICE_PATH, hookScriptFor, frameworkResult,
+  interceptCommands, dirHasMatch,
+  loadApkSources, apkSourceFor, sha256Buffer, httpGetBuffer, fetchApk,
+  parseFirebaseStrings, parseGoogleServicesJson, findFiles, extractFirebaseConfig, firebaseProject,
+  firebaseProbes, classifyFirebaseProbe, redactConfig, firebaseAudit,
+  parseAndroidManifest, extractManifest, manifestMapEntries, writeMobileMap, mobileSurface,
   extractTargets, classify, classifyRaw, loadTiers, statusCmd, staticApk, installApk, shell,
   defaultRunMobile,
 };

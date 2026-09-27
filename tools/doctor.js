@@ -6,7 +6,7 @@
 //   1. runtime      node >= 22 (engines di package.json), python3, go, pipx, git, unzip, xz
 //   2. progetto     file/cardini del workspace (registry, agents, GUI, knowledge, scope.json...)
 //                   + validazione schema del tool-registry (node tools/run.js --registry-check)
-//   3. registry     i 35 binari instradabili via tools/run.js, con come si installano
+//   3. registry     i binari instradabili via tools/run.js (elenco in tool-registry.json), con come si installano
 //   4. extra        tool-plane esteso (msf, sliver, wireless, cloud CLI)
 //   5. vendor       obscura, frida-server (root ESTERNA via tools/vendor-dir.js), tool vetted,
 //                   mirror MANIFEST (questi ultimi gitignored: servono per copia-cartella; un
@@ -164,10 +164,12 @@ const REGISTRY = [
   { bin: 'netexec', cat: 'creds', pkg: 'netexec', pipx: 'netexec', how: 'aptpipx' },
   { bin: 'impacket-secretsdump', cat: 'creds', pkg: 'impacket-scripts' },
   // ad
-  { bin: 'enum4linux', cat: 'ad', pkg: 'enum4linux', note: 'se assente copre enum4linux_ng (alternative nel registry)' },
-  { bin: 'enum4linux_ng', cat: 'ad', pkg: 'enum4linux-ng' },
+  { bin: 'enum4linux', cat: 'ad', pkg: 'enum4linux', note: 'se assente copre enum4linux-ng (alternative nel registry)' },
+  { bin: 'enum4linux-ng', cat: 'ad', pkg: 'enum4linux-ng' },
   { bin: 'ldapsearch', cat: 'ad', pkg: 'ldap-utils' },
-  { bin: 'bloodhound_python', cat: 'ad', pkg: 'bloodhound.py', note: 'il binario è bloodhound-python' },
+  { bin: 'bloodhound-python', cat: 'ad', pkg: 'bloodhound.py', note: 'il collector è bloodhound-python; su Parrot il comando `bloodhound` è il SERVER GUI (bhapi/neo4j), NON il collector' },
+  { bin: 'impacket-findDelegation', cat: 'ad', pkg: 'impacket-scripts', note: 'enum deleghe Kerberos (fallback findDelegation.py da pipx impacket)' },
+  { bin: 'coercer', cat: 'ad', pipx: 'coercer', note: 'coercione autenticazioni MS-DFSNM/EFSR per ad.js coerce (confirm-tier); impacket NON include dfscoerce — coercer è il sostituto upstream-verificato' },
   // mobile
   { bin: 'curl', cat: 'core', pkg: 'curl' },
   { bin: 'adb', cat: 'mobile', pkg: 'adb' },
@@ -184,10 +186,22 @@ const EXTRAS = [
   { bin: 'msfconsole', pkg: 'metasploit-framework' },
   { bin: 'msfvenom', pkg: 'metasploit-framework', note: 'stesso pacchetto di msfconsole' },
   { bin: 'sliver', manual: 'curl https://sliver.sh/install | sudo bash  (eseguilo SOLO tu — vedi install-tools.sh Fase 5)' },
-  { bin: 'aircrack_ng', pkg: 'aircrack-ng', note: 'fornisce aircrack-ng/airmon-ng/airodump-ng' },
-  { bin: 'airmon_ng', pkg: 'aircrack-ng', note: 'stesso pacchetto di aircrack_ng' },
-  { bin: 'airodump_ng', pkg: 'aircrack-ng', note: 'stesso pacchetto di aircrack_ng' },
+  { bin: 'aircrack-ng', pkg: 'aircrack-ng', note: 'fornisce aircrack-ng/airmon-ng/airodump-ng' },
+  { bin: 'airmon-ng', pkg: 'aircrack-ng', note: 'stesso pacchetto di aircrack-ng' },
+  { bin: 'airodump-ng', pkg: 'aircrack-ng', note: 'stesso pacchetto di aircrack-ng' },
+  { bin: 'aireplay-ng', pkg: 'aircrack-ng', note: 'deauth/injection (confirm-tier) — stesso pacchetto' },
   { bin: 'reaver', pkg: 'reaver' },
+  // wireless — reti aperte / captive portal / rogue AP (Fase 4; solo Linux/Parrot).
+  { bin: 'hcxdumptool', pkg: 'hcxdumptool', note: 'PMKID capture (confirm-tier capture)' },
+  { bin: 'hcxpcapngtool', pkg: 'hcxtools', note: 'pcap -> hashcat 22000 (pacchetto hcxtools)' },
+  { bin: 'hcxpsktool', pkg: 'hcxtools', note: 'stesso pacchetto di hcxpcapngtool' },
+  { bin: 'wifite', pkg: 'wifite', note: 'automazione wifi (confirm-tier automated)' },
+  { bin: 'hostapd', pkg: 'hostapd', note: 'rogue AP (confirm-tier rogue_ap)' },
+  { bin: 'dnsmasq', pkg: 'dnsmasq', note: 'DHCP/DNS wildcard del rogue AP / captive portal' },
+  { bin: 'iw', pkg: 'iw', note: 'monitor mode / configurazione interfaccia wireless' },
+  { bin: 'macchanger', pkg: 'macchanger', note: 'spoof MAC (confirm-tier mac_spoof)' },
+  { bin: 'tcpdump', pkg: 'tcpdump', note: 'sniff passivo (auto)' },
+  { bin: 'tshark', pkg: 'tshark', note: 'analisi passiva delle catture (auto)' },
   { bin: 'aws', manual: 'pipx install awscli (o pacchetto distro)' },
   { bin: 'az', manual: 'pipx install azure-cli' },
   { bin: 'gcloud', manual: 'vedi https://cloud.google.com/sdk/docs/install' },
@@ -324,18 +338,27 @@ async function main() {
   const scope = checkScope();
 
   if (opts.json) {
+    // install hints are part of the JSON on purpose: the Command Center builds the
+    // "install what is missing" plan from THIS document, so doctor stays the single
+    // source of truth for what to install and how (never re-derived by the UI).
+    const how = (r) => r.how || (r.pkg ? 'apt' : r.go ? 'go' : r.pipx ? 'pipx' : 'manual');
     const j = {
       ts: new Date().toISOString(),
       runtime, project,
-      registry: registry.map(({ bin, cat, installed }) => ({ bin, cat, installed })),
-      extras: extras.map(({ bin, installed }) => ({ bin, installed })),
-      vendor: vendor.map(({ p, ok }) => ({ path: p, ok })),
+      registry: registry.map(({ bin, cat, installed, pkg, go, pipx, note }) => ({ bin, cat, installed, pkg: pkg || null, go: go || null, pipx: pipx || null, note: note || null })),
+      extras: extras.map(({ bin, installed, pkg, manual, note }) => ({ bin, installed, pkg: pkg || null, manual: manual || null, note: note || null })),
+      vendor: vendor.map(({ p, ok, what, fix }) => ({ path: p, ok, what: what || null, fix: fix || null })),
       scope,
       summary: {
         registry_total: registry.length,
         registry_present: registry.filter((r) => r.installed).length,
         extras_present: extras.filter((r) => r.installed).length,
         core_broken: project.some((r) => !r.ok),
+        // additive: what the installer would act on, per group
+        runtime_missing: runtime.slice(1).filter((r) => !r.installed).map((r) => ({ bin: r.bin, how: r.how || null, note: r.note || null })),
+        registry_missing: registry.filter((r) => !r.installed).map((r) => ({ bin: r.bin, cat: r.cat, how: how(r), pkg: r.pkg || null, go: r.go || null, pipx: r.pipx || null, note: r.note || null })),
+        extras_missing: extras.filter((r) => !r.installed).map((r) => ({ bin: r.bin, how: how(r), pkg: r.pkg || null, manual: r.manual || null, note: r.note || null })),
+        vendor_missing: vendor.filter((v) => !v.ok).map((v) => ({ what: v.what, fix: v.fix })),
       },
     };
     console.log(JSON.stringify(j, null, 2));

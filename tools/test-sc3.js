@@ -261,7 +261,7 @@ async function main() {
     const r = cli(RUN, ['--registry-check']);
     const o = JSON.parse(r.stdout);
     assert.strictEqual(o.ok, true, r.stdout);
-    assert.strictEqual(o.bins, 35); // 28 web/rete + 7 mobile (adb/apktool/jadx/frida/objection/mitmproxy/mitmdump)
+    assert.strictEqual(o.bins, 83); // 35 iniziali + 19 (T1: pipeline/AD/wireless) + 26 (inventario Parrot) + 3 (coercer + impacket-findDelegation/findDelegation.py: gap-chiusura dfscoerce assente da impacket)
   });
   ok('chiave mancante → exit 1, audit {gate:tool_requires_key, missing_keys}, classe key_missing (anche dry-run)', () => {
     const audit = path.join(T, 'audit-e12.jsonl');

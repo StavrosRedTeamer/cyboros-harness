@@ -1,0 +1,56 @@
+{
+  "_comment": "StavrosRedTeamer — edizione LOCALE. Config del runner autonomo che guida il motore deterministico (tools/) e usa un modello locale abliterato via API OpenAI di llama.cpp. Nessuna dipendenza da Freebuff/cloud.",
+  "endpoint": {
+    "base_url": "http://127.0.0.1:8080/v1",
+    "api_key": "sk-local-noauth",
+    "model": "Qwen3.6-35B-A3B-abliterated",
+    "_note": "base_url = llama-server --host 127.0.0.1 --port 8080 (OpenAI-compatible). api_key ignorata da llama.cpp ma richiesta dal protocollo. model = qualsiasi stringa: llama.cpp serve l'unico modello caricato."
+  },
+  "sampling": {
+    "temperature": 0.4,
+    "top_p": 0.9,
+    "top_k": 20,
+    "presence_penalty": 0.35,
+    "frequency_penalty": 0.35,
+    "max_tokens": 1024,
+    "_note": "temperatura bassa: per un modello ~3B attivi il pentest vuole determinismo e tool-calling pulito, non creativita'. presence/frequency_penalty: primo freno soft ai loop (DRY lato server non vede le chiamate tool ripetute tra turni diversi). max_tokens per turno agente contenuto."
+  },
+  "runtime": {
+    "max_tool_iters": 8,
+    "loop_guard": {
+      "max_repeats": 1,
+      "fuzzy": true,
+      "fuzzy_threshold": 0.85,
+      "_note": "LOOP-GUARD in local/llm.js: blocca tool+args ripetuti (anche varianti quasi-identiche, typo-hunting) che DRY non vede. max_repeats=1: 2ª esecuzione -> avviso con output precedente; 3ª -> correzione forzata con cambio strategia. fuzzy_threshold: similarita' dice-bigram >= soglia = stessa azione (solo a parita' di tool)."
+    },
+    "request_timeout_ms": 300000,
+    "retries": 2,
+    "retry_backoff_ms": 3000,
+    "context_char_budget": 24000,
+    "tool_output_clip_chars": 4000,
+    "native_tools": true,
+    "text_protocol_fallback": true,
+    "use_grammar": true,
+    "allow_thinking": false,
+    "_note": "context_char_budget: taglio duro del contesto passato al modello debole (grep-first + clip). native_tools: function-calling OpenAI. use_grammar: vincola l'output a ACTION:{json}|FINAL via GBNF (local/grammar.js) — massima affidabilita' del tool-calling su modelli deboli; forza il protocollo testuale e disattiva i tool nativi per quella chiamata; si spegne da sola se il server rifiuta la grammatica. allow_thinking: consenti un blocco <think> iniziale (modelli reasoning) — tienilo false per determinismo. text_protocol_fallback: parsing ACTION: anche senza grammatica."
+  },
+  "embeddings": {
+    "enabled": false,
+    "url": "http://127.0.0.1:8081/v1/embeddings",
+    "model": "bge-m3",
+    "api_key": "sk-local",
+    "alpha": 0.6,
+    "_note": "RAG semantico IBRIDO. enabled=true -> run-local esporta STAVROS_EMBED_URL/MODEL/KEY e STAVROS_RAG_ALPHA ai tool (memory-rag). Servi un modello di embedding con un secondo llama-server: llama-server -m bge-m3-Q8_0.gguf --embeddings --host 127.0.0.1 --port 8081. alpha = peso del dense nella fusione (0=lessicale, 1=dense). Dopo l'attivazione: node tools/memory-rag.js reembed. Se il backend e' giu', il RAG torna lessicale da solo."
+  },
+  "route": {
+    "_comment": "mappa classe/subagent_id originale -> agente di FASE consolidato (edizione locale).",
+    "recon": "recon-map", "osint": "recon-map", "network": "recon-map", "ad": "recon-map", "mapper": "recon-map",
+    "sqli": "web-test", "xss": "web-test", "authz": "web-test", "authn": "web-test", "csrf": "web-test",
+    "ssrf": "web-test", "injection": "web-test", "cloud": "web-test", "llm": "web-test", "idor": "web-test",
+    "breach": "host", "postex": "host", "lateral": "host", "persist": "host", "privesc": "host",
+    "cleanup": "host", "exploit": "host",
+    "wireless": "wireless", "hardware": "wireless", "mobile": "wireless",
+    "vet": "report", "reporter": "report"
+  },
+  "phases": ["recon-map", "web-test", "host", "wireless", "report"]
+}

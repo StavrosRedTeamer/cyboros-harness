@@ -80,7 +80,7 @@ console.log('G1 — gate: pocReplay + chainHead (coda additiva, SA1 intatto) + h
   ok('report gate: SA1 (chain/oracle/evidenceQuote) contiguo invariato + coda Ondata 6', () => {
     const kinds = gateLib.GATES.report.checks.map((c) => c.kind);
     assert.deepStrictEqual(kinds.slice(0, 4), ['findings', 'verify', 'noPending', 'coverage']);
-    assert.deepStrictEqual(kinds.slice(4), ['chain', 'oracle', 'evidenceQuote', 'pocReplay', 'chainHead']);
+    assert.deepStrictEqual(kinds.slice(4), ['chain', 'oracle', 'evidenceQuote', 'pocReplay', 'chainHead', 'attackCoverage']);
     assert.ok(kinds.slice(4, 7).every((k) => ['chain', 'oracle', 'evidenceQuote'].includes(k)), 'SA1 resta contiguo');
   });
 
@@ -294,6 +294,20 @@ console.log('G3 — parsers breadth (testssl/whatweb/katana/dirsearch/enum4linux
     assert.deepStrictEqual(parsers.parseEnum4linuxNgJson(JSON.stringify([rec, rec])), [], 'array multi-record rifiutato');
     assert.deepStrictEqual(parsers.parseEnum4linuxNgJson('{"nope":1}'), []);
   });
+  ok('parseContainerJson: docker /version e kubelet PodList; forme improprie → null', () => {
+    const d = parsers.parseContainerJson(JSON.stringify({ Version: '24.0.5', ApiVersion: '1.43', Os: 'linux' }));
+    assert.deepStrictEqual(d, { kind: 'docker', version: '24.0.5', api_version: '1.43', os: 'linux' });
+    const k = parsers.parseContainerJson(JSON.stringify({ kind: 'PodList', nodeName: 'node-1', items: [
+      { metadata: { name: 'web', namespace: 'prod' }, spec: { nodeName: 'node-1', containers: [{ image: 'nginx:1.27' }] } },
+      { metadata: { name: ' ' } },
+    ] }));
+    assert.strictEqual(k.kind, 'kubelet');
+    assert.strictEqual(k.pods.length, 1);
+    assert.deepStrictEqual(k.pods[0], { namespace: 'prod', name: 'web', node_name: 'node-1', images: ['nginx:1.27'] });
+    assert.strictEqual(parsers.parseContainerJson('not-json{'), null);
+    assert.strictEqual(parsers.parseContainerJson('[1,2]'), null);
+    assert.strictEqual(parsers.parseContainerJson('{"unrelated":true}'), null);
+  });
 }
 
 // ─── G4 — target-model breadth ingest ────────────────────────────────────────
@@ -356,6 +370,30 @@ console.log('G4 — target-model: ingest breadth + snapshot + CLI');
       assert.ok(Array.isArray(ents.entities) && ents.entities.length > 0, JSON.stringify(ents));
       assert.ok(ents.entities.every((e) => e && e.entityType), JSON.stringify(ents.entities[0]));
       assert.strictEqual(ents.invalid.length, 0, JSON.stringify(ents.invalid));
+    });
+    ok('ingest container: docker /version → porta 2375 + endpoint; kubelet /pods → 10250 + pod (idempotente)', () => {
+      const docker = JSON.stringify({ Version: '24.0.5', ApiVersion: '1.43' });
+      const pods = JSON.stringify({ kind: 'PodList', items: [{ metadata: { name: 'web', namespace: 'prod' }, spec: { containers: [{ image: 'nginx:1.27' }] } }] });
+      const a = tm.ingest(db, 'container', docker, { target: 'target.example' });
+      assert.ok(a.ok, JSON.stringify(a));
+      assert.deepStrictEqual({ h: a.counts.hosts, p: a.counts.ports }, { h: 1, p: 1 }, JSON.stringify(a));
+      const b = tm.ingest(db, 'container', pods, { target: 'target.example' });
+      assert.ok(b.ok && b.counts.ports === 1 && b.counts.endpoints === 1, JSON.stringify(b));
+      const snap = tm.snapshot(db);
+      const t0 = snap.targets.find((t) => t.host === 'target.example');
+      const ports = t0.hosts.flatMap((h) => h.ports.map((p) => p.port));
+      assert.ok(ports.includes(2375) && ports.includes(10250), JSON.stringify(ports));
+      assert.ok(t0.endpoints.some((e) => e.url === 'tcp://target.example:2375/version'), 'endpoint docker');
+      assert.ok(t0.endpoints.some((e) => e.url === 'k8s://target.example:10250/prod/web'), 'endpoint pod');
+      // re-ingest is idempotent (no duplicate rows/endpoints)
+      assert.ok(tm.ingest(db, 'container', pods, { target: 'target.example' }).ok);
+      const again = tm.snapshot(db).targets.find((t) => t.host === 'target.example');
+      assert.strictEqual(again.endpoints.filter((e) => e.url === 'k8s://target.example:10250/prod/web').length, 1, 'idempotente');
+      // malformed / host-less input is a no-op, never an error
+      const bad = tm.ingest(db, 'container', 'garbage{{', { target: 'target.example' });
+      assert.ok(bad.ok && bad.counts.ports === 0, JSON.stringify(bad));
+      const nohost = tm.ingest(db, 'container', docker, {});
+      assert.ok(nohost.ok && nohost.counts.ports === 0, JSON.stringify(nohost));
     });
     ok('fail-closed: tool sconosciuto → ok:false; input malformato → zero righe senza throw', () => {
       const bad = tm.ingest(db, 'evil-tool', '{}', {});

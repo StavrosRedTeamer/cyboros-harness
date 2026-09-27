@@ -1,0 +1,16 @@
+# Workflow seed — enum-mongo (dialetto workflow, Ondata servizi P1.2)
+# Unauth listDatabases: se risponde, l'istanza è aperta (finding config). mongosh manca ->
+# fallback curl noop ( presence probe sull'endpoint HTTP di mongod, best-effort).
+name: enum-mongo
+description: Enumerazione MongoDB autorizzata (listDatabases unauth, read-only)
+vars:
+  out: reports
+requires:
+  - mongosh
+steps:
+  - id: mongo-listdbs-unauth
+    cmd: node tools/run.js mongosh --host {target} --eval 'db.runCommand({listDatabases:1})' --quiet
+    on_error: continue
+    artifacts:
+      - path: "{out}/enum-{target}-mongo.txt"
+        surface: scan

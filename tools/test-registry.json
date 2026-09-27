@@ -9,12 +9,14 @@
       "owasp_api": "OWASP API Security Top 10 (2023) ids",
       "owasp_llm": "OWASP GenAI LLM Top 10 (2025/2026) ids",
       "owasp_agentic": "OWASP Top 10 for Agentic Applications 2026 ids (ASI01-ASI10)",
+      "attack": "MITRE ATT&CK Enterprise technique ids; tactic/name resolved in tools/attack-coverage.js",
       "note_2025": "Registry aligned with OWASP Top 10:2025 — A01 Broken Access Control now explicitly covers BOLA/BFLA (bola/bfla classes); new 2025 categories A03 Software Supply Chain (supply-chain) and A10 Mishandling of Exceptional Conditions (exceptional); plus the 2025/2026 GenAI surface (llm, mcp)."
     },
     "note": "Pointers to methodology references per finding/vuln CLASS. They guide the tester and enrich reports; they are NOT evidence that a check was executed."
   },
   "classes": {
     "info": {
+      "attack": ["T1592"],
       "wstg": [
         "WSTG-INFO"
       ],
@@ -27,6 +29,7 @@
       ]
     },
     "bola": {
+      "attack": ["T1190"],
       "wstg": [
         "WSTG-ATHZ-04",
         "WSTG-ATHZ-01"
@@ -42,6 +45,7 @@
       ]
     },
     "bfla": {
+      "attack": ["T1190", "T1078"],
       "wstg": [
         "WSTG-ATHZ-02",
         "WSTG-ATHZ-01"
@@ -57,6 +61,7 @@
       ]
     },
     "llm": {
+      "attack": ["T1190"],
       "wstg": [
         "WSTG"
       ],
@@ -78,6 +83,7 @@
       ]
     },
     "mcp": {
+      "attack": ["T1190"],
       "wstg": [
         "WSTG"
       ],
@@ -97,6 +103,7 @@
       ]
     },
     "supply-chain": {
+      "attack": ["T1195"],
       "wstg": [
         "WSTG-SUPL"
       ],
@@ -110,6 +117,7 @@
       "owasp_api": []
     },
     "exceptional": {
+      "attack": ["T1190"],
       "wstg": [
         "WSTG-ERR"
       ],
@@ -124,6 +132,7 @@
       "owasp_api": []
     },
     "smuggling": {
+      "attack": ["T1190"],
       "wstg": [
         "WSTG-INPV-15"
       ],
@@ -136,6 +145,7 @@
       "owasp_api": []
     },
     "config": {
+      "attack": ["T1190", "T1078"],
       "wstg": [
         "WSTG-CONF"
       ],
@@ -150,6 +160,7 @@
       ]
     },
     "authn": {
+      "attack": ["T1110", "T1078"],
       "wstg": [
         "WSTG-ATHN",
         "WSTG-IDNT"
@@ -166,6 +177,7 @@
       ]
     },
     "session": {
+      "attack": ["T1539", "T1078"],
       "wstg": [
         "WSTG-SESS"
       ],
@@ -180,6 +192,7 @@
       ]
     },
     "authz": {
+      "attack": ["T1190", "T1078"],
       "wstg": [
         "WSTG-ATHZ"
       ],
@@ -195,6 +208,7 @@
       ]
     },
     "idor": {
+      "attack": ["T1190"],
       "wstg": [
         "WSTG-ATHZ-04"
       ],
@@ -209,6 +223,7 @@
       ]
     },
     "csrf": {
+      "attack": ["T1190"],
       "wstg": [
         "WSTG-SESS-05"
       ],
@@ -221,6 +236,7 @@
       "owasp_api": []
     },
     "sqli": {
+      "attack": ["T1190"],
       "wstg": [
         "WSTG-INPV-05"
       ],
@@ -233,6 +249,7 @@
       "owasp_api": []
     },
     "nosqli": {
+      "attack": ["T1190"],
       "wstg": [
         "WSTG-INPV"
       ],
@@ -245,6 +262,7 @@
       "owasp_api": []
     },
     "xss": {
+      "attack": ["T1059.007", "T1190"],
       "wstg": [
         "WSTG-INPV-01",
         "WSTG-INPV-02"
@@ -259,6 +277,7 @@
       "owasp_api": []
     },
     "xxe": {
+      "attack": ["T1190"],
       "wstg": [
         "WSTG-XXE-01",
         "WSTG-INPV-07"
@@ -272,6 +291,7 @@
       "owasp_api": []
     },
     "injection": {
+      "attack": ["T1059", "T1190"],
       "wstg": [
         "WSTG-INPV-11",
         "WSTG-INPV-12"
@@ -287,6 +307,7 @@
       "owasp_api": []
     },
     "ssti": {
+      "attack": ["T1059", "T1190"],
       "wstg": [
         "WSTG-INPV-11"
       ],
@@ -299,6 +320,7 @@
       "owasp_api": []
     },
     "deser": {
+      "attack": ["T1059", "T1190"],
       "wstg": [
         "WSTG-INPV-11"
       ],
@@ -311,6 +333,7 @@
       "owasp_api": []
     },
     "lfi": {
+      "attack": ["T1083", "T1005"],
       "wstg": [
         "WSTG-ATHZ-01",
         "WSTG-INPV"
@@ -324,6 +347,7 @@
       "owasp_api": []
     },
     "proto-pollution": {
+      "attack": ["T1190"],
       "wstg": [
         "WSTG-CLNT"
       ],
@@ -336,6 +360,7 @@
       "owasp_api": []
     },
     "redirect": {
+      "attack": ["T1190"],
       "wstg": [
         "WSTG-CLNT-04"
       ],
@@ -348,6 +373,7 @@
       "owasp_api": []
     },
     "upload": {
+      "attack": ["T1190", "T1505.003"],
       "wstg": [
         "WSTG-BUSL-09"
       ],
@@ -360,6 +386,7 @@
       "owasp_api": []
     },
     "ssrf": {
+      "attack": ["T1190", "T1552.005"],
       "wstg": [
         "WSTG-SSRF-01"
       ],
@@ -374,6 +401,7 @@
       ]
     },
     "graphql": {
+      "attack": ["T1190"],
       "wstg": [
         "WSTG-APIT-09"
       ],
@@ -390,6 +418,7 @@
       ]
     },
     "cloud": {
+      "attack": ["T1552.005", "T1078"],
       "wstg": [
         "WSTG-CONF"
       ],
@@ -404,6 +433,7 @@
       ]
     },
     "business-logic": {
+      "attack": ["T1190"],
       "wstg": [
         "WSTG-BUSL"
       ],
@@ -415,11 +445,198 @@
         "API6"
       ]
     },
+    "wireless": {
+      "attack": ["T1557", "T1040"],
+      "wstg": [
+        "WSTG-CRYP-01"
+      ],
+      "asvs": [
+        "V9 Communications",
+        "V6 Stored Cryptography"
+      ],
+      "cwe": [
+        "CWE-311",
+        "CWE-319",
+        "CWE-326",
+        "CWE-521"
+      ],
+      "owasp_api": []
+    },
+    "race": {
+      "attack": ["T1190"],
+      "wstg": [
+        "WSTG-BUSL"
+      ],
+      "asvs": [
+        "V13 Business Logic"
+      ],
+      "cwe": [
+        "CWE-362"
+      ],
+      "owasp_api": [
+        "API6"
+      ]
+    },
+    "ws": {
+      "attack": ["T1190"],
+      "wstg": [],
+      "asvs": [
+        "V13 API"
+      ],
+      "cwe": [
+        "CWE-306"
+      ],
+      "owasp_api": [
+        "API2"
+      ]
+    },
+    "cache-poison": {
+      "attack": ["T1190"],
+      "wstg": [],
+      "asvs": [],
+      "cwe": [],
+      "owasp_api": []
+    },
+    "saml": {
+      "attack": ["T1606.002"],
+      "wstg": [
+        "WSTG-ATHN"
+      ],
+      "asvs": [
+        "V6 Auth"
+      ],
+      "cwe": [
+        "CWE-347"
+      ],
+      "owasp_api": [
+        "API2"
+      ]
+    },
+    "jwt": {
+      "attack": ["T1606.001"],
+      "wstg": [
+        "WSTG-ATHN"
+      ],
+      "asvs": [
+        "V3 Session",
+        "V6 Auth"
+      ],
+      "cwe": [
+        "CWE-347"
+      ],
+      "owasp_api": [
+        "API2"
+      ]
+    },
+    "cors": {
+      "attack": ["T1190"],
+      "wstg": [
+        "WSTG-CONF"
+      ],
+      "asvs": [
+        "V14 Config"
+      ],
+      "cwe": [
+        "CWE-942",
+        "CWE-346"
+      ],
+      "owasp_api": [
+        "API8"
+      ]
+    },
+    "takeover": {
+      "wstg": [
+        "WSTG-CONF"
+      ],
+      "asvs": [
+        "V14 Config"
+      ],
+      "cwe": [
+        "CWE-672"
+      ],
+      "owasp_api": []
+    },
+    "dns": {
+      "attack": ["T1592"],
+      "wstg": [
+        "WSTG-INFO"
+      ],
+      "asvs": [],
+      "cwe": [
+        "CWE-200"
+      ],
+      "owasp_api": []
+    },
+    "email-auth": {
+      "wstg": [
+        "WSTG-CONF"
+      ],
+      "asvs": [
+        "V14 Config"
+      ],
+      "cwe": [
+        "CWE-290"
+      ],
+      "owasp_api": []
+    },
+    "crypto": {
+      "attack": ["T1557"],
+      "wstg": [
+        "WSTG-CRYP"
+      ],
+      "asvs": [
+        "V9 Communications",
+        "V6 Stored Cryptography"
+      ],
+      "cwe": [
+        "CWE-319",
+        "CWE-326",
+        "CWE-327"
+      ],
+      "owasp_api": []
+    },
+    "cred-dump": {
+      "attack": ["T1003", "T1003.006"],
+      "wstg": [],
+      "asvs": [],
+      "cwe": [
+        "CWE-522"
+      ],
+      "owasp_api": []
+    },
+    "lateral": {
+      "attack": ["T1021", "T1550.002", "T1557.001"],
+      "wstg": [],
+      "asvs": [],
+      "cwe": [
+        "CWE-294"
+      ],
+      "owasp_api": []
+    },
+    "privesc": {
+      "attack": ["T1548", "T1068"],
+      "wstg": [],
+      "asvs": [
+        "V1 Architecture"
+      ],
+      "cwe": [
+        "CWE-269"
+      ],
+      "owasp_api": []
+    },
     "other": {
       "wstg": [],
       "asvs": [],
       "cwe": [],
       "owasp_api": []
+    }
+  },
+  "extra_surfaces": {
+    "container": {
+      "attack": ["T1613", "T1611", "T1610"]
+    },
+    "mobile": {
+      "attack": ["T1552.001", "T1557"]
     }
   }
 }

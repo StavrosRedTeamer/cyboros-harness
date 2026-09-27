@@ -18,6 +18,7 @@ marker (unique string / arithmetic / time) — never a destructive action.
 | `smuggling.md` | HTTP request smuggling / desync (CL.TE / TE.CL / TE.TE) — detection-only; runs via `tools/desync.js` |
 | `cache-poisoning.md` | Web cache poisoning (unkeyed inputs) / cache deception — detection-only; runs via `tools/cachepoison.js` |
 | `saml.md` | SAML / XML Signature Wrapping (XSW1–8, sig-strip, NameID tamper) — detection-only; minted via `tools/saml.js`, replayed via `tools/repeater.js` |
+| `injection.md` | OS command injection, header injection/CRLF, open redirect — detection-only; runs via `tools/repeater.js` + `tools/oob.js` |
 | `upload-bypass/gen-polyglot-jpeg.js` | Valid-JPEG/script polyglot for magic-byte/MIME upload filters (see `upload-bypass/README.md`) |
 
 ## Rules of use

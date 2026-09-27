@@ -1,8 +1,13 @@
 #!/usr/bin/env node
 // Declarative workflow runner (Ondata 2 — C1w + E7). Executes a YAML "dialetto workflow"
-// file where EVERY step is a scope-enforcing wrapper call: cmd must always start with
-//   node tools/run.js <binary> ...
+// file where EVERY step is a scope-enforcing wrapper call: cmd must always start with one of
+//   node tools/run.js <binary> ...     (third-party binaries: scope-guard + enforce + audit)
+//   node tools/{repeater,stavros,ad,wifi,mobile,jwt,cors,csp,desync,cachepoison,graphql,ws,
+//              oob,dom-check,header-check,verify-finding}.js ...   (per-mode wrappers, same
+//              discipline — each one scope-checks its target before acting, verified in code)
 // so scope-guard/enforce/audit coverage is inherited by construction (never bypassed).
+// Target-less payload minting and evidence recording (saml.js forge, record-finding.js, …) are
+// NOT workflow steps: compose them outside the workflow.
 //
 // Dialect (validated fail-closed):
 //   name: <required>            description: <optional>
@@ -10,12 +15,16 @@
 //   requires: [binaries]        preflight presence (via tools/tool-plane hasBin) BEFORE anything
 //   steps[]:
 //     id: unique required
-//     cmd: required, MUST start with 'node tools/run.js '
+//     cmd: required, MUST start with a guard wrapper (see CMD_PREFIXES)
 //     when: {exit_code: N|[..], file_exists: path}   (AND-ed; exit_code = last EXECUTED step)
 //     parallel_group: <label>  consecutive steps sharing a label run concurrently (Promise.all)
 //     on_error: stop (default) | continue   ('continue' is explicit opt-in in the YAML)
-//     artifacts: [{path, surface}]  verified after the step, appended to evidence-index.md and
-//                                   folded into reports/tmp/coverage-workflow.json
+//     artifacts: [{path, surface, from}]  verified after the step, appended to evidence-index.md and
+//                                   folded into reports/tmp/coverage-workflow.json;
+//                                   from: "stdout" = il runner cattura stdout+stderr dello step
+//                                   sul path dichiarato (i wrapper stampano su stdout e non hanno
+//                                   flag di output: senza questo campo le loro prove non esistono
+//                                   su disco).
 //   decisions: [{id, when: {file_contains: {path,text} | env: {name, equals?}}, then: {set_var: {name, value}}}]
 //     (E6, Ondata 4/rimandati, OPZIONALE) DECISIONI deterministiche codificate in YAML, mai
 //     affidate alla memoria dell'agente. Esempio d'uso: un probe scrive reports/tmp/waf.txt
@@ -87,7 +96,40 @@ const WS_ROOT = path.join(__dirname, '..');
 const LOG_DIR = process.env.WORKFLOW_LOG_DIR || path.join(WS_ROOT, 'reports', 'tmp', 'workflow');
 const COVERAGE_FILE = process.env.COVERAGE_WORKFLOW_FILE || path.join(WS_ROOT, 'reports', 'tmp', 'coverage-workflow.json');
 const EVIDENCE_FILE = process.env.EVIDENCE_INDEX_FILE || path.join(WS_ROOT, 'evidence-index.md');
-const CMD_PREFIX = 'node tools/run.js ';
+// Dialect allowlist: every step must invoke a wrapper that enforces its own scope/tier gate.
+// run.js covers third-party binaries; the sibling wrappers are the same discipline for their
+// mode (repeater = HTTP tampering + rate/pacing, stavros = recon pipeline, ad/wifi/mobile =
+// per-mode guards and tier gates, jwt/cors/csp/desync/cachepoison/graphql/ws/oob/dom-check/
+// header-check/verify-finding = scoped analysis, each verified to loadScope+inScope before
+// touching a target). Adding a wrapper here is the ONLY way to widen the dialect — raw
+// binaries, shell builtins and target-less offline helpers are never accepted as steps.
+const CMD_PREFIXES = [
+  'node tools/run.js ',
+  'node tools/repeater.js ',
+  'node tools/stavros.js ',
+  'node tools/ad.js ',
+  'node tools/wifi.js ',
+  'node tools/mobile.js ',
+  'node tools/jwt.js ',
+  'node tools/cors.js ',
+  'node tools/csp.js ',
+  'node tools/desync.js ',
+  'node tools/cachepoison.js ',
+  'node tools/graphql.js ',
+  'node tools/ws.js ',
+  'node tools/oob.js ',
+  'node tools/dom-check.js ',
+  'node tools/header-check.js ',
+  'node tools/verify-finding.js ',
+];
+const CMD_PREFIX = CMD_PREFIXES[0]; // legacy hint text
+function cmdAllowed(cmd) {
+  const c = String(cmd || '').trim();
+  return CMD_PREFIXES.some((p) => c.startsWith(p));
+}
+function cmdAllowedHint() {
+  return CMD_PREFIXES.map((p) => `${p.trim()} …`).join(' | ');
+}
 
 // ---------------------------------------------------------------- YAML loading
 
@@ -124,9 +166,12 @@ function parseSubset(text) {
     const indent = rawLine.match(/^\s*/)[0].length;
     if (rawLine.includes('\t')) fail(ln, rawLine, 'tab indentation not allowed in mini-parser');
     while (stack.length && indent <= stack[stack.length - 1].indent && stack.length > 1) {
-      stack.pop();
+      // curStep muore con la SUA cornice (popped), non con il livello di ritorno (top): un
+      // blocco annidato (when/artifacts) che torna allo step non deve resettarlo, altrimenti
+      // ogni step con due blocchi si rompe nella mini-parser (PyYAML non ha il problema).
+      const popped = stack.pop();
       const top = stack[stack.length - 1];
-      if (top.key === 'steps') curStep = null;
+      if (popped.key === 'steps') curStep = null;
       if (top.key === 'vars') curMapKey = null;
       if (top.key === 'when') { curWhen = null; curMapKey = curMapKey === 'when' ? null : curMapKey; }
       if (top.key === 'artifacts') curArt = null;
@@ -246,8 +291,8 @@ function validateDoc(doc) {
         if (!s.id || typeof s.id !== 'string') push(`${at}: "id" required`);
         else if (seen.has(s.id)) push(`${at}: duplicate step id "${s.id}"`);
         else seen.add(s.id);
-        if (typeof s.cmd !== 'string' || !s.cmd.trim().startsWith(CMD_PREFIX)) {
-          push(`${at}: cmd MUST start with "${CMD_PREFIX}" (got ${JSON.stringify(String(s.cmd || '').slice(0, 60))})`);
+        if (typeof s.cmd !== 'string' || !cmdAllowed(s.cmd)) {
+          push(`${at}: cmd MUST start with a guard wrapper (${cmdAllowedHint()}) (got ${JSON.stringify(String(s.cmd || '').slice(0, 60))})`);
         }
         if (s.when != null) {
           if (typeof s.when !== 'object' || Array.isArray(s.when)) push(`${at}: "when" must be a mapping`);
@@ -263,6 +308,7 @@ function validateDoc(doc) {
           if (!Array.isArray(s.artifacts)) push(`${at}: artifacts must be a list`);
           else s.artifacts.forEach((a, j) => {
             if (!a || typeof a.path !== 'string' || !a.path.trim()) push(`${at}.artifacts[${j}]: "path" required`);
+            if (a && a.from != null && a.from !== 'stdout') push(`${at}.artifacts[${j}]: from must be "stdout"`);
           });
         }
       });
@@ -330,12 +376,14 @@ function validatePatch(overlay) {
     if (typeof p.id !== 'string' || !p.id.trim()) { errs.push(`${at}: id required`); return; }
     const hasField = ['cmd', 'when', 'on_error', 'artifacts'].some((k) => p[k] !== undefined);
     if (!hasField) errs.push(`${at}: at least one of cmd/when/on_error/artifacts`);
-    if (p.cmd !== undefined && (typeof p.cmd !== 'string' || !p.cmd.trim().startsWith(CMD_PREFIX)))
-      errs.push(`${at}: cmd MUST start with "${CMD_PREFIX}"`);
+    if (p.cmd !== undefined && (typeof p.cmd !== 'string' || !cmdAllowed(p.cmd)))
+      errs.push(`${at}: cmd MUST start with a guard wrapper (${cmdAllowedHint()})`);
     if (p.on_error !== undefined && !['stop', 'continue'].includes(p.on_error)) errs.push(`${at}: on_error must be stop|continue`);
     if (p.when !== undefined && (typeof p.when !== 'object' || Array.isArray(p.when))) errs.push(`${at}: when must be a mapping`);
     if (p.artifacts !== undefined && (!Array.isArray(p.artifacts) || p.artifacts.some((a) => !a || typeof a.path !== 'string' || !a.path.trim())))
       errs.push(`${at}: artifacts must be a list of {path}`);
+    if (p.artifacts !== undefined && Array.isArray(p.artifacts) && p.artifacts.some((a) => a && a.from != null && a.from !== 'stdout'))
+      errs.push(`${at}: artifacts.from must be "stdout"`);
   });
   return errs;
 }
@@ -416,7 +464,7 @@ function buildPlan(doc, opts) {
       when_exit_code: (s.when && s.when.exit_code != null) ? s.when.exit_code : null,
       when_file_exists: (s.when && s.when.file_exists) ? subst(s.when.file_exists, vars, `step ${s.id} when`) : null,
       on_error: s.on_error || 'stop',
-      artifacts: (s.artifacts || []).map((a) => ({ path: subst(a.path, vars, `step ${s.id} artifact`), surface: a.surface || null })),
+      artifacts: (s.artifacts || []).map((a) => ({ path: subst(a.path, vars, `step ${s.id} artifact`), surface: a.surface || null, from: a.from || null })),
     };
   }
   return { name: doc.name, description: doc.description || '', target: opts.target, vars, requires, waves: steps, decisions: decided.applied };
@@ -522,7 +570,22 @@ async function executePlan(plan, opts) {
       const r = await spawnCapture(bin, args);
       const rec = { ...s, exit: r.code, ms: r.ms, stdout_tail: r.stdout.split('\n').filter(Boolean).slice(-3).join(' | ').slice(0, 300) || undefined, stderr_tail: r.stderr.split('\n').filter(Boolean).slice(-2).join(' | ').slice(0, 300) || undefined };
       rec.bin = bin; rec.args = args; // loop-watch compatible fields
-      rec.artifacts = s.artifacts.map((a) => ({ ...a, exists: fs.existsSync(path.resolve(opts.cwd, a.path)) }));
+      // from: stdout — persist the FULL step output on the declared path before the exists
+      // check, so evidence/coverage/ledger registration works identically for stdout-only
+      // wrappers (no shell redirection is possible: steps are spawn()ed, not shell strings).
+      rec.artifacts = s.artifacts.map((a) => {
+        if (a.from === 'stdout') {
+          try {
+            const p = path.resolve(opts.cwd, a.path);
+            fs.mkdirSync(path.dirname(p), { recursive: true });
+            const body = (r.stdout || '') + (r.stderr ? '\n--- stderr ---\n' + r.stderr : '');
+            const tmp = p + '.' + process.pid;
+            fs.writeFileSync(tmp, body);
+            fs.renameSync(tmp, p);
+          } catch { /* unwriteable artifact stays missing: never fake evidence */ }
+        }
+        return { ...a, exists: fs.existsSync(path.resolve(opts.cwd, a.path)) };
+      });
       delete rec.when_exit_code; delete rec.when_file_exists;
       logLine({ ts: new Date().toISOString(), event: 'step', name: plan.name, step: rec.id, bin: rec.bin, args: rec.args, cmd: rec.cmd, exit: rec.exit, ms: rec.ms, artifacts: rec.artifacts });
       return rec;
@@ -650,4 +713,4 @@ async function main() {
 }
 
 if (require.main === module) main();
-module.exports = { loadWorkflow, validateDoc, buildPlan, checkTargetScope, tokenize, parseSubset, printPlan, evaluateDecisions, validatePatch, applyPatch };
+module.exports = { loadWorkflow, validateDoc, buildPlan, checkTargetScope, tokenize, parseSubset, printPlan, evaluateDecisions, validatePatch, applyPatch, CMD_PREFIXES, cmdAllowed };

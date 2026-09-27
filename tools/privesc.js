@@ -35,7 +35,8 @@ function audit(entry, file) {
 function loadCatalog(os) {
   const cat = JSON.parse(fs.readFileSync(CATALOG_PATH, 'utf8'));
   return {
-    checks: cat.checks.filter((e) => !os || os === 'auto' || e.os === os),
+    // A container IS a linux box plus its escape surface: 'container' runs both sets.
+    checks: cat.checks.filter((e) => !os || os === 'auto' || e.os === os || (os === 'container' && e.os === 'linux')),
     refs: cat.refs,
   };
 }
@@ -45,6 +46,9 @@ function findCheck(id) { return JSON.parse(fs.readFileSync(CATALOG_PATH, 'utf8')
 // OS probes are deliberately commands that classify AUTO on the generic channel
 // guard: `cat ...` -> loot_read, `dir`/`whoami /groups`/`id` -> enum.
 async function detectOs(runner, target) {
+  // Container first: a container is linux, but its escape surface changes which catalog runs.
+  const r0 = await runner(target, 'cat /proc/1/cgroup 2>&1; ls /.dockerenv 2>&1', {});
+  if (/kubepods|docker|containerd|lxc|podman|dockerenv/i.test(r0.output || '')) return 'container';
   const r = await runner(target, 'cat /etc/os-release 2>&1', {});
   if (/Linux|ID=|NAME=/i.test(r.output || '')) return 'linux';
   const r2 = await runner(target, 'dir C:\\', {});
@@ -121,6 +125,9 @@ async function exploit(target, req, opts) {
 const POSTCHECK = {
   linux: { cmd: 'id', ok: (out) => /\buid=0\b|\(root\)/.test(out) },
   windows: { cmd: 'whoami /groups', ok: (out) => /S-1-16-12288/.test(out) },
+  // NB: container root is NOT host root — this flags root in the current namespace only;
+  // a real escape needs host-side evidence (refs: "verify host uid 0, not container root").
+  container: { cmd: 'id', ok: (out) => /\buid=0\b/.test(out) },
 };
 
 module.exports = { loadCatalog, findRef, findCheck, detectOs, runChecks, exploit, POSTCHECK, auditFile };
@@ -143,8 +150,8 @@ if (require.main === module) {
   const [op, target] = pos;
   const usage = () => {
     console.log(`usage:
-  node tools/privesc.js catalog [--os linux|windows]
-  node tools/privesc.js checks <session> [--os auto|linux|windows] [--channel sliver|ssh]
+  node tools/privesc.js catalog [--os linux|windows|container]
+  node tools/privesc.js checks <session> [--os auto|linux|windows|container] [--channel sliver|ssh]
   node tools/privesc.js exploit <session> --ref <ref-id> --cmd "<escalation command>" --confirm "<reason>" [--channel sliver|ssh]
 
 channels: sliver (default) routes via sliver.js; ssh routes via sshx.js. Both enforce

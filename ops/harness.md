@@ -37,6 +37,13 @@ Pentest discipline (full rules: `knowledge.md` — "Verification levels", "False
 - `scope.json` IS the written authorization. Before ANY tool (even an MCP one) touches a target, run `node tools/scope-guard.js check <url|host>` and proceed only on exit 0. If it is empty/blocked, STOP and tell the user.
 - Default is non-destructive. Destructive / high-impact actions (data deletion, DoS, password spraying, persistence, lateral movement) require the user's explicit in-session confirmation for THAT action.
 
+## Wireless / captive portal (modalità separate)
+
+- **Wireless (`tools/wifi.js`) ha uno scope DIVERSO**: i target sono BSSID/ESSID/station/channel e vivono in `wifi-scope.json` (copia il template versionato `wifi-scope.example.json`), NON in `scope.json`. Il guard è `node tools/wifi-guard.js check <bssid|essid|station|channel>` (exit 0 = in scope); vuoto = tutto bloccato (fail-closed).
+- **Tier model**: `scan`/`open`/`sniff`/`crack`/`cleanup` = auto; `deauth`/`capture`/`wps`/`automated`/`join`/`mac_spoof`/`rogue_ap`/`portal_serve` = confirm — rifiutate senza `--confirm "<reason>"` + approvazione in-sessione. Runner: `node tools/wifi.js open|join|mac|sniff|rogue|rogue-stop ...` (mai i binari diretti).
+- **Captive portal HTTP (`tools/portal.js`)**: `probe`/`analyze` sono read-only (auto) e usano lo scope ordinario `scope.json` (IP/host) — per un gateway privato aggiungi la sua subnet a `allowed_ips`. `serve` è hosting/awareness **confirm-tier** con raccolta `--collect` opt-in e redazione di default.
+- Dettaglio completo: `docs/wireless.md` (cercabile con `node tools/kb-search.js "wireless captive portal rogue"`).
+
 ## MCP nativo Freebuff (quando il server è attivo su questo agente)
 
 - Freebuff (v>=0.0.156) espone i tool MCP come `<server>__<tool>` (es. `chrome-devtools__navigate_page`, `chrome-devtools__evaluate_script`). Chiamali direttamente come qualsiasi altro tool.

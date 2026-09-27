@@ -98,6 +98,82 @@ function plan(snapshot, opts) {
         cmd: `node tools/workflow.js run workflows/enum-ldap.yaml -t ${host}`,
         tier: 'read', requires_optin: false, priority: 15, covered: false });
     }
+    // ------------------------------------------------------------------
+    // Non-HTTP services (Ondata servizi, P1): una porta aperta propone la sua enumerazione.
+    // Ogni azione è una SINGOLA lettura presence-probe (nessuna credential, nessuna scrittura,
+    // coerente con "targeted requests over brute force"); covered = esiste già endpoint/vuln
+    // per quella porta nel grafo (anti-duplicati, stesso schema di smbEnumerated sopra).
+    const endWith = (re) => (t.endpoints || []).some((e) => re.test(e.url || ''));
+    if (hasPort([21], /ftp/i)) {
+      const covered = endWith(/^ftp:/i);
+      if (!covered || all) add({ surface: 'ftp', port: 21, reason: 'porta FTP aperta: banner + anonymous-login check (ftp-anon, read-only)',
+        kind: 'cmd', ref: 'nmap',
+        cmd: `node tools/run.js nmap -sV -p21 --script ftp-anon,ftp-bounce ${host}`,
+        tier: 'active', requires_optin: false, priority: 20, covered });
+    }
+    if (hasPort([161], /snmp/i)) {
+      const covered = endWith(/^udp:.*161|snmp:/i);
+      if (!covered || all) add({ surface: 'snmp', port: 161, reason: 'porta SNMP aperta: snmpwalk con community di default (sola lettura)',
+        kind: 'workflow', ref: 'workflows/enum-snmp.yaml',
+        cmd: `node tools/workflow.js run workflows/enum-snmp.yaml -t ${host}`,
+        tier: 'read', requires_optin: false, priority: 18, covered });
+    }
+    if (hasPort([1433], /mssql|ms-sql/i)) {
+      const covered = endWith(/mssql:|:\/\/[^/]*:1433/i);
+      if (!covered || all) add({ surface: 'mssql', port: 1433, reason: 'porta MSSQL aperta: audit login/database + permessi impersonate (read-only)',
+        kind: 'workflow', ref: 'workflows/enum-mssql.yaml',
+        cmd: `node tools/workflow.js run workflows/enum-mssql.yaml -t ${host}`,
+        tier: 'read', requires_optin: false, priority: 15, covered });
+      // P0.5 handoff: un permesso IMPERSONATE registrato nel grafo propone la catena verso il
+      // relay (P0.3). requires_optin: l'esecuzione della coercizione resta confirm-tier.
+      const mssqlImp = vulns.some((v) => (v.template_id || '').includes('mssql_impersonate') || /impersonat/i.test(v.class || ''));
+      if (mssqlImp) add({ surface: 'mssql', port: 1433, reason: 'permessi IMPERSONATE su MSSQL: proposta catena coercion→relay (confirm-tier su ad.js)',
+        kind: 'cmd', ref: 'ad',
+        cmd: `node tools/ad.js enum-relay ${host}`,
+        tier: 'active', requires_optin: true, priority: 46, covered: false });
+    }
+    if (hasPort([2049], /nfs/i)) {
+      const covered = endWith(/^nfs:/i);
+      if (!covered || all) add({ surface: 'nfs', port: 2049, reason: 'porta NFS aperta: showmount -e (export list, read-only)',
+        kind: 'cmd', ref: 'showmount',
+        cmd: `node tools/run.js showmount -e ${host}`,
+        tier: 'read', requires_optin: false, priority: 18, covered });
+    }
+    if (hasPort([2375, 2376], /docker/i)) {
+      const covered = endWith(/:2375|:2376/i);
+      if (!covered || all) add({ surface: 'docker', port: 2375, reason: 'Docker API esposta: probe /version (presenza, read-only)',
+        kind: 'workflow', ref: 'workflows/enum-container.yaml',
+        cmd: `node tools/workflow.js run workflows/enum-container.yaml -t ${host}`,
+        tier: 'read', requires_optin: false, priority: 12, covered });
+    }
+    if (hasPort([6379], /redis/i)) {
+      const covered = endWith(/^redis:/i);
+      if (!covered || all) add({ surface: 'redis', port: 6379, reason: 'porta Redis aperta: INFO senza auth (unauth check, read-only)',
+        kind: 'workflow', ref: 'workflows/enum-redis.yaml',
+        cmd: `node tools/workflow.js run workflows/enum-redis.yaml -t ${host}`,
+        tier: 'read', requires_optin: false, priority: 12, covered });
+    }
+    if (hasPort([9200, 9300], /elasticsearch/i)) {
+      const covered = endWith(/:9200|:9300/i);
+      if (!covered || all) add({ surface: 'elasticsearch', port: 9200, reason: 'Elasticsearch esposto: GET / (root info, read-only)',
+        kind: 'cmd', ref: 'curl',
+        cmd: `node tools/run.js curl -s http://${host}:9200/`,
+        tier: 'read', requires_optin: false, priority: 15, covered });
+    }
+    if (hasPort([10250, 10255], /kubelet|kubernetes/i)) {
+      const covered = endWith(/:10250|:10255/i);
+      if (!covered || all) add({ surface: 'kubelet', port: 10250, reason: 'kubelet esposto: GET /pods (presenza, read-only)',
+        kind: 'workflow', ref: 'workflows/enum-container.yaml',
+        cmd: `node tools/workflow.js run workflows/enum-container.yaml -t ${host}`,
+        tier: 'read', requires_optin: false, priority: 12, covered });
+    }
+    if (hasPort([27017], /mongod/i)) {
+      const covered = endWith(/^mongodb:/i);
+      if (!covered || all) add({ surface: 'mongodb', port: 27017, reason: 'porta MongoDB aperta: listDatabases unauth (read-only)',
+        kind: 'workflow', ref: 'workflows/enum-mongo.yaml',
+        cmd: `node tools/workflow.js run workflows/enum-mongo.yaml -t ${host}`,
+        tier: 'read', requires_optin: false, priority: 15, covered });
+    }
     // HTTP fingerprint/probe, then targeted nuclei
     if (hasPort([80, 443, 8080, 8443, 8000], /https?|http-proxy/i)) {
       const covered = httpEndpoints.length > 0;

@@ -1,0 +1,10 @@
+[Unit]
+Description=Run Stavros Radar weekly
+
+[Timer]
+OnCalendar=weekly
+RandomizedDelaySec=1h
+Persistent=true
+
+[Install]
+WantedBy=timers.target

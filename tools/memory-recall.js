@@ -27,7 +27,7 @@ function optValue(argv, flag, dflt) {
 }
 function hasFlag(argv, f) { return argv.includes(f); }
 
-function main() {
+async function main() {
   const argv = process.argv.slice(2);
   if (argv.includes('-h') || argv.includes('--help')) {
     console.log(fs.readFileSync(__filename, 'utf8').split('\n').filter((l) => l.startsWith('//')).map((l) => l.slice(3)).join('\n'));
@@ -36,7 +36,7 @@ function main() {
   const query = argv.find((a) => !a.startsWith('--') && a !== optValue(argv, '--class', '\u0000') && a !== optValue(argv, '--limit', '\u0000')) || '';
   try {
     if (!query.trim()) throw new Error('serve una query: memory-recall "<stack tecnologico + ostacolo>"');
-    const hits = rag.recallEntries(MEMORY_DIR, query, {
+    const hits = await rag.recallHybrid(MEMORY_DIR, query, {
       cls: optValue(argv, '--class', null),
       limit: parseInt(optValue(argv, '--limit', '3'), 10),
     });
@@ -67,4 +67,4 @@ function ragFormat(hit) {
   return lines.join('\n');
 }
 
-main();
+main().catch((e)=>{process.stderr.write("[memory-recall] ERRORE: "+e.message+"\n");process.exit(1);});

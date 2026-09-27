@@ -1,5 +1,5 @@
 // StavrosRedTeamer — definizione agente stavros-osint. Workspace standalone Freebuff: modifica direttamente questo file.
-const model = 'google/gemini-3.1-flash-lite-preview';
+const model = 'google/gemini-3.1-flash-lite';
 
 const definition = {
   id: 'stavros-osint',

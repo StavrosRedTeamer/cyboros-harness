@@ -20,7 +20,7 @@
 //     already-authorized-and-run tool output. It grants no capability and bypasses nothing.
 //
 // CLI:
-//   node tools/target-model.js ingest <tool> <file> [--target <host>]   # tool: nmap|httpx|ffuf|nuclei|netexec
+//   node tools/target-model.js ingest <tool> <file> [--target <host>]   # tool: nmap|httpx|ffuf|nuclei|netexec|testssl|whatweb|katana|dirsearch|enum4linux-ng|container
 //   node tools/target-model.js snapshot                                 # whole model as JSON
 //   node tools/target-model.js hosts | services | vulns | creds         # focused views (JSON)
 //   node tools/target-model.js entities                                 # typed entities (validated) as JSON
@@ -39,7 +39,10 @@ const now = () => new Date().toISOString();
 // The tools we know how to normalize into the model. Anything else is refused fail-closed.
 // Ondata 6 breadth: testssl (TLS/crypto), whatweb (tech/WAF), katana (crawl), dirsearch
 // (dir-bust), enum4linux-ng (SMB accounts/shares). Same fail-closed dispatch as the originals.
-const KNOWN_TOOLS = ['nmap', 'httpx', 'ffuf', 'nuclei', 'netexec', 'testssl', 'whatweb', 'katana', 'dirsearch', 'enum4linux-ng'];
+// P1.4 (Ondata servizi): container (docker /version + kubelet /pods) → host/port/endpoint nodes
+// that coverage.js surfaces as the 'container' class (otherwise the matrix would claim
+// coverage of a surface nobody tested).
+const KNOWN_TOOLS = ['nmap', 'httpx', 'ffuf', 'nuclei', 'netexec', 'testssl', 'whatweb', 'katana', 'dirsearch', 'enum4linux-ng', 'container'];
 
 // ------------------------------------------------------------------ store bootstrap
 // Additive tables. state.open() creates the base schema; we layer vulns + credentials on top.
@@ -320,6 +323,40 @@ function ingestEnum4linuxNg(db, raw, opts) {
   return { hosts: h, accounts: a, shares: s };
 }
 
+// P1.4 — container / K8s presence probes (docker Engine API + kubelet /pods). The probe output
+// is a single JSON document per endpoint; `opts.target` supplies the host (the HTTP body does
+// not carry one). Ports are fixed by product (2375 plaintext docker; 10250 kubelet HTTPS), so
+// the graph records the surface even when the probe body is empty/unhelpful.
+function ingestContainer(db, raw, opts) {
+  const r = parsers.parseContainerJson(raw);
+  if (!r) return { hosts: 0, ports: 0, endpoints: 0 };
+  const host = opts.target;
+  if (!host) return { hosts: 0, ports: 0, endpoints: 0 }; // no host to attach the node to → no-op
+  const tid = state.upsertTarget(db, host);
+  const hid = state.upsertHost(db, tid, host, { alive: 1, os: r.os || undefined });
+  let ports = 0; let endpoints = 0;
+  if (r.kind === 'docker') {
+    // 2375 is the plaintext Engine API; 2376 is the TLS twin of the same surface.
+    state.upsertPort(db, hid, 2375, 'tcp', 'container', r.version, 'open');
+    state.upsertEndpoint(db, tid, 'GET', `tcp://${host}:2375/version`, { tech: r.version || null, auth: 0 });
+    ports++; endpoints++;
+  } else if (r.kind === 'kubelet') {
+    state.upsertPort(db, hid, 10250, 'tcp', 'container', null, 'open');
+    ports++;
+    if (r.pods.length) {
+      for (const pod of r.pods) {
+        // Stable, idempotent endpoint key per pod (namespace/name are the kubelet identity).
+        state.upsertEndpoint(db, tid, 'GET', `k8s://${host}:10250/${pod.namespace || '-'}/${pod.name}`, { tech: pod.images[0] || null, auth: 0 });
+        endpoints++;
+      }
+    } else {
+      state.upsertEndpoint(db, tid, 'GET', `k8s://${host}:10250/pods`, { auth: 0 });
+      endpoints++;
+    }
+  }
+  return { hosts: 1, ports, endpoints };
+}
+
 function ingestNetexec(db, raw, opts) {
   const hosts = parsers.parseNetexec(raw);
   let h = 0; let c = 0; let s = 0;
@@ -361,6 +398,7 @@ function ingest(db, tool, raw, opts) {
     case 'katana': counts = ingestCrawl(db, raw, opts, 'katana'); break;
     case 'dirsearch': counts = ingestCrawl(db, raw, opts, 'dirsearch'); break;
     case 'enum4linux-ng': counts = ingestEnum4linuxNg(db, raw, opts); break;
+    case 'container': counts = ingestContainer(db, raw, opts); break;
     default: return { ok: false, reason: `unknown tool "${tool}"` };
   }
   return { ok: true, tool: t, counts };

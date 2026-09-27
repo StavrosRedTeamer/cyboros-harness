@@ -15,10 +15,13 @@ WRAP="$EDITION/open-freebuff-terminal.sh"
 chmod +x "$LAUNCH" "$WRAP" 2>/dev/null || true
 
 # Desktop dir: Scrivania su sistemi IT, Desktop altrimenti
-DESKTOP_DIR=""
-for d in "$HOME/Scrivania" "$HOME/Desktop"; do
-  if [[ -d "$d" ]]; then DESKTOP_DIR="$d"; break; fi
-done
+DESKTOP_DIR="$(xdg-user-dir DESKTOP 2>/dev/null || true)"
+if [[ -z "$DESKTOP_DIR" || ! -d "$DESKTOP_DIR" ]]; then
+  DESKTOP_DIR=""
+  for d in "$HOME/Desktop" "$HOME/Scrivania"; do
+    if [[ -d "$d" ]]; then DESKTOP_DIR="$d"; break; fi
+  done
+fi
 [[ -z "$DESKTOP_DIR" ]] && { mkdir -p "$HOME/Desktop"; DESKTOP_DIR="$HOME/Desktop"; }
 
 DESKTOP_FILE="$DESKTOP_DIR/stavros-freebuff.desktop"

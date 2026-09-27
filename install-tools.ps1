@@ -1,6 +1,12 @@
 # Installer best-effort dei binari usati da Stavros (Windows).
 # Non e obbligatorio: cio che manca, gli agent lo aggirano con curl/repeater.js.
 # Richiede: Go (per i tool ProjectDiscovery) e Python+pipx (per sqlmap). Salta cio che non c'e.
+#
+# NOTA — modalita wireless / captive portal = SOLO Linux/Parrot. wifi.js, wifi-guard.js,
+# portal.js e il rogue AP (hostapd+dnsmasq, monitor mode, sniff) non hanno equivalente nativo
+# su Windows: usa WSL + ./install-tools.sh oppure una VM Linux con una NIC in monitor mode.
+# Questo script NON installa tool wireless (i pacchetti apt aircrack-ng/hostapd/dnsmasq/...
+# non esistono come tali su Windows).
 
 Write-Host "== Stavros tool installer ==" -ForegroundColor Cyan
 

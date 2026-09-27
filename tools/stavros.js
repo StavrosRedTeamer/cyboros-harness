@@ -354,7 +354,17 @@ async function recon(db, host, opts) {
         state.upsertEndpoint(db, targetId, 'GET', rec.url, { tech: (rec.tech || []).join(',') });
       }
     }
-    return { target, hosts: list.length };
+    // P1.3 post-step (opt-in, --takeover): subdomain takeover + DNS hygiene audit reusing
+    // THIS recon's subs list. Detection-only; rate stays under scope's max_requests_per_second.
+    let takeover = null;
+    if (opts.takeover) {
+      try {
+        takeover = await require('./takeover').scan(target, { subsFile, record: true });
+      } catch (e) {
+        takeover = { error: e.message }; // audit failure never fails the recon phase
+      }
+    }
+    return { target, hosts: list.length, ...(takeover ? { takeover: { subs_audited: takeover.subs_audited, findings: (takeover.findings || []).length, file: takeover._file, error: takeover.error } } : {}) };
   });
 }
 
@@ -374,7 +384,10 @@ async function scan(db, target, opts) {
       if (rust && rust.status === 0) ports = parseRustscan(rust.stdout || '');
     }
     // authoritative service/version scan
-    const nmapR = await runBin('nmap', ['-sC', '-sV', '-oX', '-', t], {});
+    // -Pn: senza, su host che non rispondono all'host discovery di nmap (ICMP filtrato: cloud,
+    // Azure/AWS) nmap conclude "host seems down" e NON scansiona -> 0 porte ingerite con exit 0.
+    // Bug reale osservato su portal.noaitaly.io (20.115.232.11): senza -Pn 0 porte, con -Pn 80+443.
+    const nmapR = await runBin('nmap', ['-sC', '-sV', '-Pn', '-oX', '-', t], {});
     if (nmapR && nmapR.status === 0) {
       for (const h of parsers.parseNmapXml(nmapR.stdout || '')) {
         const hostId = state.upsertHost(db, targetId, h.address, { hostname: h.hostname, os: h.os });
@@ -581,7 +594,7 @@ function report(db, opts) {
 
 function usage() {
   console.error(
-    'usage: node tools/stavros.js recon <host> | scan <host|cidr> | enumerate <host> | fuzz <host> [--ports N,N] | status [<host>] | resume | report'
+    'usage: node tools/stavros.js recon <host> [--takeover] | scan <host|cidr> | enumerate <host> | fuzz <host> [--ports N,N] | status [<host>] | resume | report'
   );
   process.exit(2);
 }
@@ -604,6 +617,7 @@ async function main() {
     switch (cmd) {
       case 'recon':
         if (!rest[0]) usage();
+        if (rest.includes('--takeover')) opts.takeover = true;
         out = await recon(db, rest[0], opts);
         break;
       case 'scan':

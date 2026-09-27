@@ -370,6 +370,52 @@ function parseEnum4linuxNgJson(text) {
   return [{ host: o.target.trim(), os, workgroup, users, shares }];
 }
 
+// `curl http://<host>:2375/version` (Docker Engine API) or `curl https://<host>:10250/pods`
+// (kubelet PodList) → ONE normalized record (or null). Fail-soft like every parser here.
+//   docker : { kind:'docker', version, api_version, os }
+//   kubelet: { kind:'kubelet', node, pods:[{ namespace, name, node_name, images[] }] }
+// Detection is shape-based (not by port), so the same parser serves both probes; the ingest
+// layer is what maps kind → port. An unrecognized object returns null (never guesses).
+function parseContainerJson(text) {
+  let o;
+  try {
+    o = JSON.parse(String(text == null ? '' : text).trim());
+  } catch {
+    return null;
+  }
+  if (!o || typeof o !== 'object' || Array.isArray(o)) return null;
+  // Docker Engine API /version
+  if (o.Version != null || o.ApiVersion != null) {
+    return {
+      kind: 'docker',
+      version: o.Version != null ? String(o.Version) : null,
+      api_version: o.ApiVersion != null ? String(o.ApiVersion) : null,
+      os: o.Os != null ? String(o.Os) : null,
+    };
+  }
+  // kubelet /pods (PodList) — an empty list is a valid (if unhelpful) answer, not an error.
+  if (o.kind === 'PodList' || Array.isArray(o.items)) {
+    const pods = [];
+    for (const p of Array.isArray(o.items) ? o.items : []) {
+      if (!p || typeof p !== 'object') continue;
+      const md = p.metadata && typeof p.metadata === 'object' ? p.metadata : {};
+      const spec = p.spec && typeof p.spec === 'object' ? p.spec : {};
+      const name = typeof md.name === 'string' && md.name.trim() ? md.name.trim() : null;
+      if (!name) continue;
+      pods.push({
+        namespace: typeof md.namespace === 'string' && md.namespace.trim() ? md.namespace.trim() : null,
+        name,
+        node_name: typeof spec.nodeName === 'string' ? spec.nodeName : null,
+        images: (Array.isArray(spec.containers) ? spec.containers : [])
+          .map((c) => (c && typeof c.image === 'string' && c.image ? c.image : null))
+          .filter(Boolean),
+      });
+    }
+    return { kind: 'kubelet', node: typeof o.nodeName === 'string' ? o.nodeName : null, pods };
+  }
+  return null;
+}
+
 module.exports = {
   parseNucleiJsonl,
   parseHttpxJson,
@@ -382,4 +428,5 @@ module.exports = {
   parseKatanaJsonl,
   parseDirsearchJson,
   parseEnum4linuxNgJson,
+  parseContainerJson,
 };

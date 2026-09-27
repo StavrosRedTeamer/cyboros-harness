@@ -1,0 +1,30 @@
+# Workflow offensivo — attack-jwt (dialetto workflow)
+# Catena attacco JWT su {target}: decode del token (struttura/alg/exp) e poi la suite di
+# attacchi di jwt.js attack (alg:none, HS256 con secret leakati, RS256→HS256 confusion,
+# jku/x5u). L'attack parte SOLO se il decode ha prodotto un token leggibile (when exit_code).
+# Token = bearer da auth.json o catturato da analyze-bundle — passarlo con --var token=...
+# (il token è un segreto: preferire token di lab/registro, mai credenziali reali in cronologia
+# shell; knowledge.md, regola vault). Auto tier: nessuna azione distruttiva.
+# Uso: node tools/workflow.js run workflows/attack-jwt.yaml -t <url> --var token=<jwt> --var tag=<nome>
+name: attack-jwt
+description: Catena attacco JWT — decode token + suite attacchi (alg:none/HS256/RS256-confusion/jku) su target
+vars:
+  tag: target
+  outdir: reports
+  token: ""
+steps:
+  - id: jwt-decode
+    cmd: node tools/jwt.js decode {token}
+    artifacts:
+      - path: "{outdir}/attack-{tag}-jwt-decode.txt"
+        surface: authn
+        from: stdout
+  - id: jwt-attack
+    cmd: node tools/jwt.js attack {target} --token {token}
+    on_error: continue
+    when:
+      exit_code: 0
+    artifacts:
+      - path: "{outdir}/attack-{tag}-jwt-attack.txt"
+        surface: authn
+        from: stdout

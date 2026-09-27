@@ -1,0 +1,16 @@
+# Workflow seed — enum-snmp (dialetto workflow, Ondata servizi P1.2)
+# snmpwalk v2c con community di default "public", SOLA LETTURA. Risponde = community default
+# attiva (finding config). Mai snmpset, mai community da wordlist qui (nessun brute force).
+name: enum-snmp
+description: Enumerazione SNMP autorizzata (snmpwalk v2c community default, read-only)
+vars:
+  out: reports
+requires:
+  - snmpwalk
+steps:
+  - id: snmpwalk-default-community
+    cmd: node tools/run.js snmpwalk -v2c -c public {target}
+    on_error: continue
+    artifacts:
+      - path: "{out}/enum-{target}-snmp.txt"
+        surface: scan

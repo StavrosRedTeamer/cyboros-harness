@@ -343,7 +343,12 @@ async function main() {
     assert.strictEqual(good.status, 0, good.stdout);
     const jg = JSON.parse(good.stdout);
     assert.strictEqual(jg.ok, true);
-    assert.ok(jg.optional_missing.length <= 1);
+    // Gli optional_missing dipendono dall'ambiente host (quanti tool opzionali
+    // della categoria sono installati): non si può assumere un numero fisso.
+    // La proprietà invariante è: SOLO tool non-required possono esserci, e il
+    // bin esplicitamente presente (bash) non ci deve mai finire.
+    assert.ok(jg.optional_missing.every((m) => !m.required), 'optional_missing deve contenere solo tool non-required');
+    assert.ok(!jg.optional_missing.some((m) => m.bin === 'bash'), 'un bin installato non può essere in optional_missing');
   });
   await okAsync('CLI: --require-bin su bin sconosciuto alla mappa -> verifica live', async () => {
     const planeCfg = path.join(T, 'plane-empty.json');

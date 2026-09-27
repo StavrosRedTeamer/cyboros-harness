@@ -1,0 +1,30 @@
+# Workflow offensivo — attack-authz (dialetto workflow)
+# Contrasto BOLA/BFLA (OWASP 2025 A01): la STESSA risorsa ({endpoint}) viene richiesta come
+# due identità diverse ({user_a} registrata, {user_b} attaccante/low-priv). Il confronto dei
+# due body catturati è il PoC: status uguale + contenuto personale dell'altro utente = BOLA;
+# funzione admin raggiungibile dall'utente low-priv = BFLA (knowledge.md, methodology-classes).
+# Identità = nomi da auth.json (repeater --as). Nessuno step è intrusivo.
+# Uso: node tools/workflow.js run workflows/attack-authz.yaml -t <url> \
+#        --var endpoint=<url-risorsa> --var user_a=<id> --var user_b=<id> --var tag=<nome>
+name: attack-authz
+description: Contrasto autorizzativo BOLA/BFLA — stessa risorsa come due identità, body catturati per il diff
+vars:
+  tag: target
+  outdir: reports
+  endpoint: ""
+  user_a: user_a
+  user_b: user_b
+steps:
+  - id: req-as-user-a
+    cmd: node tools/repeater.js --url {endpoint} --as {user_a} --show-body
+    artifacts:
+      - path: "{outdir}/attack-{tag}-authz-{user_a}.txt"
+        surface: authz
+        from: stdout
+  - id: req-as-user-b
+    cmd: node tools/repeater.js --url {endpoint} --as {user_b} --show-body
+    on_error: continue
+    artifacts:
+      - path: "{outdir}/attack-{tag}-authz-{user_b}.txt"
+        surface: authz
+        from: stdout

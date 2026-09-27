@@ -1,0 +1,1142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Stavros Command Center — Design Draft</title>
+<!--
+  DESIGN DRAFT (bozza) — not wired to the backend.
+  A calmer, enterprise-grade visual language for the Stavros Command Center,
+  inspired by tools professionals actually run: Linear, Sentry, Datadog,
+  Vanta/Drata, DefectDojo, Snyk, Jira. Zero dependencies, offline, no external
+  assets (matches the project guardrails).
+-->
+<style>
+/* ── tokens ─────────────────────────────────────────────── */
+:root{
+  --bg:#0a0c11; --bg-2:#0e1117; --panel:#12151d; --panel-2:#161a24; --panel-3:#1b2030;
+  --line:#222838; --line-2:#2b3346; --line-3:#39425a;
+  --ink:#e7eaf1; --muted:#98a1b4; --faint:#666f83;
+  --accent:#5b8def; --accent-2:#8ab0ff; --accent-dim:rgba(91,141,239,.14);
+  --ok:#37b877; --warn:#dfa63b; --crit:#e5555d; --high:#e08a4e; --med:#d6bb45; --low:#5a9fd4; --info:#7d879a;
+  --crit-dim:rgba(229,85,93,.13); --high-dim:rgba(224,138,78,.13); --med-dim:rgba(214,187,69,.13);
+  --low-dim:rgba(90,159,212,.13); --ok-dim:rgba(55,184,119,.13); --warn-dim:rgba(223,166,59,.13);
+  --r:8px; --r-sm:6px; --r-lg:12px;
+  --shadow:0 1px 2px rgba(0,0,0,.45), 0 10px 28px rgba(0,0,0,.28);
+  --sidebar-w:250px; --topbar-h:56px;
+  --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+  --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,"Liberation Mono",monospace;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{background:var(--bg);color:var(--ink);font:14px/1.5 var(--sans);-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
+a{color:var(--accent-2);text-decoration:none}
+a:hover{text-decoration:underline}
+button{font:inherit;cursor:pointer}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.mono{font-family:var(--mono)}
+.muted{color:var(--muted)}
+.faint{color:var(--faint)}
+.num{font-variant-numeric:tabular-nums}
+.icon{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round;flex:0 0 auto}
+
+/* ── app shell ──────────────────────────────────────────── */
+.app{display:grid;grid-template-columns:var(--sidebar-w) 1fr;min-height:100vh}
+.sidebar{position:sticky;top:0;height:100vh;display:flex;flex-direction:column;background:var(--bg-2);border-right:1px solid var(--line);overflow:hidden}
+.main{min-width:0;display:flex;flex-direction:column;min-height:100vh}
+
+/* brand */
+.side-head{display:flex;align-items:center;gap:11px;padding:16px 18px 14px;border-bottom:1px solid var(--line)}
+.logo{width:30px;height:30px;border-radius:8px;display:grid;place-items:center;background:linear-gradient(135deg,#2a3a63,#16203a);border:1px solid #33456f;color:var(--accent-2);font-weight:800;font-size:15px;flex:0 0 auto}
+.side-head .t{display:flex;flex-direction:column;line-height:1.15;min-width:0}
+.side-head .t b{font-size:13.5px;letter-spacing:.2px}
+.side-head .t span{font-size:10.5px;color:var(--faint);text-transform:uppercase;letter-spacing:.14em;font-family:var(--mono)}
+.draft-badge{margin-left:auto;font:600 9px/1 var(--mono);letter-spacing:.12em;text-transform:uppercase;color:var(--warn);border:1px solid var(--warn-dim);background:var(--warn-dim);border-radius:999px;padding:3px 7px}
+
+/* campaign switcher */
+.campaign{margin:12px 14px 6px;padding:10px 12px;border:1px solid var(--line-2);border-radius:var(--r);background:var(--panel)}
+.campaign .k{font:600 9.5px/1 var(--mono);text-transform:uppercase;letter-spacing:.14em;color:var(--faint)}
+.campaign .v{margin-top:6px;display:flex;align-items:center;gap:7px;font-size:13px;font-weight:600;min-width:0}
+.campaign .v span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.campaign .sub{margin-top:3px;font-size:11px;color:var(--muted)}
+.pip{width:7px;height:7px;border-radius:50%;flex:0 0 auto;background:var(--faint)}
+.pip.ok{background:var(--ok);box-shadow:0 0 0 3px var(--ok-dim)} .pip.warn{background:var(--warn);box-shadow:0 0 0 3px var(--warn-dim)} .pip.crit{background:var(--crit);box-shadow:0 0 0 3px var(--crit-dim)} .pip.live{background:var(--accent);box-shadow:0 0 0 3px var(--accent-dim)}
+
+/* nav */
+.nav{flex:1;overflow-y:auto;padding:10px 10px 14px}
+.nav-group{margin:14px 8px 6px;font:600 9.5px/1 var(--mono);text-transform:uppercase;letter-spacing:.15em;color:var(--faint)}
+.nav-item{display:flex;align-items:center;gap:10px;width:100%;padding:7px 10px;border:0;border-radius:var(--r-sm);background:transparent;color:var(--muted);font-size:13px;text-align:left}
+.nav-item .icon{color:var(--faint)}
+.nav-item:hover{background:var(--panel);color:var(--ink)}
+.nav-item:hover .icon{color:var(--muted)}
+.nav-item.active{background:var(--accent-dim);color:#dbe6ff}
+.nav-item.active .icon{color:var(--accent-2)}
+.nav-item .count{margin-left:auto;font:600 10.5px/1 var(--mono);color:var(--faint);background:var(--panel-3);border-radius:999px;padding:3px 7px}
+.nav-item .count.hot{color:var(--crit);background:var(--crit-dim)}
+.side-foot{padding:12px 16px;border-top:1px solid var(--line);display:flex;align-items:center;gap:9px;font-size:11.5px;color:var(--muted)}
+.side-foot .avatar{width:26px;height:26px;border-radius:50%;background:var(--panel-3);border:1px solid var(--line-2);display:grid;place-items:center;font:700 11px var(--mono);color:var(--ink)}
+
+/* topbar */
+.topbar{position:sticky;top:0;z-index:20;height:var(--topbar-h);display:flex;align-items:center;gap:14px;padding:0 22px;background:rgba(10,12,17,.86);backdrop-filter:blur(10px);border-bottom:1px solid var(--line)}
+.crumbs{display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--faint)}
+.crumbs b{color:var(--ink);font-weight:600}
+.search{margin-left:auto;display:flex;align-items:center;gap:9px;min-width:260px;padding:7px 11px;border:1px solid var(--line-2);border-radius:var(--r-sm);background:var(--panel);color:var(--faint);font-size:12.5px}
+.search:hover{border-color:var(--line-3);color:var(--muted)}
+.search kbd{margin-left:auto}
+kbd{font:600 10.5px var(--mono);color:var(--muted);background:var(--panel-3);border:1px solid var(--line-2);border-bottom-width:2px;border-radius:4px;padding:1px 5px}
+.env{display:inline-flex;align-items:center;gap:7px;font:600 11px var(--mono);padding:5px 10px;border-radius:999px;border:1px solid var(--line-2);color:var(--muted);background:var(--panel);white-space:nowrap}
+.env.ok{color:var(--ok);border-color:var(--ok-dim);background:var(--ok-dim)}
+.env.ro{color:var(--warn);border-color:var(--warn-dim);background:var(--warn-dim)}
+.clock{font:12px var(--mono);color:var(--muted);white-space:nowrap}
+
+/* ── content ────────────────────────────────────────────── */
+.content{flex:1;padding:24px 26px 48px;max-width:1680px;width:100%;margin:0 auto}
+.page-head{display:flex;align-items:flex-start;gap:18px;margin-bottom:22px;flex-wrap:wrap}
+.page-head h1{margin:0;font-size:22px;font-weight:650;letter-spacing:-.2px}
+.page-head .sub{margin-top:5px;color:var(--muted);font-size:13px;max-width:70ch}
+.page-actions{margin-left:auto;display:flex;gap:9px;flex-wrap:wrap}
+.btn{display:inline-flex;align-items:center;gap:7px;padding:8px 13px;border-radius:var(--r-sm);border:1px solid var(--line-2);background:var(--panel-2);color:var(--ink);font-size:12.5px;font-weight:550;white-space:nowrap}
+.btn:hover{border-color:var(--line-3);background:var(--panel-3)}
+.btn .icon{width:15px;height:15px}
+.btn-primary{background:var(--accent);border-color:var(--accent);color:#08101f}
+.btn-primary:hover{background:var(--accent-2);border-color:var(--accent-2)}
+.btn-ghost{background:transparent}
+.btn-sm{padding:5px 9px;font-size:11.5px}
+.btn-ok{color:var(--ok);border-color:var(--ok-dim);background:var(--ok-dim)}
+.btn-danger{color:var(--crit);border-color:var(--crit-dim);background:var(--crit-dim)}
+
+/* ── kpi cards ──────────────────────────────────────────── */
+.kpis{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(168px,1fr));margin-bottom:18px}
+.kpi{padding:15px 16px;border:1px solid var(--line);border-radius:var(--r);background:var(--panel);box-shadow:var(--shadow);position:relative;text-align:left}
+button.kpi{cursor:pointer}
+button.kpi:hover{border-color:var(--line-3)}
+.kpi .k{font:600 10px/1 var(--mono);text-transform:uppercase;letter-spacing:.13em;color:var(--faint)}
+.kpi .v{margin-top:9px;font:650 27px/1 var(--sans);letter-spacing:-.6px;font-variant-numeric:tabular-nums}
+.kpi .d{margin-top:7px;font-size:11.5px;color:var(--muted);display:flex;align-items:center;gap:6px}
+.kpi .d .up{color:var(--crit)} .kpi .d .down{color:var(--ok)}
+.kpi.tone-crit .v{color:var(--crit)} .kpi.tone-high .v{color:var(--high)} .kpi.tone-med .v{color:var(--med)}
+.kpi.tone-ok .v{color:var(--ok)} .kpi.tone-accent .v{color:var(--accent-2)}
+.kpi .spark{position:absolute;right:14px;top:14px;opacity:.85}
+
+/* ── grid + panels ──────────────────────────────────────── */
+.grid{display:grid;gap:16px;align-items:start}
+.grid.c2{grid-template-columns:1.55fr 1fr}
+.grid.c3{grid-template-columns:repeat(3,1fr)}
+.panel{border:1px solid var(--line);border-radius:var(--r);background:var(--panel);box-shadow:var(--shadow);overflow:hidden}
+.panel-head{display:flex;align-items:center;gap:10px;padding:13px 16px;border-bottom:1px solid var(--line)}
+.panel-head h2{margin:0;font-size:13px;font-weight:600;letter-spacing:.1px}
+.panel-head .hint{font-size:11.5px;color:var(--faint);font-weight:400}
+.panel-head .ways{margin-left:auto;display:flex;gap:7px;align-items:center}
+.panel-body{padding:16px}
+.panel-body.tight{padding:6px 0}
+.empty{padding:22px;color:var(--faint);font-size:12.5px;text-align:center}
+
+/* ── severity bars ──────────────────────────────────────── */
+.sev-list{display:flex;flex-direction:column;gap:11px}
+.sev-row{display:grid;grid-template-columns:96px 1fr 42px;align-items:center;gap:12px}
+.sev-name{display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--muted)}
+.sev-dot{display:inline-block;vertical-align:middle;width:8px;height:8px;border-radius:2px;flex:0 0 auto}
+.sev-track{height:8px;border-radius:4px;background:var(--panel-3);overflow:hidden}
+.sev-fill{height:100%;border-radius:4px}
+.sev-count{text-align:right;font:600 13px var(--mono);font-variant-numeric:tabular-nums}
+.s-crit{background:var(--crit);color:var(--crit)} .s-high{background:var(--high);color:var(--high)}
+.s-med{background:var(--med);color:var(--med)} .s-low{background:var(--low);color:var(--low)} .s-info{background:var(--info);color:var(--info)}
+
+/* ── pills ──────────────────────────────────────────────── */
+.pill{display:inline-flex;align-items:center;gap:6px;font:600 11px/1.3 var(--mono);padding:3px 9px;border-radius:999px;border:1px solid var(--line-2);background:var(--panel-2);color:var(--muted);white-space:nowrap}
+.pill::before{content:"";width:6px;height:6px;border-radius:50%;background:currentColor;opacity:.9}
+.pill.nodot::before{display:none}
+.pill.crit{color:var(--crit);border-color:var(--crit-dim);background:var(--crit-dim)}
+.pill.high{color:var(--high);border-color:var(--high-dim);background:var(--high-dim)}
+.pill.med{color:var(--med);border-color:var(--med-dim);background:var(--med-dim)}
+.pill.low{color:var(--low);border-color:var(--low-dim);background:var(--low-dim)}
+.pill.info{color:var(--info)}
+.pill.ok{color:var(--ok);border-color:var(--ok-dim);background:var(--ok-dim)}
+.pill.warn{color:var(--warn);border-color:var(--warn-dim);background:var(--warn-dim)}
+.pill.accent{color:var(--accent-2);border-color:var(--accent-dim);background:var(--accent-dim)}
+
+/* ── tables ─────────────────────────────────────────────── */
+table{width:100%;border-collapse:collapse;font-size:13px}
+th,td{text-align:left;padding:11px 16px;border-bottom:1px solid var(--line);vertical-align:middle}
+thead th{position:sticky;top:0;background:var(--panel-2);color:var(--faint);font:600 10px var(--mono);text-transform:uppercase;letter-spacing:.11em;z-index:1}
+tbody tr:hover td{background:var(--panel-2)}
+tbody tr{cursor:pointer}
+tbody tr:last-child td{border-bottom:0}
+td.c{text-align:center}
+td.r{text-align:right}
+.host{font:12px var(--mono);color:var(--muted)}
+.sev-cell{display:inline-flex;align-items:center;gap:8px;font-weight:600;font-size:12.5px}
+
+/* ── activity feed ──────────────────────────────────────── */
+.feed{display:flex;flex-direction:column}
+.feed-item{display:flex;gap:12px;padding:11px 16px;border-bottom:1px solid var(--line)}
+.feed-item:last-child{border-bottom:0}
+.feed-ico{width:26px;height:26px;border-radius:7px;display:grid;place-items:center;flex:0 0 auto;background:var(--panel-3);color:var(--muted)}
+.feed-ico.crit{background:var(--crit-dim);color:var(--crit)} .feed-ico.ok{background:var(--ok-dim);color:var(--ok)}
+.feed-ico.accent{background:var(--accent-dim);color:var(--accent-2)} .feed-ico.warn{background:var(--warn-dim);color:var(--warn)}
+.feed-body{min-width:0;flex:1}
+.feed-body .t{font-size:12.5px;line-height:1.45}
+.feed-body .t b{font-weight:600}
+.feed-time{margin-left:auto;font:11px var(--mono);color:var(--faint);white-space:nowrap}
+
+/* ── mission action cards ───────────────────────────────── */
+.actions{display:flex;flex-direction:column;gap:11px;padding:16px}
+.action{border:1px solid var(--line-2);border-left:3px solid var(--line-3);border-radius:var(--r-sm);background:var(--panel-2);padding:13px 14px}
+.action.a-auto{border-left-color:var(--accent)} .action.a-confirm{border-left-color:var(--warn)} .action.a-blocked{border-left-color:var(--crit);opacity:.9}
+.action .top{display:flex;align-items:center;gap:9px;flex-wrap:wrap}
+.action .top b{font-size:13.5px;font-weight:600}
+.action .why{margin-top:7px;color:var(--muted);font-size:12.5px;line-height:1.5;max-width:78ch}
+.action .cmd{margin-top:9px;font:11.5px var(--mono);color:var(--muted);background:var(--bg-2);border:1px solid var(--line);border-radius:var(--r-sm);padding:7px 10px;overflow-x:auto;white-space:nowrap}
+.action .foot{margin-top:11px;display:flex;align-items:center;gap:9px;flex-wrap:wrap}
+.action .foot .meta{font-size:11.5px;color:var(--faint);display:flex;gap:14px;flex-wrap:wrap}
+.action .spacer{flex:1}
+
+/* ── approvals ──────────────────────────────────────────── */
+.appr{border:1px solid var(--line-2);border-radius:var(--r-sm);background:var(--panel-2);padding:13px 14px;display:flex;gap:13px;flex-wrap:wrap;align-items:flex-start}
+.appr .body{min-width:0;flex:1}
+.appr .body b{font-size:13px}
+.appr .body .meta{margin-top:5px;font-size:11.5px;color:var(--muted);display:flex;gap:12px;flex-wrap:wrap}
+.appr .acts{display:flex;gap:8px;align-items:center}
+
+/* ── small stat strip ───────────────────────────────────── */
+.statline{display:flex;flex-wrap:wrap;gap:26px;padding:4px 0}
+.statline .s{display:flex;flex-direction:column;gap:3px}
+.statline .s .k{font:600 9.5px var(--mono);text-transform:uppercase;letter-spacing:.13em;color:var(--faint)}
+.statline .s .v{font:600 17px var(--sans);font-variant-numeric:tabular-nums}
+
+/* ── lists, meters, key-value, toggles ──────────────────── */
+.list{display:flex;flex-direction:column}
+.lrow{display:flex;align-items:center;gap:12px;width:100%;padding:12px 16px;border:0;border-bottom:1px solid var(--line);background:transparent;text-align:left;color:var(--ink)}
+.lrow:last-child{border-bottom:0}
+.lrow:hover{background:var(--panel-2)}
+.lrow .grow{min-width:0;flex:1}
+.lrow .t{font-size:12.8px;line-height:1.45}
+.lrow .s{margin-top:3px;font-size:11.5px;color:var(--muted)}
+.lrow .right{margin-left:auto;display:flex;align-items:center;gap:8px;flex:0 0 auto}
+.meter{display:block;height:6px;border-radius:3px;background:var(--panel-3);overflow:hidden}
+.meter i{display:block;height:100%;border-radius:3px;background:var(--accent)}
+.kv{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:15px 24px}
+.kv .k{font:600 9.5px var(--mono);text-transform:uppercase;letter-spacing:.13em;color:var(--faint)}
+.kv .v{margin-top:4px;font-size:13px;line-height:1.5}
+.sw{width:36px;height:20px;border-radius:999px;background:var(--panel-3);border:1px solid var(--line-2);position:relative;flex:0 0 auto;padding:0}
+.sw::after{content:"";position:absolute;top:2px;left:2px;width:14px;height:14px;border-radius:50%;background:var(--muted);transition:left .15s ease,background .15s ease}
+.sw.on{background:var(--accent-dim);border-color:var(--accent)}
+.sw.on::after{left:18px;background:var(--accent-2)}
+
+/* ── coverage matrix + tool cards ───────────────────────── */
+.matrix{display:grid;gap:10px;grid-template-columns:repeat(auto-fill,minmax(170px,1fr))}
+.cell{border:1px solid var(--line-2);border-radius:var(--r-sm);background:var(--panel-2);padding:11px 12px}
+.cell .c-k{font:600 11.5px var(--mono);color:var(--muted)}
+.cell .c-v{margin-top:6px;font-size:11.5px;color:var(--faint)}
+.cell.done{border-color:var(--ok-dim);background:var(--ok-dim)}
+.cell.part{border-color:var(--med-dim);background:var(--med-dim)}
+.cell.gap{border-color:var(--crit-dim);background:var(--crit-dim)}
+.cell.na{opacity:.62}
+.legend{display:flex;flex-wrap:wrap;gap:8px 26px}
+.legend .lg{display:inline-flex;align-items:center;gap:9px;font-size:12.5px;color:var(--muted)}
+.legend .lg i{width:10px;height:10px;border-radius:2px;display:block}
+.tools{display:grid;gap:12px;grid-template-columns:repeat(auto-fill,minmax(214px,1fr))}
+.tool{border:1px solid var(--line-2);border-radius:var(--r-sm);background:var(--panel-2);padding:13px 14px}
+.tool .n{display:flex;align-items:center;gap:9px;font-size:13px;font-weight:600}
+.tool .n .pill{margin-left:auto}
+.tool .m{margin-top:7px;font:11.5px var(--mono);color:var(--muted)}
+
+/* ── terminal ───────────────────────────────────────────── */
+.term{background:#070910;font:12px/1.75 var(--mono);padding:14px 16px;color:#b9c2d4;max-height:430px;overflow:auto}
+.term .line{white-space:pre-wrap;word-break:break-word}
+.term .p{color:var(--accent-2)}
+.term .ok{color:var(--ok)} .term .warn{color:var(--warn)} .term .crit{color:var(--crit)} .term .dim{color:var(--faint)}
+.term-input{display:flex;align-items:center;gap:9px;padding:9px 16px;border-top:1px solid var(--line);background:var(--panel-2);color:var(--muted)}
+.term-input input{flex:1;background:transparent;border:0;color:var(--ink);font:12.5px var(--mono);outline:none}
+
+/* ── findings controls ──────────────────────────────────── */
+.pill.off{opacity:.42;filter:saturate(.5)}
+th button{background:transparent;border:0;color:inherit;font:inherit;letter-spacing:inherit;text-transform:inherit;padding:0;display:inline-flex;align-items:center;gap:5px}
+th button:hover{color:var(--muted)}
+th button.active{color:var(--ink)}
+th button.active::after{content:"▾";font-size:9px}
+input[type=search]:focus-visible,input[type=text]:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+
+/* ── command palette ────────────────────────────────────── */
+.palette{position:fixed;inset:0;z-index:100;display:none;align-items:flex-start;justify-content:center;padding-top:11vh;background:rgba(6,8,13,.6);backdrop-filter:blur(3px)}
+.palette.open{display:flex}
+.palette .box{width:min(620px,92vw);border:1px solid var(--line-3);border-radius:var(--r-lg);background:var(--panel);box-shadow:var(--shadow);overflow:hidden}
+.palette .inp{display:flex;align-items:center;gap:10px;padding:13px 16px;border-bottom:1px solid var(--line);color:var(--faint)}
+.palette .inp input{flex:1;background:transparent;border:0;color:var(--ink);font:14px var(--sans);outline:none}
+.palette .res{max-height:46vh;overflow:auto;padding:6px}
+.palette .res button{display:flex;align-items:center;gap:11px;width:100%;padding:9px 12px;border:0;border-radius:var(--r-sm);background:transparent;color:var(--ink);font-size:13px;text-align:left}
+.palette .res button .icon{color:var(--faint)}
+.palette .res button:hover,.palette .res button.sel{background:var(--accent-dim)}
+.palette .res button .k{margin-left:auto;font:10.5px var(--mono);color:var(--faint)}
+
+/* ── responsive ─────────────────────────────────────────── */
+@media(max-width:1080px){
+  .grid.c2{grid-template-columns:1fr}
+  .grid.c3{grid-template-columns:1fr}
+}
+@media(max-width:860px){
+  :root{--sidebar-w:64px}
+  .side-head .t,.campaign .sub,.campaign .k,.side-foot span,.side-foot .who{display:none}
+  .campaign{display:flex;align-items:center;justify-content:center;margin:10px 0;padding:4px 0;border:0;background:transparent}
+  .campaign .v span{display:none}
+  .nav-group{text-align:center;font-size:0;margin:12px 0 4px}
+  .nav-item{justify-content:center;padding:9px}
+  .nav-item .label{display:none}
+  .nav-item .count{margin:0;position:absolute;transform:translate(14px,-12px)}
+  .search{min-width:0}
+  .content{padding:18px 14px 40px}
+}
+@media(prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+::-webkit-scrollbar{width:10px;height:10px}
+::-webkit-scrollbar-thumb{background:var(--line-2);border-radius:6px;border:2px solid var(--bg-2)}
+::-webkit-scrollbar-track{background:transparent}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+<symbol id="i-grid" viewBox="0 0 16 16"><rect x="1.5" y="1.5" width="5.2" height="5.2" rx="1.2"/><rect x="9.3" y="1.5" width="5.2" height="5.2" rx="1.2"/><rect x="1.5" y="9.3" width="5.2" height="5.2" rx="1.2"/><rect x="9.3" y="9.3" width="5.2" height="5.2" rx="1.2"/></symbol>
+<symbol id="i-flag" viewBox="0 0 16 16"><path d="M3.5 14V2.5"/><path d="M3.5 3.2h8.2l-1.6 2.3 1.6 2.3H3.5"/></symbol>
+<symbol id="i-target" viewBox="0 0 16 16"><circle cx="8" cy="8" r="6"/><circle cx="8" cy="8" r="2.6"/><circle cx="8" cy="8" r=".5" fill="currentColor"/></symbol>
+<symbol id="i-check" viewBox="0 0 16 16"><circle cx="8" cy="8" r="6"/><path d="M5.4 8.2l1.9 1.9 3.4-3.9"/></symbol>
+<symbol id="i-list" viewBox="0 0 16 16"><path d="M5.5 4h8M5.5 8h8M5.5 12h8"/><circle cx="2.6" cy="4" r=".8" fill="currentColor" stroke="none"/><circle cx="2.6" cy="8" r=".8" fill="currentColor" stroke="none"/><circle cx="2.6" cy="12" r=".8" fill="currentColor" stroke="none"/></symbol>
+<symbol id="i-alert" viewBox="0 0 16 16"><path d="M8 2.4l6 10.4H2z"/><path d="M8 6.6v3M8 11.4v.01"/></symbol>
+<symbol id="i-flow" viewBox="0 0 16 16"><circle cx="3" cy="8" r="1.8"/><circle cx="13" cy="4" r="1.6"/><circle cx="13" cy="12" r="1.6"/><path d="M4.7 7.2l6.5-2.6M4.7 8.8l6.5 2.6"/></symbol>
+<symbol id="i-server" viewBox="0 0 16 16"><rect x="2.2" y="2.5" width="11.6" height="4.6" rx="1.2"/><rect x="2.2" y="8.9" width="11.6" height="4.6" rx="1.2"/><path d="M4.6 4.8h.01M4.6 11.2h.01"/></symbol>
+<symbol id="i-net" viewBox="0 0 16 16"><circle cx="8" cy="3" r="1.7"/><circle cx="3" cy="12" r="1.7"/><circle cx="13" cy="12" r="1.7"/><path d="M7 4.4L4 10.5M9 4.4l3 6.1M4.6 12h6.8"/></symbol>
+<symbol id="i-bars" viewBox="0 0 16 16"><path d="M3.5 13.5V8M8 13.5V3M12.5 13.5V6"/></symbol>
+<symbol id="i-shield" viewBox="0 0 16 16"><path d="M8 2l4.6 1.7v4c0 3-2 5-4.6 6.3C5.4 12.7 3.4 10.7 3.4 7.7v-4z"/></symbol>
+<symbol id="i-sliders" viewBox="0 0 16 16"><path d="M2.5 5h11M2.5 11h11"/><circle cx="6" cy="5" r="1.6" fill="var(--panel)"/><circle cx="10.5" cy="11" r="1.6" fill="var(--panel)"/></symbol>
+<symbol id="i-doc" viewBox="0 0 16 16"><path d="M4 2.5h5.2L12.5 5.7V13.5H4z"/><path d="M9 2.5V6h3.5"/></symbol>
+<symbol id="i-term" viewBox="0 0 16 16"><rect x="2" y="3" width="12" height="10" rx="1.4"/><path d="M5 7l2 2-2 2M8.6 11h2.6"/></symbol>
+<symbol id="i-chart" viewBox="0 0 16 16"><path d="M2.5 13.5V2.5M2.5 13.5H13.5"/><path d="M5 11l2.6-3.2L10 9.4l3-4.4"/></symbol>
+<symbol id="i-bolt" viewBox="0 0 16 16"><path d="M8.6 1.8L3.4 9h3.6l-1 5.2L13.2 7H9.4z"/></symbol>
+</defs></svg>
+
+<div class="app">
+  <aside class="sidebar">
+    <div class="side-head">
+      <div class="logo">S</div>
+      <div class="t"><b>Stavros</b><span>Command Center</span></div>
+      <span class="draft-badge">draft</span>
+    </div>
+    <div class="campaign">
+      <div class="k">Active campaign</div>
+      <div class="v"><span class="pip live"></span><span>ACME Q3 External</span></div>
+      <div class="sub">Client · ACME Corp · RoE signed</div>
+    </div>
+    <nav class="nav" id="nav"></nav>
+    <div class="side-foot">
+      <div class="avatar">OP</div>
+      <span>operator@endpoint</span>
+    </div>
+  </aside>
+  <div class="main">
+    <header class="topbar">
+      <div class="crumbs" id="crumbs"><b>Overview</b></div>
+      <button class="search" type="button" data-palette><svg class="icon"><use href="#i-target"/></svg>Search or run a command<kbd>⌘K</kbd></button>
+      <span class="env ro">read-only session</span>
+      <span class="env ok"><span class="pip ok"></span>scope ok</span>
+      <span class="clock" id="clock">--:--</span>
+    </header>
+    <div class="content" id="view"></div>
+  </div>
+</div>
+
+<div class="palette" id="palette">
+  <div class="box" role="dialog" aria-modal="true" aria-label="Command palette">
+    <div class="inp"><svg class="icon"><use href="#i-target"/></svg><input id="pmq" type="text" placeholder="Jump to a surface…" autocomplete="off"><kbd>esc</kbd></div>
+    <div class="res" id="pres"></div>
+  </div>
+</div>
+
+<script>
+'use strict';
+/* ── fixture data (a realistic engagement, no backend) ───────────────────── */
+const DATA = {
+  trend: [0,1,0,2,1,1,3,2,4,3,5,4,6,5,7,6,8,7],
+  severity: { Critical:2, High:4, Medium:5, Low:3, Info:3 },
+  kpis: [
+    { k:'Critical', v:2, tone:'crit', d:'+1 today', dir:'up', view:'findings' },
+    { k:'High',     v:4, tone:'high', d:'+2 this week', dir:'up', view:'findings' },
+    { k:'Assets in scope', v:42, tone:'accent', d:'6 hosts · 3 web apps', view:'scope' },
+    { k:'Coverage', v:'68%', tone:'ok', d:'9 classes left', view:'coverage' },
+    { k:'Open actions', v:5, tone:'med', d:'2 need approval', view:'mission' },
+    { k:'Budget', v:'3.2h', tone:null, d:'of 8h allocated', view:'mission' },
+  ],
+  findings: [
+    { sev:'Critical', title:'SQL injection in /api/v1/search', host:'app.acme.example', ep:'/api/v1/search?q=', cwe:'CWE-89', cvss:9.8, status:'confirmed', ts:'11:42' },
+    { sev:'Critical', title:'Admin console reachable without authentication', host:'admin.acme.example', ep:'/admin', cwe:'CWE-306', cvss:9.1, status:'proven', ts:'11:39' },
+    { sev:'High', title:'Stored XSS in profile bio field', host:'app.acme.example', ep:'/profile/edit', cwe:'CWE-79', cvss:7.2, status:'confirmed', ts:'11:21' },
+    { sev:'High', title:'IDOR on invoice retrieval', host:'api.acme.example', ep:'/api/invoices/{id}', cwe:'CWE-639', cvss:7.5, status:'proven', ts:'10:58' },
+    { sev:'High', title:'Legacy TLS 1.0 accepted on VPN gateway', host:'vpn.acme.example', ep:'443/tcp', cwe:'CWE-326', cvss:7.4, status:'suspected', ts:'10:41' },
+    { sev:'High', title:'SSRF via image import URL parameter', host:'app.acme.example', ep:'/api/import', cwe:'CWE-918', cvss:8.1, status:'confirmed', ts:'10:12' },
+    { sev:'Medium', title:'Missing Content-Security-Policy header', host:'www.acme.example', ep:'/', cwe:'CWE-693', cvss:5.3, status:'confirmed', ts:'09:55' },
+    { sev:'Medium', title:'Verbose errors leak stack traces', host:'app.acme.example', ep:'/debug', cwe:'CWE-209', cvss:5.0, status:'confirmed', ts:'09:40' },
+    { sev:'Medium', title:'Weak password policy on SSO', host:'sso.acme.example', ep:'/login', cwe:'CWE-521', cvss:4.9, status:'suspected', ts:'09:22' },
+    { sev:'Medium', title:'Open redirect on logout endpoint', host:'www.acme.example', ep:'/logout?next=', cwe:'CWE-601', cvss:4.7, status:'confirmed', ts:'08:58' },
+    { sev:'Medium', title:'Directory listing enabled on CDN origin', host:'static.acme.example', ep:'/assets/', cwe:'CWE-548', cvss:5.2, status:'confirmed', ts:'08:33' },
+    { sev:'Low', title:'Session cookie missing SameSite attribute', host:'www.acme.example', ep:'/', cwe:'CWE-1275', cvss:3.1, status:'confirmed', ts:'08:20' },
+    { sev:'Low', title:'Autocomplete enabled on sensitive field', host:'sso.acme.example', ep:'/login', cwe:'CWE-522', cvss:2.6, status:'suspected', ts:'08:05' },
+    { sev:'Low', title:'Server version banner disclosure', host:'vpn.acme.example', ep:'443/tcp', cwe:'CWE-200', cvss:2.2, status:'confirmed', ts:'07:58' },
+  ],
+  actions: [
+    { tier:'auto', label:'Confirm SQLi finding with automated checks', why:'Critical finding recorded but not yet independently reproduced.', cmd:'node tools/run.js sqlmap -u https://app.acme.example/api/v1/search?q= --batch --level 3', meta:['next-actions','~4 min','tier auto'] },
+    { tier:'confirm', label:'Enumerate AD trusts on dc01.corp.example', why:'Coverage gap: active-directory class is untested on the internal segment.', cmd:'node tools/run.js netexec smb dc01.corp.example --shares', meta:['coverage-loop','~12 min','tier confirm'] },
+    { tier:'auto', label:'Retest IDOR fix after change window', why:'Vendor patched /api/invoices/{id}; a retest closes the finding cycle.', cmd:'node tools/run.js retest --finding F-1042', meta:['finding-cycle','~2 min','tier auto'] },
+    { tier:'blocked', label:'Capture WPA handshake on ACME-GUEST', why:'Wireless class planned, but the SSID is not in wifi-scope.json.', cmd:'node tools/run.js hcxdumptool -i wlan0 --bssid ACME-GUEST', meta:['wireless','blocked: out of scope'] },
+    { tier:'auto', label:'Generate client report draft', why:'All Critical/High findings are proven; a draft is ready to assemble.', cmd:'node tools/report-html.js --campaign acme-q3 --draft', meta:['reporter','~1 min','tier auto'] },
+  ],
+  approvals: [
+    { status:'pending', risk:'high', label:'Credential spray against sso.acme.example', host:'sso.acme.example', cls:'authn', by:'fleet-agent', when:'6 min ago' },
+    { status:'pending', risk:'high', label:'Enable C2 listener on 10.0.4.12', host:'10.0.4.12', cls:'command-and-control', by:'c2-guard', when:'14 min ago' },
+    { status:'granted', risk:'med', label:'Start Sliver beacon on app.acme.example', host:'app.acme.example', cls:'post-exploitation', by:'operator', when:'38 min ago' },
+    { status:'denied', risk:'low', label:'Horizontal port sweep of 10.0.0.0/16', host:'10.0.0.0/16', cls:'discovery', by:'operator', when:'1 h ago' },
+  ],
+  feed: [
+    { ico:'crit', sym:'i-alert', t:'Finding recorded — <b>SQL injection in /api/v1/search</b>', s:'critical · app.acme.example', when:'11:42' },
+    { ico:'accent', sym:'i-flow', t:'Gate passed — <b>recon</b>', s:'scope anchored · 42 assets', when:'11:38' },
+    { ico:'ok', sym:'i-bolt', t:'Job completed — <b>nuclei</b>', s:'2,481 requests · 0 errors', when:'11:30' },
+    { ico:'ok', sym:'i-check', t:'Approval granted — <b>Sliver beacon</b>', s:'app.acme.example', when:'11:12' },
+    { ico:'accent', sym:'i-doc', t:'Artifact added — <b>reports/app.scan.json</b>', s:'1.2 MB · hash chained', when:'10:58' },
+    { ico:'warn', sym:'i-flag', t:'Campaign activated — <b>ACME Q3 External</b>', s:'template web-app', when:'10:40' },
+  ],
+  hosts: [
+    { host:'app.acme.example', crit:2, high:3, total:8 },
+    { host:'www.acme.example', crit:0, high:0, total:3 },
+    { host:'sso.acme.example', crit:0, high:0, total:2 },
+    { host:'api.acme.example', crit:0, high:1, total:2 },
+    { host:'vpn.acme.example', crit:0, high:1, total:2 },
+    { host:'admin.acme.example', crit:1, high:0, total:1 },
+  ],
+  campaign: {
+    name:'ACME Q3 External', client:'ACME Corp', template:'web-app',
+    window:'2026-09-14 → 2026-10-02', roe:'signed · 2026-09-10', lead:'operator@endpoint',
+    phases:[
+      { n:'Recon', st:'done', d:'42 assets discovered, scope anchored' },
+      { n:'Scan', st:'done', d:'nuclei + nmap baselines across 6 hosts' },
+      { n:'Exploit', st:'active', d:'2 critical findings proven, 3 in progress' },
+      { n:'Report', st:'pending', d:'draft assembles once every High is proven' },
+    ],
+    roe2:[
+      ['Allowed hosts','6 in scope'],
+      ['Techniques','authenticated + unauthenticated web, AD enumeration'],
+      ['Denied','DoS, social engineering, production writes'],
+      ['Loot handling','stored as hashes · count only'],
+      ['Rate limit','5 rps, no aggressive fuzzing'],
+      ['Emergency contact','<span class="mono">soc@acme.example</span>'],
+    ],
+  },
+  ledger:[
+    { seq:1042, ts:'11:42:07', actor:'finding-recorder', act:'finding.created', detail:'F-1042 SQL injection in /api/v1/search', hash:'9f31c2a7', prev:'1d44b809' },
+    { seq:1041, ts:'11:38:51', actor:'scope-guard', act:'gate.passed', detail:'gate recon · 42 assets anchored', hash:'1d44b809', prev:'c07e2f18' },
+    { seq:1040, ts:'11:30:12', actor:'tool-runner', act:'job.completed', detail:'nuclei · 2,481 requests · 0 errors', hash:'c07e2f18', prev:'88ab31d0' },
+    { seq:1039, ts:'11:12:44', actor:'operator', act:'approval.granted', detail:'#A-77 Sliver beacon on app.acme.example', hash:'88ab31d0', prev:'4ff0c25e' },
+    { seq:1038, ts:'10:58:03', actor:'artifact-store', act:'artifact.added', detail:'reports/app.scan.json · 1.2 MB', hash:'4ff0c25e', prev:'b21d9a44' },
+    { seq:1037, ts:'10:40:19', actor:'operator', act:'campaign.activated', detail:'ACME Q3 External · template web-app', hash:'b21d9a44', prev:'—' },
+  ],
+  pipeline:[
+    { st:'queued', label:'Directory fuzz on www.acme.example', job:'ffuf · wordlist medium', by:'auto', when:'queued 11:45' },
+    { st:'running', label:'SQLi confirmation sweep', job:'sqlmap · level 3 · batch', by:'fleet-agent', when:'started 11:43' },
+    { st:'done', label:'Baseline port and service scan', job:'nmap -sV -sC · 6 hosts', by:'auto', when:'done 11:30' },
+    { st:'done', label:'HTTP crawl and parameter harvest', job:'katana + paramspider', by:'auto', when:'done 11:04' },
+    { st:'failed', label:'SMB share enumeration on dc01', job:'netexec smb · timeout', by:'fleet-agent', when:'failed 10:52' },
+  ],
+  sessions:[
+    { id:'sess-3', target:'app.acme.example', tool:'sqlmap', state:'live', since:'11:43', ops:'operator' },
+    { id:'sess-2', target:'sso.acme.example', tool:'curl · manual recon', state:'live', since:'11:20', ops:'operator' },
+    { id:'sess-1', target:'vpn.acme.example', tool:'openssl s_client', state:'idle', since:'10:58', ops:'auto' },
+  ],
+  graph:{
+    nodes:[
+      { id:'app', x:210, y:70, kind:'web', label:'app.acme.example', crit:2 },
+      { id:'www', x:70, y:150, kind:'web', label:'www.acme.example', crit:0 },
+      { id:'api', x:210, y:190, kind:'api', label:'api.acme.example', crit:0 },
+      { id:'sso', x:350, y:150, kind:'sso', label:'sso.acme.example', crit:0 },
+      { id:'admin', x:350, y:60, kind:'admin', label:'admin.acme.example', crit:1 },
+      { id:'db', x:210, y:300, kind:'data', label:'db01.acme.internal', crit:0 },
+      { id:'vpn', x:490, y:230, kind:'net', label:'vpn.acme.example', crit:0 },
+    ],
+    edges:[['app','api'],['app','db'],['www','api'],['sso','app'],['admin','app'],['api','db'],['sso','vpn']],
+  },
+  coverage:[
+    { c:'Web application', st:'done', d:'6/6 hosts' },
+    { c:'Network services', st:'done', d:'top 1000 ports' },
+    { c:'Evidencing', st:'done', d:'hash-chained' },
+    { c:'Authentication', st:'part', d:'SSO only' },
+    { c:'Cloud / API', st:'part', d:'REST discovered' },
+    { c:'Client-side', st:'part', d:'XSS only' },
+    { c:'Active Directory', st:'gap', d:'0/1 segments' },
+    { c:'Wireless', st:'gap', d:'not in scope' },
+    { c:'Supply chain', st:'gap', d:'not started' },
+  ],
+  scopeIn:[
+    { r:'app.acme.example', t:'web app', note:'primary target' },
+    { r:'www.acme.example', t:'web app', note:'marketing site' },
+    { r:'api.acme.example', t:'REST API', note:'versioned v1' },
+    { r:'sso.acme.example', t:'identity', note:'auth surface' },
+    { r:'vpn.acme.example', t:'network', note:'gateway only' },
+    { r:'10.0.4.0/24', t:'internal', note:'lab segment · no production writes' },
+  ],
+  scopeOut:[
+    { r:'admin.acme.example', note:'pending written approval' },
+    { r:'static.acme.example', note:'CDN origin · read only' },
+    { r:'*.corp.example', note:'corporate network excluded' },
+    { r:'10.0.0.0/16', note:'denied — sweep request rejected' },
+  ],
+  config:[
+    { g:'Guardrails', rows:[
+      { k:'Scope enforcement on every command', on:true },
+      { k:'Require approval for confirm-tier actions', on:true },
+      { k:'Block actions outside the campaign window', on:true },
+      { k:'Rate limit outbound requests (5 rps)', on:true },
+    ]},
+    { g:'Data handling', rows:[
+      { k:'Store loot as hashes, count only', on:true },
+      { k:'Hash-chain the append-only ledger', on:true },
+      { k:'Redact credentials from logs', on:true },
+      { k:'Retain raw artifacts for 30 days', on:false },
+    ]},
+    { g:'Notifications', rows:[
+      { k:'Desktop notification on Critical finding', on:true },
+      { k:'Notify on approval request', on:true },
+      { k:'Mute non-critical activity', on:false },
+    ]},
+  ],
+  team:[
+    { n:'operator@endpoint', role:'lead operator', state:'active', last:'now' },
+    { n:'fleet-agent', role:'agent', state:'active', last:'2 min ago' },
+    { n:'c2-guard', role:'policy agent', state:'active', last:'11 min ago' },
+    { n:'analyst@acme.example', role:'client observer', state:'read-only', last:'1 h ago' },
+  ],
+  arsenal:[
+    { n:'nmap', cat:'recon', v:'7.94', st:'installed' },
+    { n:'nuclei', cat:'recon', v:'3.3.7', st:'installed' },
+    { n:'sqlmap', cat:'exploit', v:'1.8.7', st:'installed' },
+    { n:'ffuf', cat:'fuzz', v:'2.1.0', st:'installed' },
+    { n:'netexec', cat:'ad', v:'1.2.0', st:'installed' },
+    { n:'sliver', cat:'c2', v:'1.5.42', st:'installed' },
+    { n:'bloodhound', cat:'ad', v:'5.9.0', st:'missing' },
+    { n:'hcxdumptool', cat:'wireless', v:'6.3.5', st:'missing' },
+  ],
+  reports:[
+    { n:'ACME Q3 External — assessment report', fmt:'HTML', size:'1.1 MB', when:'generated 10:58', st:'draft' },
+    { n:'ACME Q3 External — executive summary', fmt:'PDF', size:'320 KB', when:'generated 10:59', st:'draft' },
+    { n:'Coverage matrix export', fmt:'CSV', size:'12 KB', when:'generated 09:40', st:'final' },
+    { n:'Raw evidence bundle', fmt:'JSON', size:'8.4 MB', when:'hash-chained 09:12', st:'final' },
+  ],
+  term:[
+    { cls:'p', t:'operator@endpoint:~$ node tools/run.js nmap -sV app.acme.example' },
+    { cls:'dim', t:'[scope] app.acme.example ∈ scope (web app) — gate ok' },
+    { cls:'', t:'Starting Nmap 7.94 ( https://nmap.org )' },
+    { cls:'ok', t:'80/tcp   open  http    nginx 1.24.0' },
+    { cls:'ok', t:'443/tcp  open  https   nginx 1.24.0' },
+    { cls:'warn', t:'3306/tcp open  mysql   MySQL 8.0.34  ← not in the asset inventory' },
+    { cls:'', t:'Nmap done: 1 IP address (1 host up) scanned in 12.4 seconds' },
+    { cls:'p', t:'operator@endpoint:~$ ' },
+  ],
+};
+
+/* ── helpers ─────────────────────────────────────────────────────────────── */
+const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
+const icon = (id, cls) => '<svg class="icon ' + (cls || '') + '" aria-hidden="true"><use href="#' + id + '"/></svg>';
+const sevClass = (s) => ({ Critical:'crit', High:'high', Medium:'med', Low:'low', Info:'info' }[s] || 'info');
+const statusClass = (s) => ({ proven:'ok', confirmed:'accent', suspected:'info' }[s] || 'info');
+const sevPill = (s) => '<span class="pill ' + sevClass(s) + '">' + esc(s) + '</span>';
+const statusPill = (s) => '<span class="pill ' + statusClass(s) + '">' + esc(s) + '</span>';
+
+/* ── navigation ──────────────────────────────────────────────────────────── */
+const NAV = [
+  { g:'Engagement', items:[
+    { id:'overview', label:'Overview', icon:'i-grid' },
+    { id:'campaign', label:'Campaign', icon:'i-flag' },
+    { id:'mission', label:'Mission', icon:'i-target', count:5 },
+    { id:'approvals', label:'Approvals', icon:'i-check', count:2, hot:true },
+    { id:'ledger', label:'Ledger', icon:'i-list' },
+  ]},
+  { g:'Attack', items:[
+    { id:'findings', label:'Findings', icon:'i-alert', count:14 },
+    { id:'pipeline', label:'Pipeline', icon:'i-flow' },
+    { id:'sessions', label:'Sessions', icon:'i-server', count:3 },
+    { id:'graph', label:'Graph', icon:'i-net' },
+    { id:'coverage', label:'Coverage', icon:'i-bars' },
+  ]},
+  { g:'Control', items:[
+    { id:'scope', label:'Scope', icon:'i-shield' },
+    { id:'config', label:'Configuration', icon:'i-sliders' },
+    { id:'team', label:'Team', icon:'i-net' },
+    { id:'arsenal', label:'Arsenal', icon:'i-bolt' },
+  ]},
+  { g:'Console', items:[
+    { id:'reports', label:'Reports', icon:'i-doc' },
+    { id:'terminal', label:'Terminal', icon:'i-term' },
+  ]},
+];
+
+function renderNav(active) {
+  document.getElementById('nav').innerHTML = NAV.map((grp) =>
+    '<div class="nav-group">' + esc(grp.g) + '</div>' +
+    grp.items.map((it) =>
+      '<button class="nav-item' + (it.id === active ? ' active' : '') + '" data-view="' + it.id + '">' +
+        icon(it.icon) + '<span class="label">' + esc(it.label) + '</span>' +
+        (it.count != null ? '<span class="count' + (it.hot ? ' hot' : '') + '">' + it.count + '</span>' : '') +
+      '</button>').join('')
+  ).join('');
+}
+
+/* ── tiny inline charts (no libs) ────────────────────────────────────────── */
+function sparkline(values, w, h, color) {
+  w = w || 96; h = h || 30;
+  const max = Math.max(1, ...values), min = Math.min(...values);
+  const span = Math.max(1, max - min);
+  const pts = values.map((v, i) => {
+    const x = values.length > 1 ? (i / (values.length - 1)) * w : w / 2;
+    const y = h - 2 - ((v - min) / span) * (h - 6);
+    return x.toFixed(1) + ',' + y.toFixed(1);
+  });
+  return '<svg class="spark" width="' + w + '" height="' + h + '" viewBox="0 0 ' + w + ' ' + h + '" aria-hidden="true">' +
+    '<polyline points="' + pts.join(' ') + '" fill="none" stroke="' + color + '" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"/></svg>';
+}
+
+function areaChart(values, w, h) {
+  w = w || 640; h = h || 150; const pad = 8;
+  const max = Math.max(1, ...values);
+  const X = (i) => pad + (i / (values.length - 1)) * (w - pad * 2);
+  const Y = (v) => h - pad - (v / max) * (h - pad * 2);
+  const line = values.map((v, i) => (i ? 'L' : 'M') + X(i).toFixed(1) + ' ' + Y(v).toFixed(1)).join(' ');
+  const area = line + ' L' + X(values.length - 1).toFixed(1) + ' ' + (h - pad) + ' L' + X(0).toFixed(1) + ' ' + (h - pad) + ' Z';
+  const grid = [0, .5, 1].map((t) => '<line x1="' + pad + '" y1="' + (pad + t * (h - pad * 2)).toFixed(1) + '" x2="' + (w - pad) + '" y2="' + (pad + t * (h - pad * 2)).toFixed(1) + '" stroke="var(--line)" stroke-width="1"/>').join('');
+  const last = values.length - 1;
+  return '<svg viewBox="0 0 ' + w + ' ' + h + '" width="100%" height="' + h + '" preserveAspectRatio="none" aria-hidden="true">' +
+    '<defs><linearGradient id="ag" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="var(--accent)" stop-opacity=".35"/><stop offset="1" stop-color="var(--accent)" stop-opacity="0"/></linearGradient></defs>' +
+    grid + '<path d="' + area + '" fill="url(#ag)"/><path d="' + line + '" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>' +
+    '<circle cx="' + X(last).toFixed(1) + '" cy="' + Y(values[last]).toFixed(1) + '" r="3.2" fill="var(--accent)"/></svg>';
+}
+
+function kpiCard(k) {
+  const col = k.tone === 'crit' ? 'var(--crit)' : k.tone === 'high' ? 'var(--high)' : k.tone === 'med' ? 'var(--med)' : k.tone === 'ok' ? 'var(--ok)' : 'var(--accent)';
+  const tag = k.view ? 'button' : 'div';
+  return '<' + tag + ' class="kpi' + (k.tone ? ' tone-' + k.tone : '') + '"' + (k.view ? ' data-goto="' + k.view + '"' : '') + '>' +
+    sparkline(DATA.trend.slice(-12), 78, 26, col) +
+    '<div class="k">' + esc(k.k) + '</div>' +
+    '<div class="v">' + esc(k.v) + '</div>' +
+    '<div class="d">' + (k.dir ? '<span class="' + k.dir + '">' + (k.dir === 'up' ? '▲' : '▼') + '</span>' : '') + esc(k.d) + '</div>' +
+  '</' + tag + '>';
+}
+
+/* ── Overview ────────────────────────────────────────────────────────────── */
+function viewOverview() {
+  const sev = DATA.severity;
+  const total = Object.values(sev).reduce((a, b) => a + b, 0);
+  const sevList = ['Critical','High','Medium','Low','Info'].map((s) =>
+    '<div class="sev-row"><span class="sev-name"><span class="sev-dot s-' + sevClass(s) + '"></span>' + s + '</span>' +
+    '<span class="sev-track"><span class="sev-fill s-' + sevClass(s) + '" style="width:' + ((sev[s] || 0) / total * 100).toFixed(1) + '%"></span></span>' +
+    '<span class="sev-count">' + (sev[s] || 0) + '</span></div>').join('');
+
+  const hostRows = DATA.hosts.map((h) =>
+    '<tr data-goto="findings"><td class="mono">' + esc(h.host) + '</td>' +
+    '<td class="r"><b style="color:' + (h.crit ? 'var(--crit)' : 'var(--faint)') + '">' + h.crit + '</b></td>' +
+    '<td class="r"><b style="color:' + (h.high ? 'var(--high)' : 'var(--faint)') + '">' + h.high + '</b></td>' +
+    '<td class="r mono">' + h.total + '</td></tr>').join('');
+
+  const feedRows = DATA.feed.map((f) =>
+    '<div class="feed-item"><span class="feed-ico ' + f.ico + '">' + icon(f.sym) + '</span>' +
+    '<div class="feed-body"><div class="t">' + f.t + '</div><div class="faint" style="font-size:11.5px;margin-top:2px">' + esc(f.s) + '</div></div>' +
+    '<span class="feed-time">' + esc(f.when) + '</span></div>').join('');
+
+  return pageHead('Overview', 'Engagement health across findings, coverage, mission queue and approvals.',
+      '<button class="btn">' + icon('i-chart') + 'Export report</button><button class="btn btn-primary">' + icon('i-bolt') + 'Run next action</button>') +
+    '<div class="kpis">' + DATA.kpis.map(kpiCard).join('') + '</div>' +
+    '<div class="grid c2">' +
+      panel('Findings over time', 'last 18 days', '<div class="statline"><div class="s"><span class="k">Total</span><span class="v">' + total + '</span></div><div class="s"><span class="k">This week</span><span class="v">' + DATA.trend.slice(-7).reduce((a, b) => a + b, 0) + '</span></div><div class="s"><span class="k">Mean / day</span><span class="v">' + (total / 18).toFixed(1) + '</span></div></div>' + areaChart(DATA.trend)) +
+      panel('Findings by severity', total + ' total', sevList) +
+    '</div>' +
+    '<div class="grid c2" style="margin-top:16px">' +
+      panel('Targets by risk', 'click a host to filter findings', '<div class="panel-body tight"><table><thead><tr><th>Host</th><th class="r">Crit</th><th class="r">High</th><th class="r">Total</th></tr></thead><tbody>' + hostRows + '</tbody></table></div>') +
+      panel('Recent activity', null, '<div class="feed">' + feedRows + '</div>') +
+    '</div>';
+}
+
+/* shared layout helpers */
+function pageHead(title, sub, actions) {
+  return '<div class="page-head"><div><h1>' + esc(title) + '</h1>' + (sub ? '<div class="sub">' + sub + '</div>' : '') + '</div>' +
+    (actions ? '<div class="page-actions">' + actions + '</div>' : '') + '</div>';
+}
+function panel(title, hint, body) {
+  return '<div class="panel"><div class="panel-head"><h2>' + esc(title) + '</h2>' +
+    (hint ? '<span class="hint">' + esc(hint) + '</span>' : '') + '</div>' + body + '</div>';
+}
+
+/* Findings — filters, search and sort are live (state kept in `fstate`) */
+const sevColor = (s) => ({ Critical:'var(--crit)', High:'var(--high)', Medium:'var(--med)', Low:'var(--low)', Info:'var(--info)' }[s] || 'var(--info)');
+const SEV_ORDER = { Critical:0, High:1, Medium:2, Low:3, Info:4 };
+const fstate = { q:'', sev:new Set(), sort:'sev' };
+const SORTS = {
+  sev: (a, b) => SEV_ORDER[a.sev] - SEV_ORDER[b.sev] || b.cvss - a.cvss,
+  title: (a, b) => a.title.localeCompare(b.title),
+  host: (a, b) => a.host.localeCompare(b.host) || SEV_ORDER[a.sev] - SEV_ORDER[b.sev],
+  cvss: (a, b) => b.cvss - a.cvss,
+  ts: (a, b) => b.ts.localeCompare(a.ts),
+};
+function findingsList() {
+  const q = fstate.q.trim().toLowerCase();
+  return DATA.findings.filter((f) =>
+    (!fstate.sev.size || fstate.sev.has(f.sev)) &&
+    (!q || (f.title + ' ' + f.host + ' ' + f.ep + ' ' + f.cwe).toLowerCase().includes(q))
+  ).sort(SORTS[fstate.sort] || SORTS.sev);
+}
+function findingsRows() {
+  const rows = findingsList();
+  if (!rows.length) return '<tr><td colspan="8"><div class="empty">No findings match the current filters.</div></td></tr>';
+  return rows.map((f) =>
+    '<tr tabindex="0"><td>' + sevPill(f.sev) + '</td>' +
+    '<td><b style="font-weight:550">' + esc(f.title) + '</b></td>' +
+    '<td class="mono">' + esc(f.host) + '</td>' +
+    '<td class="mono muted">' + esc(f.ep) + '</td>' +
+    '<td class="mono faint">' + esc(f.cwe) + '</td>' +
+    '<td class="r"><b style="color:' + sevColor(f.sev) + ';font-family:var(--mono)">' + f.cvss.toFixed(1) + '</b></td>' +
+    '<td>' + statusPill(f.status) + '</td>' +
+    '<td class="r faint mono">' + esc(f.ts) + '</td></tr>').join('');
+}
+function viewFindings() {
+  const sev = DATA.severity;
+  const chips = ['Critical','High','Medium','Low','Info'].map((s) =>
+    '<button class="pill ' + sevClass(s) + (fstate.sev.size && !fstate.sev.has(s) ? ' off' : '') + '" data-sev="' + s + '">' + s + ' · ' + (sev[s] || 0) + '</button>').join('');
+  const th = (label, key, align) =>
+    '<th' + (align ? ' class="' + align + '"' : '') + '><button data-sort="' + key + '"' + (fstate.sort === key ? ' class="active"' : '') + '>' + label + '</button></th>';
+  return pageHead('Findings', 'Every recorded finding — filter by severity, search, or sort any column.',
+      '<button class="btn">' + icon('i-doc') + 'Export CSV</button><button class="btn btn-primary">' + icon('i-alert') + 'New finding</button>') +
+    '<div class="panel" style="margin-bottom:16px"><div class="panel-body" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">' +
+      '<input id="fsearch" type="search" value="' + esc(fstate.q) + '" placeholder="Search title, host, endpoint or CWE" style="min-width:280px;flex:1;padding:8px 11px;border:1px solid var(--line-2);border-radius:var(--r-sm);background:var(--panel);color:var(--ink);font:13px var(--sans)">' +
+      chips +
+    '</div></div>' +
+    '<div class="panel"><div class="panel-head"><h2>All findings</h2><span class="hint" id="fcount">' + findingsList().length + ' of ' + DATA.findings.length + ' findings</span></div>' +
+      '<div class="panel-body tight"><table><thead><tr>' +
+        th('Severity','sev') + th('Title','title') + th('Host','host') + '<th>Endpoint</th><th>CWE</th>' + th('CVSS','cvss','r') + '<th>Status</th>' + th('Detected','ts','r') +
+      '</tr></thead><tbody id="fbody">' + findingsRows() + '</tbody></table></div></div>';
+}
+
+/* Mission */
+function viewMission() {
+  const cards = DATA.actions.map((a) => {
+    const pill = a.tier === 'auto' ? '<span class="pill accent">auto</span>' : a.tier === 'confirm' ? '<span class="pill warn">needs approval</span>' : '<span class="pill crit">blocked</span>';
+    const btn = a.tier === 'blocked' ? '<button class="btn btn-sm" disabled style="opacity:.5">Dispatch</button>' :
+      a.tier === 'confirm' ? '<button class="btn btn-sm btn-ok">Request approval</button>' : '<button class="btn btn-sm btn-primary">Dispatch</button>';
+    return '<div class="action a-' + a.tier + '"><div class="top">' + pill + '<b>' + esc(a.label) + '</b></div>' +
+      '<div class="why">' + esc(a.why) + '</div>' +
+      '<div class="cmd">' + esc(a.cmd) + '</div>' +
+      '<div class="foot"><span class="meta">' + a.meta.map(esc).join('<span></span>') + '</span><span class="spacer"></span>' + btn + '</div></div>';
+  }).join('');
+  return pageHead('Mission', 'The deterministic plan: what to do next, why, and what it costs.',
+      '<button class="btn">' + icon('i-list') + 'Recompute plan</button><button class="btn btn-primary">' + icon('i-bolt') + 'Dispatch all auto</button>') +
+    '<div class="kpis">' +
+      kpiCard({ k:'Open actions', v:5, tone:'med', d:'2 auto · 2 confirm · 1 blocked' }) +
+      kpiCard({ k:'Gates passed', v:'4/6', tone:'ok', d:'chains + report remaining' }) +
+      kpiCard({ k:'Coverage gaps', v:9, tone:'med', d:'9 classes untested' }) +
+      kpiCard({ k:'Budget', v:'3.2h', tone:null, d:'of 8h · no halt' }) +
+    '</div>' +
+    panel('Action queue', 'ordered by impact', '<div class="actions">' + cards + '</div>');
+}
+
+/* Approvals */
+function viewApprovals() {
+  const cards = DATA.approvals.map((a) => {
+    const sp = a.status === 'pending' ? '<span class="pill warn">pending</span>' : a.status === 'granted' ? '<span class="pill ok">granted</span>' : '<span class="pill crit">denied</span>';
+    const risk = '<span class="pill ' + (a.risk === 'high' ? 'crit' : a.risk === 'med' ? 'med' : 'low') + '">risk ' + a.risk + '</span>';
+    const acts = a.status === 'pending' ? '<button class="btn btn-sm btn-ok">Approve</button><button class="btn btn-sm btn-danger">Deny</button>' : '<span class="faint" style="font-size:11.5px">decided</span>';
+    return '<div class="appr"><div class="body"><div style="display:flex;gap:9px;align-items:center;flex-wrap:wrap">' + sp + risk + '<b>' + esc(a.label) + '</b></div>' +
+      '<div class="meta"><span class="mono">' + esc(a.host) + '</span><span>' + esc(a.cls) + '</span><span>requested by ' + esc(a.by) + ' · ' + esc(a.when) + '</span></div></div>' +
+      '<div class="acts">' + acts + '</div></div>';
+  }).join('');
+  return pageHead('Approvals', 'Human-in-the-loop consent. Every confirm-tier action waits here for a verifiable token.',
+      '<button class="btn">' + icon('i-list') + 'View policy</button>') +
+    '<div class="kpis">' +
+      kpiCard({ k:'Pending', v:2, tone:'med', d:'awaiting operator' }) +
+      kpiCard({ k:'Granted today', v:5, tone:'ok', d:'all scoped' }) +
+      kpiCard({ k:'Denied today', v:1, tone:null, d:'out of scope' }) +
+      kpiCard({ k:'Median decision', v:'3m', tone:null, d:'last 24h' }) +
+    '</div>' +
+    panel('Inbox', 'most recent first', '<div style="padding:16px;display:flex;flex-direction:column;gap:11px">' + cards + '</div>');
+}
+
+/* ── Campaign ────────────────────────────────────────────────────────────── */
+function viewCampaign() {
+  const c = DATA.campaign;
+  const tone = { done:['i-check','ok'], active:['i-bolt','accent'], pending:['i-grid',''] };
+  const phases = c.phases.map((p) => lrow({
+    icon: tone[p.st][0], ico: tone[p.st][1],
+    title: esc(p.n) + ' <span class="pill ' + (p.st === 'done' ? 'ok' : p.st === 'active' ? 'accent' : 'info') + ' nodot">' + p.st + '</span>',
+    sub: esc(p.d),
+  })).join('');
+  const done = c.phases.filter((p) => p.st === 'done').length;
+  return pageHead('Campaign', 'The engagement container: client, rules of engagement and phase progress.',
+      '<button class="btn">' + icon('i-doc') + 'RoE document</button><button class="btn btn-primary">' + icon('i-flag') + 'Switch campaign</button>') +
+    '<div class="grid c2">' +
+      panel('Engagement', null, '<div class="panel-body">' + kv([
+        ['Campaign', '<b>' + esc(c.name) + '</b>'],
+        ['Client', esc(c.client)],
+        ['Template', '<span class="mono">' + esc(c.template) + '</span>'],
+        ['Window', esc(c.window)],
+        ['Rules of engagement', '<span class="pill ok nodot">' + esc(c.roe) + '</span>'],
+        ['Lead', '<span class="mono">' + esc(c.lead) + '</span>'],
+      ]) + '</div>') +
+      panel('Phases', done + '/' + c.phases.length + ' complete', '<div class="list">' + phases + '</div>') +
+    '</div>' +
+    '<div style="margin-top:16px">' +
+      panel('Rules of engagement', 'enforced by the scope guard', '<div class="panel-body">' + kv(c.roe2) + '</div>') +
+    '</div>';
+}
+
+/* ── Ledger ──────────────────────────────────────────────────────────────── */
+function viewLedger() {
+  const entries = DATA.ledger.map((e) => lrow({
+    icon: 'i-list',
+    title: '<span class="mono faint">#' + e.seq + '</span> &nbsp;' + esc(e.act) + ' — <b>' + esc(e.detail) + '</b>',
+    sub: '<span class="mono">' + esc(e.actor) + '</span> · ' + esc(e.ts) +
+         ' · <span class="mono">' + e.hash + '</span> <span class="faint">← ' + e.prev + '</span>',
+    right: '<span class="pill ok nodot">chain ok</span>',
+  })).join('');
+  return pageHead('Ledger', 'Append-only, hash-chained record of everything the platform did.',
+      '<button class="btn">' + icon('i-check') + 'Verify chain</button><button class="btn">' + icon('i-doc') + 'Export JSONL</button>') +
+    '<div class="kpis">' + [
+      { k:'Entries', v:'1,042', tone:'accent', d:'since campaign start' },
+      { k:'Chain integrity', v:'100%', tone:'ok', d:'last verified 11:44' },
+      { k:'Actors', v:4, tone:null, d:'2 agents · 2 humans' },
+      { k:'Retention', v:'30d', tone:null, d:'raw artifacts' },
+    ].map(kpiCard).join('') + '</div>' +
+    panel('Recent entries', DATA.ledger.length + ' of 1,042 shown', '<div class="list">' + entries + '</div>');
+}
+
+/* ── Pipeline ────────────────────────────────────────────────────────────── */
+function viewPipeline() {
+  const meta = { queued:['info','queued','i-list',''], running:['accent','running','i-bolt','accent'], done:['ok','done','i-check','ok'], failed:['crit','failed','i-alert','crit'] };
+  const jobs = DATA.pipeline.map((j) => lrow({
+    icon: meta[j.st][2], ico: meta[j.st][3],
+    title: '<span class="pill ' + meta[j.st][0] + ' nodot">' + meta[j.st][1] + '</span> &nbsp;' + esc(j.label),
+    sub: '<span class="mono">' + esc(j.job) + '</span> · ' + esc(j.by) + ' · ' + esc(j.when),
+    right: '<button class="btn btn-sm">Log</button>',
+  })).join('');
+  const load = [
+    ['Workers online','3 / 4',75,'var(--ok)'],
+    ['Queue depth','1 job',12,'var(--accent)'],
+    ['Budget consumed','3.2 h of 8 h',40,'var(--med)'],
+    ['Error rate','2.6%',8,'var(--crit)'],
+  ].map((m) => lrow({
+    title: esc(m[0]),
+    sub: '<span class="meter" style="margin-top:7px"><i style="width:' + m[2] + '%;background:' + m[3] + '"></i></span>',
+    right: '<span class="mono muted">' + esc(m[1]) + '</span>',
+  })).join('');
+  return pageHead('Pipeline', 'Jobs across the fleet — queue, execution and outcome.',
+      '<button class="btn">' + icon('i-list') + 'Job history</button><button class="btn btn-primary">' + icon('i-flow') + 'New job</button>') +
+    '<div class="kpis">' + [
+      { k:'Queued', v:1, tone:null, d:'waiting for a worker' },
+      { k:'Running', v:1, tone:'accent', d:'sqlmap · 2 min elapsed' },
+      { k:'Completed today', v:37, tone:'ok', d:'0 errors' },
+      { k:'Failed today', v:1, tone:'crit', d:'netexec · timeout' },
+    ].map(kpiCard).join('') + '</div>' +
+    '<div class="grid c2">' +
+      panel('Jobs', DATA.pipeline.length + ' in window', '<div class="list">' + jobs + '</div>') +
+      panel('Fleet load', 'last hour', '<div class="panel-body">' + load + '</div>') +
+    '</div>';
+}
+
+/* ── Sessions ────────────────────────────────────────────────────────────── */
+function viewSessions() {
+  const rows = DATA.sessions.map((s) => lrow({
+    icon: 'i-server', ico: s.state === 'live' ? 'accent' : '',
+    title: '<span class="mono">' + esc(s.id) + '</span> &nbsp;' + esc(s.target) +
+      ' <span class="pill ' + (s.state === 'live' ? 'accent' : 'info') + ' nodot">' + s.state + '</span>',
+    sub: '<span class="mono">' + esc(s.tool) + '</span> · since ' + esc(s.since) + ' · ' + esc(s.ops),
+    right: '<button class="btn btn-sm">Attach</button><button class="btn btn-sm btn-danger">Kill</button>',
+  })).join('');
+  return pageHead('Sessions', 'Live interactive shells attached to targets in scope.',
+      '<button class="btn">' + icon('i-list') + 'Replay</button><button class="btn btn-primary">' + icon('i-term') + 'New session</button>') +
+    '<div class="kpis">' + [
+      { k:'Live', v:2, tone:'accent', d:'2 PTY attached' },
+      { k:'Idle', v:1, tone:null, d:'auto session' },
+      { k:'Commands today', v:318, tone:'ok', d:'all scope-checked' },
+      { k:'Blocked by guard', v:4, tone:'crit', d:'out of scope' },
+    ].map(kpiCard).join('') + '</div>' +
+    panel('Sessions', DATA.sessions.length + ' open', '<div class="list">' + rows + '</div>');
+}
+
+/* ── Graph ───────────────────────────────────────────────────────────────── */
+function viewGraph() {
+  const g = DATA.graph, by = {};
+  g.nodes.forEach((n) => (by[n.id] = n));
+  const kind = { web:'var(--accent)', api:'var(--low)', sso:'var(--med)', admin:'var(--crit)', data:'var(--ok)', net:'var(--info)' };
+  const edges = g.edges.map((e) => '<line x1="' + by[e[0]].x + '" y1="' + by[e[0]].y + '" x2="' + by[e[1]].x + '" y2="' + by[e[1]].y + '" stroke="var(--line-3)" stroke-width="1.4"/>').join('');
+  const nodes = g.nodes.map((n) => {
+    const c = n.crit ? 'var(--crit)' : kind[n.kind];
+    return '<g><circle cx="' + n.x + '" cy="' + n.y + '" r="' + (n.crit ? 12 : 9) + '" fill="var(--panel-2)" stroke="' + c + '" stroke-width="2"/>' +
+      (n.crit ? '<circle cx="' + n.x + '" cy="' + n.y + '" r="3.6" fill="var(--crit)"/>' : '') +
+      '<text x="' + n.x + '" y="' + (n.y - 17) + '" fill="var(--muted)" font-size="10" text-anchor="middle" font-family="ui-monospace,monospace">' + esc(n.label) + '</text></g>';
+  }).join('');
+  const legend = Object.keys(kind).map((k) => '<span class="lg"><i style="background:' + kind[k] + '"></i>' + k + '</span>').join('');
+  return pageHead('Graph', 'How discovered assets relate to one another.',
+      '<button class="btn">' + icon('i-sliders') + 'Layout</button><button class="btn btn-primary">' + icon('i-net') + 'Expand neighbors</button>') +
+    '<div class="grid c2">' +
+      panel('Asset relationships', g.nodes.length + ' nodes · ' + g.edges.length + ' edges',
+        '<div class="panel-body"><svg viewBox="0 0 560 340" width="100%" height="390" role="img" aria-label="Asset relationship graph">' + edges + nodes + '</svg></div>') +
+      panel('Paths that matter', 'shortest route to crown jewels', '<div class="list">' +
+        lrow({ icon:'i-flag', ico:'crit', title:'www → api → db01 <span class="pill crit nodot">critical</span>', sub:'3 hops · SQLi opens the database tier' }) +
+        lrow({ icon:'i-flag', ico:'warn', title:'sso → vpn', sub:'2 hops · legacy TLS on the gateway' }) +
+        lrow({ icon:'i-flag', title:'app → sso', sub:'2 hops · shared session domain' }) +
+      '</div>') +
+    '</div>' +
+    '<div style="margin-top:16px">' + panel('Node types', 'stroke colour in the graph', '<div class="panel-body"><div class="legend">' + legend + '</div></div>') + '</div>';
+}
+
+/* ── Coverage ────────────────────────────────────────────────────────────── */
+function viewCoverage() {
+  const tone = { done:'ok', part:'med', gap:'crit', na:'info' };
+  const cells = DATA.coverage.map((c) =>
+    '<div class="cell ' + c.st + '"><div class="c-k">' + esc(c.c) + '</div><div class="c-v">' + esc(c.d) + '</div>' +
+    '<div style="margin-top:9px"><span class="pill ' + tone[c.st] + ' nodot">' + c.st + '</span></div></div>').join('');
+  const gaps = DATA.coverage.filter((c) => c.st === 'gap').length;
+  return pageHead('Coverage', 'Which attack classes have been exercised, per the methodology.',
+      '<button class="btn">' + icon('i-sliders') + 'Methodology</button><button class="btn btn-primary">' + icon('i-target') + 'Plan the gaps</button>') +
+    '<div class="kpis">' + [
+      { k:'Coverage', v:'68%', tone:'ok', d:'9 classes tracked' },
+      { k:'Exercised', v:3, tone:'ok', d:'web · network · evidencing' },
+      { k:'Partial', v:3, tone:'med', d:'auth · API · client-side' },
+      { k:'Gaps', v:gaps, tone:'crit', d:'AD · wireless · supply chain' },
+    ].map(kpiCard).join('') + '</div>' +
+    panel('Attack classes', 'colour = coverage state', '<div class="panel-body"><div class="matrix">' + cells + '</div></div>');
+}
+
+/* ── Scope ───────────────────────────────────────────────────────────────── */
+function viewScope() {
+  const inside = DATA.scopeIn.map((s) => lrow({
+    icon:'i-shield', ico:'ok', title:'<span class="mono">' + esc(s.r) + '</span>',
+    sub: esc(s.t) + ' · ' + esc(s.note), right:'<span class="pill ok nodot">allowed</span>',
+  })).join('');
+  const outside = DATA.scopeOut.map((s) => lrow({
+    icon:'i-shield', ico:'crit', title:'<span class="mono">' + esc(s.r) + '</span>',
+    sub: esc(s.note), right:'<span class="pill crit nodot">denied</span>',
+  })).join('');
+  return pageHead('Scope', 'The single source of truth the guard checks before any command runs.',
+      '<button class="btn">' + icon('i-doc') + 'Scope file</button><button class="btn btn-primary">' + icon('i-check') + 'Re-anchor scope</button>') +
+    '<div class="panel" style="margin-bottom:16px"><div class="panel-body" style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">' +
+      icon('i-target') +
+      '<input id="scope-check" type="text" placeholder="Check a host or CIDR against scope…" style="flex:1;min-width:240px;padding:9px 12px;border:1px solid var(--line-2);border-radius:var(--r-sm);background:var(--panel-2);color:var(--ink);font:13px var(--mono)">' +
+      '<span id="scope-verdict"><span class="pill info nodot">waiting for input</span></span>' +
+    '</div></div>' +
+    '<div class="grid c2">' +
+      panel('In scope', DATA.scopeIn.length + ' rules', '<div class="list">' + inside + '</div>') +
+      panel('Out of scope', DATA.scopeOut.length + ' rules', '<div class="list">' + outside + '</div>') +
+    '</div>';
+}
+
+/* ── Configuration ───────────────────────────────────────────────────────── */
+function viewConfig() {
+  const groups = DATA.config.map((g) => panel(g.g, g.rows.filter((r) => r.on).length + '/' + g.rows.length + ' enabled',
+    '<div class="list">' + g.rows.map((r) => lrow({ title: esc(r.k), right: toggle(r.on, r.k) })).join('') + '</div>')).join('');
+  return pageHead('Configuration', 'Guardrails, data handling and notification policy. Every change is audit-logged.',
+      '<button class="btn btn-ghost">Restore defaults</button><button class="btn btn-primary">' + icon('i-check') + 'Apply</button>') +
+    '<div class="grid c2">' + groups + '</div>';
+}
+
+/* ── Team ────────────────────────────────────────────────────────────────── */
+function viewTeam() {
+  const role = (r) => r === 'lead operator' ? 'accent' : (r === 'agent' || r === 'policy agent') ? 'ok' : 'info';
+  const rows = DATA.team.map((m) => lrow({
+    icon: 'i-net',
+    title: '<b>' + esc(m.n) + '</b> <span class="pill ' + role(m.role) + ' nodot">' + esc(m.role) + '</span>',
+    sub: 'last active ' + esc(m.last),
+    right: '<span class="pill ' + (m.state === 'active' ? 'ok' : 'info') + ' nodot">' + esc(m.state) + '</span>',
+  })).join('');
+  return pageHead('Team', 'Who can act on this engagement, and with what authority.',
+      '<button class="btn">' + icon('i-list') + 'Access log</button><button class="btn btn-primary">' + icon('i-net') + 'Invite</button>') +
+    '<div class="kpis">' + [
+      { k:'Members', v:4, tone:'accent', d:'2 agents · 2 humans' },
+      { k:'Active now', v:3, tone:'ok', d:'1 read-only' },
+      { k:'Actions today', v:126, tone:null, d:'attributed in the ledger' },
+      { k:'Pending invites', v:0, tone:null, d:'none' },
+    ].map(kpiCard).join('') + '</div>' +
+    panel('Members', null, '<div class="list">' + rows + '</div>');
+}
+
+/* ── Arsenal ─────────────────────────────────────────────────────────────── */
+function viewArsenal() {
+  const cards = DATA.arsenal.map((t) =>
+    '<div class="tool"><div class="n">' + icon(t.cat === 'c2' ? 'i-bolt' : 'i-term') + esc(t.n) +
+    '<span class="pill ' + (t.st === 'installed' ? 'ok' : 'crit') + ' nodot">' + t.st + '</span></div>' +
+    '<div class="m">' + esc(t.cat) + ' · v' + esc(t.v) + '</div></div>').join('');
+  const missing = DATA.arsenal.filter((t) => t.st !== 'installed').length;
+  return pageHead('Arsenal', 'Tools available to the fleet, resolved per campaign template.',
+      '<button class="btn">' + icon('i-list') + 'Check versions</button><button class="btn btn-primary">' + icon('i-bolt') + 'Install missing</button>') +
+    '<div class="kpis">' + [
+      { k:'Installed', v:(DATA.arsenal.length - missing) + '/' + DATA.arsenal.length, tone:'ok', d:'ready to dispatch' },
+      { k:'Missing', v:missing, tone:'crit', d:'AD · wireless' },
+      { k:'Categories', v:6, tone:null, d:'recon → c2' },
+      { k:'Avg. tool age', v:'3w', tone:null, d:'since last update' },
+    ].map(kpiCard).join('') + '</div>' +
+    panel('Toolbox', DATA.arsenal.length + ' tools', '<div class="panel-body"><div class="tools">' + cards + '</div></div>');
+}
+
+/* ── Reports ─────────────────────────────────────────────────────────────── */
+function viewReports() {
+  const st = { draft:['warn','draft'], final:['ok','final'] };
+  const rows = DATA.reports.map((r) => lrow({
+    icon: 'i-doc', ico: r.st === 'final' ? 'ok' : 'accent',
+    title: esc(r.n) + ' <span class="pill ' + st[r.st][0] + ' nodot">' + st[r.st][1] + '</span>',
+    sub: '<span class="mono">' + esc(r.fmt) + '</span> · ' + esc(r.size) + ' · ' + esc(r.when),
+    right: '<button class="btn btn-sm">Open</button>',
+  })).join('');
+  return pageHead('Reports', 'Client-facing deliverables and evidence bundles.',
+      '<button class="btn">' + icon('i-doc') + 'Template</button><button class="btn btn-primary">' + icon('i-bolt') + 'Generate draft</button>') +
+    '<div class="kpis">' + [
+      { k:'Drafts', v:2, tone:'med', d:'awaiting review' },
+      { k:'Final', v:2, tone:'ok', d:'hash-chained' },
+      { k:'Critical findings', v:2, tone:'crit', d:'both proven' },
+      { k:'Evidence size', v:'9.5 MB', tone:null, d:'4 artifacts' },
+    ].map(kpiCard).join('') + '</div>' +
+    panel('Deliverables', DATA.reports.length + ' files', '<div class="list">' + rows + '</div>');
+}
+
+/* ── Terminal ────────────────────────────────────────────────────────────── */
+function viewTerminal() {
+  const lines = DATA.term.map((l) => '<div class="line ' + l.cls + '">' + esc(l.t) + '</div>').join('');
+  return pageHead('Terminal', 'A live PTY, with every command still checked against scope.',
+      '<button class="btn">' + icon('i-server') + 'sess-3</button><button class="btn btn-danger">' + icon('i-term') + 'Stop session</button>') +
+    '<div class="panel"><div class="panel-head"><h2>sess-3 · sqlmap</h2><span class="hint">app.acme.example · live since 11:43</span><span class="ways"><span class="pill ok nodot">scope ok</span></span></div>' +
+      '<div class="term" id="tlog">' + lines + '</div>' +
+      '<div class="term-input">' + icon('i-term') + '<input id="tinput" type="text" placeholder="Type a command — responses are simulated in this draft" autocomplete="off"></div>' +
+    '</div>';
+}
+
+/* ── shared row / value helpers ─────────────────────────────────────────── */
+function lrow(o) {
+  return '<div class="lrow">' +
+    (o.icon ? '<span class="feed-ico ' + (o.ico || '') + '">' + icon(o.icon) + '</span>' : '') +
+    '<div class="grow"><div class="t">' + o.title + '</div>' + (o.sub ? '<div class="s">' + o.sub + '</div>' : '') + '</div>' +
+    (o.right ? '<div class="right">' + o.right + '</div>' : '') +
+  '</div>';
+}
+function kv(pairs) {
+  return '<div class="kv">' + pairs.map((p) =>
+    '<div><div class="k">' + esc(p[0]) + '</div><div class="v">' + p[1] + '</div></div>').join('') + '</div>';
+}
+function toggle(on, label) {
+  return '<button class="sw' + (on ? ' on' : '') + '" data-sw aria-pressed="' + (on ? 'true' : 'false') + '" aria-label="' + esc(label) + '"></button>';
+}
+
+/* ── findings: filtering, search and sorting ────────────────────────────── */
+function refreshFindings() {
+  const body = document.getElementById('fbody');
+  if (!body) return;
+  body.innerHTML = findingsRows();
+  const count = document.getElementById('fcount');
+  if (count) count.textContent = findingsList().length + ' of ' + DATA.findings.length + ' findings';
+  document.querySelectorAll('[data-sev]').forEach((b) =>
+    b.classList.toggle('off', fstate.sev.size > 0 && !fstate.sev.has(b.dataset.sev)));
+  document.querySelectorAll('[data-sort]').forEach((b) =>
+    b.classList.toggle('active', b.dataset.sort === fstate.sort));
+}
+
+/* ── Terminal + scope check (view-local behaviour) ──────────────────────── */
+function bindTerminal() {
+  const input = document.getElementById('tinput');
+  if (!input) return;
+  input.addEventListener('keydown', (e) => {
+    if (e.key !== 'Enter' || !input.value.trim()) return;
+    const cmd = input.value.trim();
+    const log = document.getElementById('tlog');
+    const line = (cls, t) => '<div class="line ' + cls + '">' + esc(t) + '</div>';
+    const rule = DATA.scopeIn.find((s) => cmd.includes(s.r));
+    const denied = DATA.scopeOut.find((s) => cmd.includes(s.r.replace('*.', '')));
+    let out = line('p', '$ ' + cmd) + line('dim', '[draft] no backend attached — this response is simulated');
+    if (denied) out += line('crit', '[scope] ' + denied.r + ' is out of scope — command blocked by the guard');
+    else if (rule) out += line('', '[scope] ' + rule.r + ' ∈ scope (' + rule.t + ') — gate ok') + line('', 'queued in the pipeline · run ' + (1043 + DATA.ledger.length));
+    else out += line('warn', '[scope] no in-scope asset matched — needs explicit approval');
+    log.insertAdjacentHTML('beforeend', out);
+    log.scrollTop = log.scrollHeight;
+    input.value = '';
+  });
+}
+function bindScopeCheck() {
+  const el = document.getElementById('scope-check');
+  if (!el) return;
+  el.addEventListener('input', () => {
+    const q = el.value.trim().toLowerCase();
+    const out = document.getElementById('scope-verdict');
+    if (!q) { out.innerHTML = '<span class="pill info nodot">waiting for input</span>'; return; }
+    const hit = DATA.scopeIn.find((s) => s.r.toLowerCase().includes(q));
+    const bad = DATA.scopeOut.find((s) => s.r.toLowerCase().replace('*.', '').includes(q));
+    out.innerHTML = hit ? '<span class="pill ok nodot">in scope · ' + esc(hit.r) + '</span>' :
+      bad ? '<span class="pill crit nodot">out of scope · ' + esc(bad.r) + '</span>' :
+      '<span class="pill warn nodot">unknown · requires approval</span>';
+  });
+}
+
+/* ── Command palette ────────────────────────────────────────────────────── */
+function paletteRender(query) {
+  const q = (query || '').toLowerCase();
+  const items = NAV.flatMap((g) => g.items.map((i) => ({ id:i.id, label:i.label, group:g.g, icon:i.icon })));
+  const hits = items.filter((i) => !q || (i.label + ' ' + i.group).toLowerCase().includes(q));
+  document.getElementById('pres').innerHTML = hits.length
+    ? hits.map((h, idx) => '<button data-view="' + h.id + '"' + (idx === 0 ? ' class="sel"' : '') + '>' + icon(h.icon) + '<span>' + esc(h.label) + '</span><span class="k">' + esc(h.group) + '</span></button>').join('')
+    : '<div class="empty">No matches</div>';
+}
+function openPalette() {
+  document.getElementById('palette').classList.add('open');
+  const q = document.getElementById('pmq');
+  q.value = '';
+  paletteRender('');
+  setTimeout(() => q.focus(), 0);
+}
+function closePalette() { document.getElementById('palette').classList.remove('open'); }
+
+/* ── router ─────────────────────────────────────────────────────────────── */
+const LABELS = {}, GROUPS = {};
+NAV.forEach((g) => g.items.forEach((i) => { LABELS[i.id] = i.label; GROUPS[i.id] = g.g; }));
+const VIEWS = {
+  overview: viewOverview, campaign: viewCampaign, mission: viewMission, approvals: viewApprovals, ledger: viewLedger,
+  findings: viewFindings, pipeline: viewPipeline, sessions: viewSessions, graph: viewGraph, coverage: viewCoverage,
+  scope: viewScope, config: viewConfig, team: viewTeam, arsenal: viewArsenal, reports: viewReports, terminal: viewTerminal,
+};
+function render(view) {
+  if (!VIEWS[view]) view = 'overview';
+  renderNav(view);
+  document.getElementById('crumbs').innerHTML = esc(GROUPS[view]) + ' <span class="faint">/</span> <b>' + esc(LABELS[view]) + '</b>';
+  document.getElementById('view').innerHTML = VIEWS[view]();
+  window.scrollTo({ top: 0, behavior: 'auto' });
+  if (view === 'terminal') bindTerminal();
+  if (view === 'scope') bindScopeCheck();
+}
+
+/* ── events ─────────────────────────────────────────────────────────────── */
+document.addEventListener('click', (e) => {
+  const sw = e.target.closest('[data-sw]');
+  if (sw) {
+    sw.classList.toggle('on');
+    sw.setAttribute('aria-pressed', sw.classList.contains('on') ? 'true' : 'false');
+    return;
+  }
+  const sev = e.target.closest('[data-sev]');
+  if (sev) { const v = sev.dataset.sev; if (fstate.sev.has(v)) fstate.sev.delete(v); else fstate.sev.add(v); refreshFindings(); return; }
+  const sort = e.target.closest('[data-sort]');
+  if (sort) { fstate.sort = sort.dataset.sort; refreshFindings(); return; }
+  const go = e.target.closest('[data-view],[data-goto]');
+  if (go) { render(go.dataset.view || go.dataset.goto); closePalette(); return; }
+  if (e.target.closest('[data-palette]')) openPalette();
+});
+document.addEventListener('input', (e) => {
+  if (e.target.id === 'fsearch') { fstate.q = e.target.value; refreshFindings(); }
+});
+document.addEventListener('keydown', (e) => {
+  if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); openPalette(); return; }
+  if (e.key === 'Escape') closePalette();
+});
+document.getElementById('palette').addEventListener('click', (e) => { if (e.target.id === 'palette') closePalette(); });
+document.getElementById('pmq').addEventListener('input', (e) => paletteRender(e.target.value));
+document.getElementById('pmq').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') { const first = document.querySelector('#pres button'); if (first) { render(first.dataset.view); closePalette(); } }
+});
+
+function tick() { document.getElementById('clock').textContent = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }); }
+tick(); setInterval(tick, 30000);
+render('overview');
+</script>
+</body>
+</html>

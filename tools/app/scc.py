@@ -27,6 +27,7 @@ import subprocess
 import threading
 import time
 import urllib.request
+from types import SimpleNamespace
 
 WS = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 TOOLS = os.path.join(WS, "tools")
@@ -34,6 +35,7 @@ LOG_DIR = os.path.join(WS, "reports", "app")
 LOG_FILE = os.path.join(LOG_DIR, "scc.log")
 APP_NAME = "stavros-cc"
 SERVER_NAME = "stavros-cc-single"
+_QT_APP = None  # keeps a QApplication created outside main() alive
 
 
 def log(msg):
@@ -47,9 +49,29 @@ def log(msg):
     sys.stderr.write("[scc] %s\n" % msg)
 
 
+def _tooling_path():
+    """PATH for the backend AND every job it spawns.
+
+    The shell can be started from a tray/autostart environment whose PATH is the system
+    default, which hides tooling installed in the user's own dirs: `~/go/bin` (the
+    ProjectDiscovery go tools), `~/.local/bin` (pipx), `/usr/sbin` (wireless/network tools).
+    doctor.js resolves binaries through PATH, so a shrunken PATH reports installed tools as
+    missing AND makes a dispatched job fail with "not found" — the same PATH is handed to
+    tools/run.js. Prepend the usual dirs that actually exist, keep what we inherited.
+    """
+    parts = [p for p in os.environ.get("PATH", "").split(os.pathsep) if p]
+    for d in (os.path.expanduser("~/.local/bin"), os.path.expanduser("~/go/bin"),
+              os.path.expanduser("~/bin"), "/usr/local/sbin", "/usr/sbin", "/sbin"):
+        if os.path.isdir(d) and d not in parts:
+            parts.append(d)
+    if "/usr/bin" not in parts:
+        parts.append("/usr/bin")
+    return os.pathsep.join(parts)
+
+
 def _env(*extra):
     env = dict(os.environ)
-    env["PATH"] = env.get("PATH", "") + os.pathsep + "/usr/bin"
+    env["PATH"] = _tooling_path()
     for k, v in extra:
         env[k] = v
     return env
@@ -96,21 +118,33 @@ class BackendSupervisor:
             self.proc = subprocess.Popen(args, cwd=WS, env=env, stdout=subprocess.PIPE,
                                          stderr=subprocess.STDOUT, text=True, bufsize=1)
             self.owned = True
-            deadline = time.time() + 15
-            for line in self.proc.stdout:
-                log("backend: " + line.rstrip())
-                if line.startswith("SCC_URL="):
-                    self.url = line.strip().split("=", 1)[1]
-                if line.startswith("SCC_PORT="):
-                    try:
-                        self.port = int(line.strip().split("=", 1)[1])
-                    except ValueError:
-                        pass
-                if self.url and self.port:
-                    return self.url
-                if time.time() > deadline:
-                    break
-            raise RuntimeError("backend did not print SCC_URL within 15s")
+            # Drain the handshake on a thread: a blocking read would hang forever when the
+            # backend prints nothing, and would stop draining the pipe once it is up.
+            proc = self.proc
+            state = {}
+            ready = threading.Event()
+
+            def _read_handshake():
+                for line in proc.stdout:
+                    log("backend: " + line.rstrip())
+                    if line.startswith("SCC_URL="):
+                        state["url"] = line.strip().split("=", 1)[1]
+                    if line.startswith("SCC_PORT="):
+                        try:
+                            state["port"] = int(line.strip().split("=", 1)[1])
+                        except ValueError:
+                            pass
+                    if state.get("url") and state.get("port"):
+                        ready.set()
+                ready.set()
+
+            threading.Thread(target=_read_handshake, daemon=True).start()
+            if not ready.wait(15) or not state.get("url"):
+                raise RuntimeError("backend did not print SCC_URL within 15s (exit code %s)"
+                                   % proc.poll())
+            self.url = state["url"]
+            self.port = state.get("port")
+            return self.url
 
     def healthy(self):
         if not self.url:
@@ -157,20 +191,61 @@ class BackendSupervisor:
 
 
 # ── single instance ───────────────────────────────────────────────────────────
-def acquire_single_instance():
-    """Return a QLocalServer we own, 'existing' when another window is already up, or None
-    when PyQt6 is unavailable (caller falls back)."""
+def serve_raise_requests(server, window):
+    """Accept single-instance connections and raise `window` when asked.
+
+    A second launch sends "raise" and waits for the "ok" reply; without this handler the
+    launcher exits while the first window stays hidden/minimized/on another desktop, so the
+    user only sees the launcher spinner disappear.
+    """
+    from PyQt6.QtWidgets import QApplication
+
+    def on_new_connection():
+        while server.hasPendingConnections():
+            conn = server.nextPendingConnection()
+            conn.disconnected.connect(conn.deleteLater)
+
+            def on_ready(c=conn):
+                if b"raise" not in bytes(c.readAll()):
+                    return
+                log("raise requested by a second launch")
+                window.showNormal()
+                window.raise_()
+                window.activateWindow()
+                QApplication.alert(window, 0)  # Wayland may refuse focus: flash the taskbar entry
+                c.write(b"ok\n")
+                c.flush()
+                c.waitForBytesWritten(200)
+                c.disconnectFromServer()
+
+            conn.readyRead.connect(on_ready)
+
+    server.newConnection.connect(on_new_connection)
+
+
+def acquire_single_instance(ack_timeout_ms=1200):
+    """Return a QLocalServer we own, 'existing' when another window raised itself, or None
+    when PyQt6 is unavailable (caller falls back).
+
+    A socket that accepts the connection but never answers the raise (a hung window, or a
+    build that predates the handshake) is not trusted: we take the name over so a window
+    always appears instead of the launch dying silently.
+    """
     try:
         from PyQt6.QtNetwork import QLocalServer, QLocalSocket
     except ImportError:
         return None
     sock = QLocalSocket()
-    sock.connectToServer(SERVER_NAME)
+    sock.connectToServer(SERVER_NAME)  # void in Qt6: never test its return value
     if sock.waitForConnected(200):
         sock.write(b"raise\n")
         sock.flush()
         sock.waitForBytesWritten(200)
-        return "existing"
+        if sock.waitForReadyRead(ack_timeout_ms) and b"ok" in bytes(sock.readAll()):
+            sock.abort()
+            return "existing"
+        log("single-instance peer did not answer the raise — taking over")
+    sock.abort()
     try:
         QLocalServer.removeServer(SERVER_NAME)
     except Exception:  # noqa: BLE001
@@ -200,6 +275,44 @@ def _resolve_url_for_web(sup):
     return sup.start()
 
 
+def load_qt():
+    """Import the Qt shell bindings once. None when PyQt6/WebEngine is missing."""
+    try:
+        from PyQt6.QtWidgets import (QApplication, QMainWindow, QToolBar, QLabel, QStatusBar,
+                                     QSystemTrayIcon, QMenu, QMessageBox)
+        from PyQt6.QtGui import QIcon, QPixmap, QColor, QPainter
+        from PyQt6.QtCore import QTimer, QSize, QUrl, QSettings
+        from PyQt6.QtWebEngineWidgets import QWebEngineView
+    except ImportError as e:  # noqa: BLE001
+        log("PyQt6 unavailable (%s) — falling back to Chromium/browser" % e)
+        return None
+    return SimpleNamespace(
+        QApplication=QApplication, QMainWindow=QMainWindow, QToolBar=QToolBar, QLabel=QLabel,
+        QStatusBar=QStatusBar, QSystemTrayIcon=QSystemTrayIcon, QMenu=QMenu,
+        QMessageBox=QMessageBox, QIcon=QIcon, QPixmap=QPixmap, QColor=QColor,
+        QPainter=QPainter, QTimer=QTimer, QSize=QSize, QUrl=QUrl, QSettings=QSettings,
+        QWebEngineView=QWebEngineView)
+
+
+def report_startup_failure(message):
+    """Launched from the desktop there is no terminal: make the failure visible.
+
+    Without this the launcher icon just disappears again and the operator has no clue.
+    """
+    log("FATAL: %s" % message)
+    sys.stderr.write("[scc] %s\n" % message)
+    if not (os.environ.get("DISPLAY") or os.environ.get("WAYLAND_DISPLAY")):
+        return
+    try:
+        from PyQt6.QtWidgets import QApplication, QMessageBox
+    except ImportError:
+        return
+    global _QT_APP
+    _QT_APP = QApplication.instance() or QApplication(sys.argv)
+    QMessageBox.critical(None, "Stavros Command Center",
+                         "%s\n\nBackend: tools/gui-server.js\nLog: %s" % (message, LOG_FILE))
+
+
 def main(argv):
     read_only = "--read-only" in argv
     headless = "--headless" in argv
@@ -207,11 +320,29 @@ def main(argv):
     kiosk = "--kiosk" in argv
     keep_server = "--keep-server" in argv
 
+    # Qt shell path. The single instance is claimed BEFORE anything is spawned: a second
+    # launch must raise the existing window and touch nothing else — no redundant backend,
+    # no second window, and above all no silent exit while the launcher spinner disappears.
+    qt = None if (web or headless) else load_qt()
+    single = None
+    app = None
+    if qt is not None:
+        app = qt.QApplication(sys.argv)
+        app.setApplicationName("Stavros Command Center")
+        app.setOrganizationName("StavrosRedTeamer")
+        single = acquire_single_instance()
+        if single == "existing":
+            log("another window is already running — raising it and exiting")
+            return 0
+
     sup = BackendSupervisor(read_only=read_only, keep_server=keep_server)
     try:
         url = sup.start()
     except Exception as e:  # noqa: BLE001
-        log("FATAL: cannot start backend: %s" % e)
+        if headless or web:
+            log("FATAL: cannot start backend: %s" % e)
+            return 1
+        report_startup_failure("cannot start the backend: %s" % e)
         return 1
 
     if web:
@@ -229,25 +360,15 @@ def main(argv):
         sup.stop()
         return 0
 
-    try:
-        from PyQt6.QtWidgets import (QApplication, QMainWindow, QToolBar, QLabel, QStatusBar,
-                                     QSystemTrayIcon, QMenu, QMessageBox, QWidget)
-        from PyQt6.QtGui import QIcon, QAction, QPixmap, QColor, QPainter
-        from PyQt6.QtCore import QTimer, QSize, QUrl, QSettings
-        from PyQt6.QtWebEngineWidgets import QWebEngineView
-    except ImportError as e:  # noqa: BLE001
-        log("PyQt6 unavailable (%s) — falling back to Chromium/browser" % e)
+    if qt is None:
         fallback_browser(url)  # browser is now the UI: keep the backend alive
         return 0
 
-    app = QApplication(sys.argv)
-    app.setApplicationName("Stavros Command Center")
-    app.setOrganizationName("StavrosRedTeamer")
-
-    single = acquire_single_instance()
-    if single == "existing":
-        log("another window is already running — raising it and exiting")
-        return 0
+    QMainWindow, QToolBar, QLabel, QStatusBar = qt.QMainWindow, qt.QToolBar, qt.QLabel, qt.QStatusBar
+    QSystemTrayIcon, QMenu, QMessageBox = qt.QSystemTrayIcon, qt.QMenu, qt.QMessageBox
+    QIcon, QPixmap, QColor, QPainter = qt.QIcon, qt.QPixmap, qt.QColor, qt.QPainter
+    QTimer, QSize, QUrl, QSettings = qt.QTimer, qt.QSize, qt.QUrl, qt.QSettings
+    QWebEngineView = qt.QWebEngineView
 
     icon_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "icons", "stavros-cc.svg")
 
@@ -355,7 +476,11 @@ def main(argv):
             event.accept()
 
     win = MainWindow()
+    if single is not None and single != "existing":
+        serve_raise_requests(single, win)
     win.show()
+    win.raise_()
+    win.activateWindow()
     rc = app.exec()
     sup.stop()
     return rc

@@ -8,9 +8,17 @@
 //
 // mobile-scope.json:
 //   allowed_packages:  ["com.lab.vulnapp"]  -> Android applicationId (exact, case-sensitive)
-//   allowed_serials:   ["127.0.0.1:5555"]   -> adb serials; ONLY loopback ReDroid instances.
-//                                              A non-loopback serial (real LAN IP, 0.0.0.0,
-//                                              remote host) is ALWAYS rejected, even if listed.
+//   allowed_serials:   ["127.0.0.1:5555"]   -> adb serials. Two shapes:
+//                                              (a) host:port  -> ONLY loopback ReDroid instances;
+//                                                  a non-loopback host:port (LAN IP, 0.0.0.0,
+//                                                  remote host) is ALWAYS rejected, even if listed.
+//                                              (b) USB/hardware serial (e.g. "bb83609b") -> a
+//                                                  physically-attached authorized device. It has
+//                                                  no network host to pin to loopback, so it is
+//                                                  gated PURELY on exact allowlist membership
+//                                                  (still fail-closed: not listed = rejected).
+//                                                  Documented, deliberate loosening of the
+//                                                  loopback-only rule for an in-engagement device.
 //   allowed_apk_sha256: ["<hex64>", ...]     -> SHA256 allowlist for APK files (lab + bounty
 //                                              in-scope). Empty = any APK whose package is allowed
 //                                              may be analyzed statically; install still needs
@@ -26,7 +34,24 @@ const net = require('net');
 function loadMobileScope(scopePath) {
   // MOBILE_SCOPE_JSON env override: lets tests point at another file.
   const p = scopePath || process.env.MOBILE_SCOPE_JSON || path.join(__dirname, '..', 'mobile-scope.json');
-  return JSON.parse(fs.readFileSync(p, 'utf8'));
+  let raw;
+  try {
+    raw = fs.readFileSync(p, 'utf8');
+  } catch (e) {
+    // Fail-closed with an explicit reason so the operator sees WHICH precondition failed.
+    const err = new Error(`mobile-scope.json unreadable at ${p}: ${e.message}`);
+    err.code = 'MOBILE_SCOPE_UNREADABLE';
+    throw err;
+  }
+  try {
+    return JSON.parse(raw);
+  } catch (e) {
+    // Explicit JSON parse error: without this, a syntax typo silently blocks the WHOLE
+    // mobile mode as a generic load-failure. Surface the parse message + path.
+    const err = new Error(`mobile-scope.json is not valid JSON: ${e.message} (at ${p})`);
+    err.code = 'MOBILE_SCOPE_INVALID_JSON';
+    throw err;
+  }
 }
 
 const PKG_RE = /^[a-zA-Z][a-zA-Z0-9_]*(\.[a-zA-Z][a-zA-Z0-9_]*)+$/;
@@ -47,8 +72,13 @@ function parseSerial(s) {
   const t = String(s == null ? '' : s).trim();
   if (/^(emulator-\d+)$/.test(t)) return { host: null, local: true, token: t };
   const m = t.match(/^(.*?):(\d{1,5})$/);
-  if (!m) return null;
-  return { host: m[1].replace(/^\[|\]$/g, ''), port: Number(m[2]), token: t };
+  if (m) return { host: m[1].replace(/^\[|\]$/g, ''), port: Number(m[2]), token: t };
+  // USB/hardware adb serial (no host:port), e.g. "bb83609b" or "emulator" transport ids that
+  // are bare alphanumerics. Packages always contain a dot (PKG_RE) and sha256 is 64 hex, so a
+  // dotless 4-24 char alphanumeric token is unambiguously a serial. Loopback cannot apply
+  // (there is no host); serialInScope() gates it on exact allowlist membership.
+  if (/^[A-Za-z0-9]{4,24}$/.test(t)) return { host: null, usb: true, token: t };
+  return null;
 }
 
 function isLoopbackHost(h) {
@@ -79,9 +109,10 @@ function serialInScope(serial, scope) {
     return { ok: false, reason: `serial ${t} is not loopback: only local ReDroid (127.0.0.1) is allowed` };
   }
   const allowed = (scope && scope.allowed_serials) || [];
-  return allowed.includes(t)
-    ? { ok: true, reason: 'serial allowlisted' }
-    : { ok: false, reason: `serial ${t} not in mobile-scope.json allowed_serials` };
+  if (!allowed.includes(t)) {
+    return { ok: false, reason: `serial ${t} not in mobile-scope.json allowed_serials` };
+  }
+  return { ok: true, reason: parsed.usb ? 'usb/hardware serial allowlisted (authorized physical device)' : 'serial allowlisted' };
 }
 
 function apkInScope(sha256, scope) {
@@ -120,8 +151,8 @@ if (require.main === module) {
   let scope;
   try {
     scope = loadMobileScope();
-  } catch {
-    console.log(JSON.stringify({ ok: false, reason: 'mobile-scope.json missing - nothing is authorized yet' }));
+  } catch (e) {
+    console.log(JSON.stringify({ ok: false, reason: e && e.message ? e.message : 'mobile-scope.json missing - nothing is authorized yet' }));
     process.exit(1);
   }
   if (scopeEmpty(scope)) {

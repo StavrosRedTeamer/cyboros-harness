@@ -93,6 +93,9 @@ const GATES = {
       // test-gate-chain asserisce slice(0,4) legacy + slice(4) SA1 e viene aggiornato di conseguenza.
       { kind: 'pocReplay', hint: 'every verified finding has a reproducer exp/<id>.py on disk' },
       { kind: 'chainHead', hint: 'findings chain head matches the external head-anchor log' },
+      // P0 (additivo, in coda): la matrice ATT&CK e' l'artefatto che misura la copertura offensiva
+      // per tecnica (tools/attack-coverage.js --write), complementare a coverage-matrix.md.
+      { kind: 'attackCoverage', hint: 'ATT&CK coverage matrix prepared' },
     ],
     manual: ['Coverage matrix complete — every class tested or marked N/A with rationale', 'Cross-check done: independent subagent reviewed the findings'],
   },
@@ -152,6 +155,17 @@ function checkCoverage() {
   const cov = readText('reports/coverage-matrix.md');
   const ok = cov.includes('|') && cov.includes('|');
   return { ok, detail: ok ? 'coverage-matrix.md has table rows' : 'coverage-matrix.md missing or empty' };
+}
+
+// P0: matrice ATT&CK — prodotta da "node tools/attack-coverage.js --write". L'header + almeno
+// una riga di tattica provano che l'artefatto e' una matrice vera, non uno stub.
+function checkAttackCoverage() {
+  const text = readText('reports/attack-matrix.md');
+  const rows = text.split('\n').filter((l) => l.trim().startsWith('|') && !/^\|\s*-{2,}/.test(l.trim()));
+  const ok = text.includes('| Tactic |') && rows.length > 1;
+  return { ok, detail: ok
+    ? `attack-matrix.md has ${rows.length - 1} tactic row(s)`
+    : 'attack-matrix.md missing or has no tactic rows (run: node tools/attack-coverage.js --write)' };
 }
 
 // Dual-schema scope normalization (additive): accepts the classic {allowed_hosts,allowed_ips}
@@ -249,6 +263,7 @@ function runCheck(check) {
     case 'verify': return checkVerify(check.min);
     case 'noPending': return checkNoPending();
     case 'coverage': return checkCoverage();
+    case 'attackCoverage': return checkAttackCoverage();
     case 'scopeNonEmpty': return checkScopeNonEmpty();
     case 'chain': return checkChain(check.file);
     case 'oracle': return checkOracle(check.file);
@@ -387,4 +402,4 @@ function main() {
 
 if (require.main === module) main();
 
-module.exports = { GATES, runGate, gateChecks, loadWorkflowReports, gateLogHasPass, checkFile, checkMarkers, checkFindings, checkVerify, checkNoPending, checkCoverage, checkScopeNonEmpty, checkChain, checkOracle, checkEvidenceQuote, checkPocReplay, checkChainHead };
+module.exports = { GATES, runGate, gateChecks, loadWorkflowReports, gateLogHasPass, checkFile, checkMarkers, checkFindings, checkVerify, checkNoPending, checkCoverage, checkAttackCoverage, checkScopeNonEmpty, checkChain, checkOracle, checkEvidenceQuote, checkPocReplay, checkChainHead };

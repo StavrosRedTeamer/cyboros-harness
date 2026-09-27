@@ -6,7 +6,9 @@
 #
 # Pre-flight (fail-closed): scope.json non vuoto, CLI freebuff presente,
 # Chrome per chrome-devtools MCP (warning, non bloccante).
-# Poi lancia: freebuff --cwd "$EDITION" (TUI interattiva).
+# Poi lancia: freebuff --cwd "$EDITION" --trust-agents (TUI interattiva).
+# --trust-agents: carica .agents/*.ts + mcp.json senza chiedere conferma a ogni avvio
+# (richiesto dalle versioni recenti della CLI, altrimenti la flotta stavros non parte).
 set -euo pipefail
 
 # --- 0. TTY sano: colori + input tasti (frecce) nella TUI Freebuff ---
@@ -64,18 +66,35 @@ if ! node "$EDITION/tools/scope-guard.js" --help >/dev/null 2>&1; then
 fi
 say "Pre-flight OK (scope: ${SCOPE_OK} entry autorizzate)."
 
-# --- 4. Chrome per chrome-devtools MCP (warning non bloccante) ---
+# --- 4. schema degli agenti contro il BINARIO installato (fail-closed) ---
+# Il binario si auto-aggiorna a ogni avvio epuo cambiare le regole di validazione:
+# un .agents/*.ts perfettamente valido con la 0.0.198 puo far bloccare l'invio dei
+# messaggi con la 0.0.203 (log: "[send-message] Validation failed"). Il controllo
+# qui replica le regole note dello schema agente, cosi' il guasto si vede all'avvio
+# invece di manifestarsi come TUI muta. STAVROS_SKIP_VET=1 per saltarlo.
+if [[ "${STAVROS_SKIP_VET:-0}" != "1" ]]; then
+  if ! node "$EDITION/tools/vet-agents-vs-freebuff.js"; then
+    die "Schema degli agenti non compatibile con Freebuff $(cat "$HOME/.config/manicode/freebuff-metadata.json" 2>/dev/null | grep -o '"version"[^,]*' || echo '?') — vedi sopra. (STAVROS_SKIP_VET=1 per forzare)"
+  fi
+fi
+
+# --- 5. Chrome per chrome-devtools MCP (warning non bloccante) ---
 CHROME_BIN="$(command -v google-chrome 2>/dev/null || command -v chromium 2>/dev/null || command -v chromium-browser 2>/dev/null || true)"
 if [[ -z "$CHROME_BIN" ]]; then
   warn "Chrome/Chromium non trovato: il server MCP 'chrome-devtools' non partirà."
   warn "Installa Chrome oppure disattiva chrome-devtools in build-agents.mjs (MCP_SERVERS)."
 fi
 
-# --- 5. modello di default (info) ---
-say "Agente root: stavros (orchestratore) — modello scelto dal picker all'avvio di Freebuff."
+# --- 6. modello di default (info) ---
+# Il main agent di Freebuff e' sempre un wrapper bundled derivato dal MODELLO scelto
+# (freebuffModel in settings.json): l'identita' "Stavros" non viene da .agents/, ma dal
+# blocco IDENTITÀ in AGENTS.md e dal router in ~/.AGENTS.md. vedi local/README-local.md
+say "Agente: default del prodotto — per Stavros scrivi '@stavros' come PRIMO messaggio"
+say "Modello: $(node -e 'try{process.stdout.write(require("fs").readFileSync(process.env.HOME+"/.config/manicode/settings.json","utf8").match(/"freebuffModel":\s*"([^"]+)"/)?.[1]??"default")}catch{}' 2>/dev/null)"
+say "Verifica wiring: node tools/check-identity.js"
 say "Avvio: freebuff --cwd $EDITION"
 
 [[ "$CHECK_ONLY" == "1" ]] && exit 0
 
-# --- 6. avvio TUI ---
-exec freebuff --cwd "$EDITION"
+# --- 7. avvio TUI ---
+exec freebuff --cwd "$EDITION" --trust-agents

@@ -56,6 +56,8 @@ APT_PKGS=(
   metasploit-framework netexec impacket-scripts responder evil-winrm enum4linux-ng ldap-utils bloodhound.py certipy-ad
   # wireless (Fase 4 — modalita separata; richiede NIC in monitor mode)
   aircrack-ng reaver hcxdumptool hcxtools wifite
+  # wireless — reti aperte / captive portal (associazione, spoof MAC, sniff, rogue AP)
+  iw wireless-tools macchanger tcpdump tshark dnsmasq hostapd
   # password / creds
   john hashcat hydra medusa cewl crunch
   # wordlist / payload
@@ -81,7 +83,9 @@ if [ "${#MISSING_APT[@]}" -gt 0 ]; then
   info "apt-get update && apt-get install: ${MISSING_APT[*]}"
   if [ -n "$SUDO" ] || [ "$(id -u)" -eq 0 ]; then
     $SUDO apt-get update -y
-    $SUDO apt-get install -y "${MISSING_APT[@]}" || warn "apt install parziale: alcuni pacchetti non trovati (nome diverso su questa release?)"
+    # DEBIAN_FRONTEND noninteractive: tshark apre un debconf prompt (dumpcap non-root) che
+    # altrimenti blocca l'installer in attesa di input.
+    $SUDO DEBIAN_FRONTEND=noninteractive apt-get install -y "${MISSING_APT[@]}" || warn "apt install parziale: alcuni pacchetti non trovati (nome diverso su questa release?)"
   fi
 else
   ok "tutti i pacchetti apt gia presenti"
@@ -331,6 +335,7 @@ for b in nmap masscan naabu sqlmap ghauri nuclei ffuf feroxbuster gobuster wfuzz
          amass theHarvester dnsrecon fierce katana gau waybackurls interactsh-client eyewitness h8mail msfconsole \
          netexec impacket-GetNPUsers impacket-secretsdump impacket-GetUserSPNs certipy responder evil-winrm enum4linux-ng ldapsearch bloodhound-python \
           airodump-ng aireplay-ng airmon-ng aircrack-ng reaver hcxdumptool wifite \
+          iw iwconfig macchanger tcpdump tshark dnsmasq hostapd \
           adb apktool jadx frida objection mitmproxy mitmdump aapt apksigner \
           john hashcat hydra medusa cewl crunch chromium curl; do
   if have "$b"; then

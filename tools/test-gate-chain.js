@@ -212,7 +212,7 @@ console.log('# tools/gate.js — A3 chain/oracle/evidenceQuote checks');
   ok('report gate keeps original checks, appends SA1 chain/oracle/evidenceQuote, then Ondata-6 tail', () => {
     const kinds = gate.GATES.report.checks.map((c) => c.kind);
     assert.deepStrictEqual(kinds.slice(0, 4), ['findings', 'verify', 'noPending', 'coverage']);
-    assert.deepStrictEqual(kinds.slice(4), ['chain', 'oracle', 'evidenceQuote', 'pocReplay', 'chainHead']);
+    assert.deepStrictEqual(kinds.slice(4), ['chain', 'oracle', 'evidenceQuote', 'pocReplay', 'chainHead', 'attackCoverage']);
   });
   ok('runGate(report) returns one result per check', () => {
     const r = gate.runGate('report');

@@ -32,6 +32,13 @@ const { spawn, execFile } = require('child_process');
 const crypto = require('crypto');
 const ccInstance = require('./cc-instance');
 const ccRouter = require('./cc-router'); // WP3..WP7 additive /api/cc/* router
+const { augmentPath } = require('./tool-path');
+
+// The harness resolves binaries through PATH (doctor.js, tool-plane.js, run.js) and every
+// child of this server inherits ours. A dashboard started from a tray/autostart gets the
+// SYSTEM path, which hides ~/go/bin and ~/.local/bin: installed tools would be reported as
+// missing and dispatched jobs would die with "not found". Fix it once, here, for every child.
+augmentPath(process.env);
 
 const TOOLS_DIR = __dirname;
 const ROOT = path.join(TOOLS_DIR, '..');

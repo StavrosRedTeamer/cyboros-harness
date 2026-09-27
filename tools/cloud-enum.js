@@ -135,7 +135,9 @@ async function enumIam(provider, opts) {
   return { ok: true, provider, loot_id: key.loot_id, results: out };
 }
 
-module.exports = { classify, candidates, bucketUrls, classifyBucketResult, probeBuckets, iamReadCommands, enumIam, readLootKey };
+// probeUrl: the scope-safe GET primitive, exported so other clouds (e.g. mobile firebase-audit)
+// reuse ONE implementation instead of duplicating the scope-guard + resolveAndGuard path.
+module.exports = { classify, candidates, bucketUrls, classifyBucketResult, probeBuckets, iamReadCommands, enumIam, readLootKey, probeUrl: realProbe };
 
 // ---- CLI --------------------------------------------------------------------
 async function main() {

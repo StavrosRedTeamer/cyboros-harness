@@ -6,18 +6,21 @@
 name: recon-baseline
 description: Baseline di ricognizione su un target autorizzato (host discovery + top ports)
 vars:
-  ports: "1-1000"
+  ports: "1000"   # --top-ports vuole un NUMERO di porte, non un intervallo ("1-1000" non e' valido)
 requires:
   - nmap
 steps:
+  # NB: -oN/-oG scrivono gli artefatti DICHIARATI qui sotto. Senza flag di output nmap manda
+  # tutto su stdout e il workflow registrava artifact inesistenti (exists:false) con i dati
+  # persi. Stessa cosa in scansione: il dato va su file per essere ledgerato/ingerito.
   - id: host-discovery
-    cmd: node tools/run.js nmap -sn {target}
+    cmd: node tools/run.js nmap -sn {target} -oN reports/recon-{target}-discovery.txt
     on_error: continue
     artifacts:
       - path: reports/recon-{target}-discovery.txt
         surface: scan
   - id: top-ports
-    cmd: node tools/run.js nmap -Pn --top-ports {ports} {target}
+    cmd: node tools/run.js nmap -Pn --top-ports {ports} -oG reports/recon-{target}-topports.gnmap {target}
     when:
       exit_code: [0, 1]   # nmap esce 1 se l'host non risponde al ping sweep: prosegue comunque
     artifacts:

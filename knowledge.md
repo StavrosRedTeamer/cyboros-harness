@@ -64,6 +64,7 @@ independently of you (scope-guard/run/c2-guard/wifi-guard — all fail-closed).
 | h8mail | breach OSINT (dominio checkato) | `node tools/run.js h8mail -t <email> -sk -j reports/tmp/h8mail-<ts>.json` |
 | record-finding | registra finding (dedup, redact, loot vault) — per OGNI finding | `node tools/record-finding.js '{...}'` |
 | egress/wifi/host-exploit | egress+OPSEC · wireless · C2/post-ex/privesc | vedi docs/{egress-opsec,wireless,host-exploitation}.md |
+| portal | captive portal: fingerprint controller + superfici di bypass (read-only) + awareness hosting (confirm-tier) — scope.json | `node tools/portal.js probe\|analyze <url>` / `serve --confirm "<reason>"` |
 
 ## Pipeline deterministica (recon/scan/enumerate)
 
@@ -176,7 +177,8 @@ For every verified finding, `node tools/gen-poc.js <id|--latest>` writes a Pytho
 
 `node tools/gate.js status <host>` mostra i gate passati; `pass <phase>` quando i criteri strutturali
 valgono (recon → map → test → authed → chains → report). Gate P3: findings registrati, ≥1 verified,
-nessuno pending, coverage matrix completa (`node tools/coverage.js <host> --write`). No P3 → no report-html.
+nessuno pending, coverage matrix completa (`node tools/coverage.js <host> --write`) + matrice ATT&CK
+(`node tools/attack-coverage.js --write`). No P3 → no report-html.
 
 ## Dove sta il dettaglio (map)
 
@@ -188,5 +190,5 @@ con `node tools/kb-search.js "query"` (indicizza knowledge.md + `docs/**/*.md`).
 | docs/toolbox.md | Flag completi per-tool (repeater, jwt, cors/csp/header-check/desync, oob, dom-check+obscura, graphql, chain/cvss/epss/threatintel, searchsploit, wp-check, record-finding) |
 | docs/host-exploitation.md | Host exploitation (sessions/c2-guard/msf/sliver/sshx/privesc/hardware) + threat intel (repo-vet, Nethsecurity, SKELETONKEY/chimera, watchlist, Havoc CDN) |
 | docs/egress-opsec.md | Egress gateway, chained SOCKS5, `check`, OPSEC posture |
-| docs/wireless.md | Modalità wireless completa (wifi-guard, wifi.js, tier model, findings) |
+| docs/wireless.md | Modalità wireless completa (wifi-guard, wifi.js open/join/mac/sniff/rogue, portal.js probe/analyze/serve, tier model, findings) |
 | docs/methodology-classes.md | Testing by class dettagliato (BOLA/BFLA, SSRF/XXE, SSTI/deser, upload, race, JWT, CORS, CSP, WS, authn, csrf, cloud, LLM/ASI) |

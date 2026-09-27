@@ -1,0 +1,29 @@
+# Workflow seed — enum-container (dialetto workflow, Ondata servizi P1.2)
+# Docker API (2375/2376) + kubelet (10250/10255): SOLO presence probe GET (version/pods).
+# on_error continue: un endpoint assente non deve fermare gli altri. L'output dei probe
+# alimenta l'ingest 'container' in target-model (P1.4).
+name: enum-container
+description: Presence probe container/K8s autorizzati (docker /version + kubelet /pods, read-only)
+vars:
+  out: reports
+requires:
+  - curl
+steps:
+  - id: docker-version-probe
+    cmd: node tools/run.js curl -s http://{target}:2375/version
+    on_error: continue
+    artifacts:
+      - path: "{out}/enum-{target}-docker.txt"
+        surface: scan
+  - id: kubelet-pods-probe
+    cmd: node tools/run.js curl -sk https://{target}:10250/pods
+    on_error: continue
+    artifacts:
+      - path: "{out}/enum-{target}-kubelet.txt"
+        surface: scan
+  - id: kubelet-readonly-pods-probe
+    cmd: node tools/run.js curl -s http://{target}:10255/pods
+    on_error: continue
+    artifacts:
+      - path: "{out}/enum-{target}-kubelet-ro.txt"
+        surface: scan

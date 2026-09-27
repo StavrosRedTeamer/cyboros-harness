@@ -1013,7 +1013,8 @@ function cmdkActions() {
     { kind: 'tab', label: 'Graph', run: () => switchTab('graph') },
     { kind: 'tab', label: 'Coverage', run: () => switchTab('coverage') },
     { kind: 'tab', label: 'Scope', run: () => switchTab('scope') },
-    { kind: 'tab', label: 'Control (config/team/arsenal/knowledge/radar/doctor)', run: () => switchTab('control') },
+    { kind: 'tab', label: 'Arsenal (tools of this device + install missing)', run: () => switchTab('arsenal') },
+    { kind: 'tab', label: 'Control (config/team/knowledge/radar/doctor)', run: () => switchTab('control') },
     { kind: 'tab', label: 'Reports', run: () => switchTab('reports') },
     { kind: 'tab', label: 'Freebuff terminal', run: () => switchTab('freebuff') },
     { kind: 'action', label: 'Refresh current tab', run: () => renderTab(activeTab) },
@@ -1095,6 +1096,7 @@ function renderTab(tab) {
   else if (tab === 'graph') { showSkeleton('graph'); renderGraphTab(); }
   else if (tab === 'coverage') { showSkeleton('coverage'); renderCoverageTab(); }
   else if (tab === 'scope') { showSkeleton('scope'); api('/api/scope').then(renderScope).catch((e) => toast(String(e.message || e), 'err')); }
+  else if (tab === 'arsenal') { showSkeleton('arsenal'); renderArsenalTab(); }
   else if (tab === 'control') { showSkeleton('control'); renderControlTab(); }
   else if (tab === 'reports') { showSkeleton('reports'); api('/api/reports').then(renderReports).catch((e) => toast(String(e.message || e), 'err')); }
   else if (tab === 'freebuff') renderFreebuffTab();

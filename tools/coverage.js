@@ -30,6 +30,18 @@ const CLASSES = [
   'chain', 'cloud', 'network', 'wireless', 'postex',
 ];
 
+// Superfici introdotte dal piano servizi che NON sono classi web (container/K8s, mobile) e che
+// entrano nella matrice SOLO dove la superficie esiste davvero: candidato esplicito nella map,
+// finding registrato, entità tipizzata o (container) porta aperta passata in opts.ports.
+// Così un host web resta byte-identico (le classi extra non aggiungono righe 'missed' finte) e
+// la matrice non dichiara copertura di una superficie mai testata. ADDITIVO per costruzione.
+const EXTRA_CLASSES = ['container', 'mobile'];
+const CONTAINER_PORTS = [2375, 2376, 10250, 10255];
+
+function hasContainerSurface(ports) {
+  return (ports || []).some((p) => CONTAINER_PORTS.includes(Number(p && typeof p === 'object' ? p.port : p)));
+}
+
 function loadJsonl(file) {
   try {
     return fs.readFileSync(file, 'utf8').split('\n').filter(Boolean).map((l) => JSON.parse(l));
@@ -49,6 +61,10 @@ function classOf(f) {
   // F4 (Ondata 4): preferisce il testo umano (title/type) al solo ID CWE — un titolo
   // "SQL injection" con cwe "CWE-89" deve classificarsi sqli, non 'other'. Fallback al cwe
   // solo quando non c'è testo. Miglioramento puro: nulla di corretto prima diventa errato.
+  // Il campo `class` esplicito (già validato contro la tassonomia da record-finding.js) vince
+  // sull'euristica testuale: un finding registrato come authz non deve finire in 'logic' solo
+  // perché il titolo contiene "business logic". Classi fuori tassonomia (es. 'info') proseguono.
+  if (typeof f.class === 'string' && CLASSES.includes(f.class)) return f.class;
   const t = String(f.title || f.type || f.cwe || '').toLowerCase();
   if (/sql|sqli/.test(t)) return 'sqli';
   if (/xss/.test(t)) return 'xss';
@@ -70,6 +86,10 @@ function classOf(f) {
   if (/network|port|smb|nfs/.test(t)) return 'network';
   if (/wireless|wifi|wpa/.test(t)) return 'wireless';
   if (/post|exfil|lateral|persist/.test(t)) return 'postex';
+  // Extra surfaces (P1.4/M.4) — after every web/host class so existing classifications are
+  // untouched; a title that already matched an earlier class keeps it.
+  if (/container|docker|kubelet|kubernetes|k8s/.test(t)) return 'container';
+  if (/deeplink|\bexported\b|\bandroid\b|\bapk\b|\bfrida\b/.test(t)) return 'mobile';
   return 'other';
 }
 
@@ -112,7 +132,16 @@ function buildMatrix(host, opts) {
       if (e.entityType === 'Finding' && ['confirmed', 'verified'].includes(e.status)) entByClass[cls].confirmed = true;
     }
   }
-  const rows = CLASSES.map((cls) => {
+  // Classi extra incluse solo quando rilevanti (vedi EXTRA_CLASSES): map/finding/entità/
+  // porta container/mobile esplicito. Senza opts, `classes` coincide con CLASSES.
+  const extra = EXTRA_CLASSES.filter((c) =>
+    candidates[c] !== undefined
+    || (byClass[c] && byClass[c].length)
+    || (entByClass[c] && entByClass[c].present)
+    || (c === 'container' && hasContainerSurface(opts.ports))
+    || (c === 'mobile' && !!opts.mobile));
+  const classes = CLASSES.concat(extra);
+  const rows = classes.map((cls) => {
     const raw = candidates[cls] ?? candidates[cls + 's'];
     const parsed = raw === undefined ? { candidates: 0, skip_reason: null } : parseCandidateEntry(raw);
     const cand = parsed.candidates;
@@ -164,4 +193,4 @@ function main() {
 
 if (require.main === module) main();
 
-module.exports = { CLASSES, buildMatrix, classOf, matrixTable };
+module.exports = { CLASSES, EXTRA_CLASSES, CONTAINER_PORTS, hasContainerSurface, buildMatrix, classOf, matrixTable };

@@ -418,10 +418,10 @@ reports:
     assert.strictEqual(checks[1].declared, true);
     // report gate: nessun check kind 'file' hardcoded (coverage è kind dedicato) → i report
     // dichiarati vengono APPESI; i 3 check SA1 restano identici e contigui, seguiti dalla coda
-    // Ondata 6 (pocReplay, chainHead) e infine dai file dichiarati.
+    // Ondata 6 (pocReplay, chainHead), la coda P0 (attackCoverage) e infine dai file dichiarati.
     const repChecks = gateLib.gateChecks('report', wf);
     const repKinds = repChecks.map((c) => c.kind);
-    assert.deepStrictEqual(repKinds, ['findings', 'verify', 'noPending', 'coverage', 'chain', 'oracle', 'evidenceQuote', 'pocReplay', 'chainHead', 'file', 'file']);
+    assert.deepStrictEqual(repKinds, ['findings', 'verify', 'noPending', 'coverage', 'chain', 'oracle', 'evidenceQuote', 'pocReplay', 'chainHead', 'attackCoverage', 'file', 'file']);
     assert.ok(repChecks.some((c) => c.kind === 'chain' && c.hint.includes('hash-chain')));
     assert.ok(repChecks.some((c) => c.kind === 'oracle'));
     assert.ok(repChecks.some((c) => c.kind === 'evidenceQuote'));

@@ -10,6 +10,9 @@
     "test": "node tools/run-tests.js",
     "test:all": "node tools/run-tests.js --e2e",
     "test:list": "node tools/run-tests.js --list",
-    "console": "node tools/gui-server.js"
+    "console": "node tools/gui-server.js",
+    "radar": "node tools/radar.js run",
+    "galaxy": "node tools/attack-galaxy.js",
+    "doctor": "node tools/doctor.js"
   }
 }

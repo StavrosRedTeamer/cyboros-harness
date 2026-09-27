@@ -112,11 +112,24 @@
   methodology pointers. `map.js candidates <host>` returns a `refs` block per class (testers read the
   standard first); `record-finding.js` accepts `"class":"idor"` (validated against the registry) and
   auto-attaches a `standards` block (or derives it from `cwe`). Unknown class = recording refused.
+- **ATT&CK coverage matrix:** `node tools/attack-coverage.js [--host <h>] [--json] [--write]` — the
+  offensive-coverage view per MITRE ATT&CK technique, from `test-registry.json` (`attack` per class +
+  `extra_surfaces`). PLANNED = techniques reachable by a harness class; EXECUTED = techniques recorded
+  on `findings.jsonl` (an explicit `technique: T####` wins, otherwise the finding's `class` is mapped
+  through the same registry). `--write` emits `reports/attack-matrix.md` — a report-gate (P3) input;
+  run it before the report gate, like `coverage.js <host> --write`.
 - **Knowledge retrieval:** `node tools/kb-search.js index` builds an FTS5 index over `knowledge.md` +
   `docs/**/*.md` (`--docs` adds `reports/*.md`); `node tools/kb-search.js "query terms" [--limit N]`
   returns heading-scoped snippets — use it instead of re-reading the whole methodology.
 - **HTML report:** `node tools/report-html.js [--findings <f>] [--state <db>] [--sploit <j>] [--out <f>]`
   -> standalone HTML (severity + CVSS + CWE + EPSS + chains + recon). Markdown remains the source of truth.
+- **Attack galaxy (shape view):** `node tools/attack-galaxy.js [--findings <f>] [--out <f>] [--host <h>]`
+  -> `reports/attack-galaxy.html`, a self-contained force graph of the engagement: host nodes sized by
+  finding count, finding nodes coloured by severity, magenta edges = the attack chains `chain.js` found.
+  Drag/pan/zoom, click for the full PoC + remediation, filter by severity, chain membership or day.
+  `--print` dumps the host rollup on stdout. Zero deps and ZERO egress: no CDN, no remote font, no
+  remote asset of any kind (asserted by `test-attack-galaxy.js`), so the file works air-gapped; the
+  layout seed is derived from the corpus, so the same findings always draw the same picture.
 - **Breach hunting (OSINT):** `node tools/run.js h8mail -t <email> -sk -j reports/tmp/h8mail-<ts>.json`
   — lookup email/password nei breach (HIBP v3, Snusbase, Leak-Lookup, Hunter.io o dump locali via
   `-lb`/`-bc`/`-gz`; BSD-3). run.js estrae il **dominio** da `user@dom` (args, stdin, file `-t`) e lo
@@ -130,3 +143,26 @@
   EVERY confirmed finding. If a finding carries a `secret` field (a looted hash/key/token), the raw
   material is written to the gitignored loot vault `reports/loot.jsonl` and the finding keeps only a
   `secret_fingerprint` + `loot_id` — never put raw secrets anywhere else.
+- **Active Directory orchestrator:** `node tools/ad.js <op> <host> [opts]` — structured, scope + tier
+  gated AD front end (the AD analog of wifi.js; see docs/host-exploitation.md for relay/coercion).
+  Ops: `enum` `roast` `adcs` `bloodhound` `enum-relay` `enum-coerce` `enum-delegation` `enum-mssql`
+  (AUTO) · `dcsync` `secretsdump` `coerce` `relay` (CONFIRM, need `--confirm "<reason>"`;
+  coerce/relay also need a listener registered in `reports/sessions.json`). Passwords via `--pass-file`.
+- **Service-surface planner + workflows:** `next-actions.js` proposes single read-only presence probes
+  for open non-HTTP ports (21 ftp, 161 snmp, 1433 mssql, 2049 nfs, 2375/2376 docker, 6379 redis,
+  9200/9300 elasticsearch, 10250/10255 kubelet, 27017 mongo) — one request each, no credentials, and an
+  action is suppressed when the port is already covered. The proposals target the `workflows/enum-*.yaml`
+  seeds (`enum-redis`, `enum-mongo`, `enum-container`, `enum-snmp`, `enum-mssql`); run one with
+  `node tools/workflow.js run workflows/enum-<x>.yaml -t <host>` (dry-run supported). Container/K8s
+  output is ingested with `node tools/target-model.js ingest container <file> --target <host>` and shows
+  as the `container` coverage row.
+- **Subdomain takeover + DNS hygiene:** `node tools/takeover.js scan <domain>` (detection-only, read-only)
+  — reuses existing recon subs (no new massive resolution), resolves CNAME/HTTP against provider
+  placeholder fingerprints, and runs SPF/DMARC/AXFR/wildcard checks; writes `reports/takeover-<domain>.json`.
+  Takeover claims are `suspected` + single-request verify; the claim-check PoC stays a manual operator step.
+- **Mobile (Android):** `node tools/mobile.js <check|status|static|surface|fetch-apk|firebase-audit|install|shell|frida|intercept|ca-install|reset>`.
+  Targets are packages/adb serials/APK hashes from `mobile-scope.json` (separate scope, fail-closed).
+  `fetch-apk` downloads only from a declared `apk_sources` URL and refuses on sha256 mismatch;
+  `frida` picks the hook from the static pass (Flutter → `disable-flutter-tls.js`, PairIP → repack hint);
+  `surface` records exported components/deeplinks into `reports/<pkg>-map.json`; `firebase-audit` does
+  ONE read-only existence probe per Firebase asset. Full detail in docs/mobile.md.

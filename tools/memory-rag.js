@@ -6,10 +6,17 @@
 // semantica (stack tecnologico + ostacolo), non solo per keyword. Il DB risiede nel workspace
 // (memory/rag-store.jsonl, committato e sanificato) — zero servizi cloud, zero dipendenze npm.
 //
-// Embedding: feature hashing (FNV-1a) su token + bigram, DIM=512, L2-normalizzato. Deterministico,
-// offline, senza modelli esterni — la similarità coseno su hashing N-gram cattura l'overlap
-// lessicale stack/tecnica che serve al recall ("spring boot waf union" ≈ "springboot waf union select").
-// Design vincolato dal repo: ZERO dipendenze runtime (niente chromadb/sqlite-vec/hnswlib-node).
+// Embedding LESSICALE (default): feature hashing (FNV-1a) su token + bigram, DIM=512,
+// L2-normalizzato. Deterministico, offline, senza modelli esterni — la similarità coseno su
+// hashing N-gram cattura l'overlap lessicale stack/tecnica ("spring boot waf union" ≈
+// "springboot waf union select"). ZERO dipendenze runtime.
+//
+// Embedding DENSE SEMANTICO (opzionale, IBRIDO): se STAVROS_EMBED_URL è impostato
+// (tools/embeddings.js → un modello locale servito su /v1/embeddings, es. bge-m3), ogni record
+// porta anche `dvec` e il recall FONDE dense+lessicale (peso STAVROS_RAG_ALPHA, default 0.6).
+// Così matcha per SIGNIFICATO (parafrasi, sinonimi, IT/EN/ZH), non solo per parole comuni.
+// A prova di fallimento: se il backend è giù/assente, si ricade sul lessicale (nessuna regressione).
+// Backfill dei record esistenti: `node tools/memory-rag.js reembed`.
 //
 // Commands:
 //   store  --file <json> | --stdin      valida+sanifica+embedda e appende (record vettoriale)
@@ -33,6 +40,7 @@
 const fs = require('fs');
 const path = require('path');
 const mem = require('./memory'); // riuso il sanitizer e i parser jsonl (fonte unica delle garanzie)
+const emb = require('./embeddings'); // backend dense SEMANTICO opzionale (fallback lessicale)
 
 const ROOT = path.resolve(__dirname, '..');
 const MEMORY_DIR = process.env.STAVROS_MEMORY_DIR || path.join(ROOT, 'memory');
@@ -42,6 +50,22 @@ const INDEX_FILE = 'RAG-INDEX.md';
 const DIM = 512;
 const DEFAULT_LIMIT = 3;          // il plan: top-3 risultati
 const MIN_SCORE = 0.05;           // sotto questa similarità il hit è rumore: non restituito
+// Peso del segnale DENSE nella fusione ibrida (dense semantico vs lessicale). 0=solo lessicale,
+// 1=solo dense. Configurabile via STAVROS_RAG_ALPHA. Usato solo quando il dense è disponibile.
+const DENSE_ALPHA = Math.min(1, Math.max(0, parseFloat(process.env.STAVROS_RAG_ALPHA || '0.6')));
+
+// Testo compatto da dare all'embedder dense: ripete stack/classe (le chiavi del recall) e
+// aggiunge ostacolo+soluzione (il contenuto). Un'unica stringa per record e per query.
+function denseText(rec) {
+  const tags = Array.isArray(rec.tags) ? rec.tags.join(' ') : (rec.tags || '');
+  return [
+    rec.vulnerability_class ? `class: ${rec.vulnerability_class}` : '',
+    rec.target_stack ? `stack: ${rec.target_stack}` : '',
+    tags ? `tags: ${tags}` : '',
+    rec.obstacle ? `obstacle: ${rec.obstacle}` : '',
+    rec.solution ? `solution: ${rec.solution}` : '',
+  ].filter(Boolean).join('. ');
+}
 
 // ---------- embedding: feature hashing (FNV-1a 32-bit) ----------
 function fnv1a32(str) {
@@ -121,7 +145,7 @@ function validateEntry(e) {
   return errs;
 }
 
-function storeEntry(dir, input) {
+function storeEntry(dir, input, extra = {}) {
   const errs = validateEntry(input);
   if (errs.length) throw new Error('validazione fallita:\n  - ' + errs.join('\n  - '));
   const rec = {
@@ -137,6 +161,10 @@ function storeEntry(dir, input) {
     status: 'active',
     sanitized: true,
     vec: null,
+    // dense semantico opzionale: number[] L2-normalizzato, oppure null (fallback lessicale).
+    // Calcolato async dal chiamante (CLI) e passato qui già pronto per tenere storeEntry sincrono.
+    dvec: Array.isArray(extra.dvec) && extra.dvec.length ? extra.dvec : null,
+    dmodel: extra.dvec ? (extra.dmodel || null) : null,
   };
   // stesso sanitizer delle lezioni: niente host in scope / IP / email / token / credenziali
   const probe = { ...rec, vec: undefined };
@@ -166,25 +194,71 @@ function nextId(records) {
 }
 
 // ---------- recall ----------
+// Sincrono. Lessicale di default; IBRIDO se opts.qDense (vettore dense della query, calcolato
+// async dal chiamante) è presente: fonde dense semantico + lessicale con peso opts.alpha.
 function recallEntries(dir, query, opts = {}) {
   const limit = opts.limit || DEFAULT_LIMIT;
+  const alpha = (opts.alpha != null) ? opts.alpha : DENSE_ALPHA;
   const qVec = embedQuery(query);
+  const qDense = Array.isArray(opts.qDense) && opts.qDense.length ? opts.qDense : null;
   const qTokens = new Set(tokenize(query));
   const out = [];
   for (const rec of mem.readJsonl(memPath(dir, STORE_FILE))) {
     if (rec.status !== 'active') continue;
     if (opts.cls && String(rec.vulnerability_class).toUpperCase() !== opts.cls.toUpperCase()) continue;
-    const score = cosine(qVec, rec.vec);
-    if (score < MIN_SCORE) continue;
+    const lex = cosine(qVec, rec.vec);
+    // fusione ibrida solo se ho il dense sia per la query che per il record
+    let base = lex, dense = null, mode = 'lex';
+    if (qDense && Array.isArray(rec.dvec) && rec.dvec.length === qDense.length) {
+      dense = emb.denseCosine(qDense, rec.dvec);
+      base = alpha * dense + (1 - alpha) * lex;
+      mode = 'hybrid';
+    }
+    if (base < MIN_SCORE) continue;
     // bonus deterministico per overlap lessicale esplicito (stack/classe citati nella query)
     const recTokens = new Set([
       ...tokenize(rec.target_stack), ...tokenize(rec.vulnerability_class), ...(rec.tags || []),
     ]);
     let overlap = 0;
     for (const t of qTokens) if (recTokens.has(t)) overlap++;
-    out.push({ rec, score: score + overlap * 0.05, base: score });
+    out.push({ rec, score: base + overlap * 0.05, base, lex, dense, mode });
   }
   return out.sort((a, b) => b.score - a.score).slice(0, limit);
+}
+
+// Async: calcola il dense della query (se il backend è attivo) e delega a recallEntries.
+// I wrapper (recall CLI, memory-recall.js) usano questo per avere l'ibrido automaticamente.
+async function recallHybrid(dir, query, opts = {}) {
+  let qDense = null;
+  if (emb.isEnabled()) {
+    try { qDense = await emb.embedOne(denseText({ solution: query, target_stack: '', vulnerability_class: '' })); }
+    catch { qDense = null; }
+  }
+  return recallEntries(dir, query, { ...opts, qDense });
+}
+
+// Async: (ri)calcola il dense per i record dello store. Backfill dopo aver attivato il backend,
+// o dopo aver cambiato modello. force=true ricalcola tutti; altrimenti solo quelli senza dvec.
+async function reembedAll(dir, { force = false } = {}) {
+  if (!emb.isEnabled()) throw new Error('backend dense non configurato (STAVROS_EMBED_URL). Niente da fare.');
+  const file = memPath(dir, STORE_FILE);
+  const store = mem.readJsonl(file);
+  const targets = store.filter((r) => force || !Array.isArray(r.dvec) || !r.dvec.length);
+  if (!targets.length) return { updated: 0, total: store.length, skipped: store.length };
+  const model = emb.cfg().model;
+  const BATCH = 32;
+  let updated = 0;
+  for (let i = 0; i < targets.length; i += BATCH) {
+    const chunk = targets.slice(i, i + BATCH);
+    const vecs = await emb.embedTexts(chunk.map(denseText));
+    if (!vecs) throw new Error('embedding fallito durante il reembed (endpoint giù?). Nessuna modifica scritta.');
+    chunk.forEach((r, k) => { r.dvec = vecs[k]; r.dmodel = model; updated++; });
+  }
+  const tmp = file + '.tmp';
+  fs.writeFileSync(tmp, store.map((r) => JSON.stringify(r)).join('\n') + '\n');
+  fs.renameSync(tmp, file);
+  rebuildIndex(dir);
+  return { updated, total: store.length, model };
 }
 
 // ---------- lifecycle / index / stats ----------
@@ -204,8 +278,11 @@ function retireEntry(dir, id, reason) {
 
 function fmtHit(hit) {
   const r = hit.rec;
+  const modeTag = hit.mode === 'hybrid'
+    ? ` (ibrido d=${(hit.dense ?? 0).toFixed(2)}/l=${(hit.lex ?? 0).toFixed(2)})`
+    : '';
   const lines = [
-    `[${r.id}] score=${hit.score.toFixed(2)} │ ${r.vulnerability_class} │ ${r.target_stack}` +
+    `[${r.id}] score=${hit.score.toFixed(2)}${modeTag} │ ${r.vulnerability_class} │ ${r.target_stack}` +
       (r.tags && r.tags.length ? ` │ tags:${r.tags.join(',')}` : ''),
   ];
   if (r.obstacle) lines.push(`  obstacle: ${r.obstacle}`);
@@ -244,6 +321,8 @@ function stats(dir) {
     retired: count((r) => r.status === 'retired'),
     with_obstacle: count((r) => !!r.obstacle),
     with_poc: count((r) => !!r.poc_snippet),
+    with_dense: count((r) => Array.isArray(r.dvec) && r.dvec.length),
+    dense_backend: emb.isEnabled() ? emb.cfg().model : 'disabilitato (lessicale)',
   };
 }
 
@@ -260,21 +339,34 @@ function optValue(argv, flag, dflt) {
 }
 function hasFlag(argv, f) { return argv.includes(f); }
 
-function main() {
+async function main() {
   const argv = process.argv.slice(2);
   const cmd = argv[0];
   const dir = MEMORY_DIR;
   try {
     switch (cmd) {
       case 'store': {
-        const rec = storeEntry(dir, readInputJson(argv));
-        console.log(JSON.stringify({ ok: true, id: rec.id, class: rec.vulnerability_class, nnz: rec.vec.length }, null, 2));
+        const input = readInputJson(argv);
+        // dense opzionale: calcolato PRIMA (async) e passato a storeEntry (sincrono).
+        let extra = {};
+        if (emb.isEnabled()) {
+          const probe = { ...input, vulnerability_class: String(input.vulnerability_class || '').toUpperCase() };
+          const dv = await emb.embedOne(denseText(probe)).catch(() => null);
+          if (dv) extra = { dvec: dv, dmodel: emb.cfg().model };
+        }
+        const rec = storeEntry(dir, input, extra);
+        console.log(JSON.stringify({ ok: true, id: rec.id, class: rec.vulnerability_class, nnz: rec.vec.length, dense: !!rec.dvec }, null, 2));
+        break;
+      }
+      case 'reembed': {
+        const res = await reembedAll(dir, { force: hasFlag(argv, '--force') });
+        console.log(JSON.stringify({ ok: true, ...res }, null, 2));
         break;
       }
       case 'recall': {
         const query = argv[1] && !argv[1].startsWith('--') ? argv[1] : '';
         if (!query.trim()) throw new Error('serve una query: recall "<stack tecnologico + ostacolo>"');
-        const hits = recallEntries(dir, query, {
+        const hits = await recallHybrid(dir, query, {
           cls: optValue(argv, '--class', null),
           limit: parseInt(optValue(argv, '--limit', String(DEFAULT_LIMIT)), 10),
         });
@@ -305,7 +397,11 @@ function main() {
           '  node tools/memory-rag.js store --file entry.json | --stdin',
           '  node tools/memory-rag.js recall "<query>" [--class c] [--limit n] [--json]',
           '  node tools/memory-rag.js retire RAG-0007 [--reason s]',
+          '  node tools/memory-rag.js reembed [--force]   # (ri)calcola i vettori dense semantici',
           '  node tools/memory-rag.js stats | index',
+          '',
+          'Dense semantico (opzionale): imposta STAVROS_EMBED_URL (es. http://127.0.0.1:8081/v1/embeddings)',
+          'per attivare il recall IBRIDO. Senza, il RAG resta lessicale (nessuna regressione).',
         ].join('\n'));
         process.exit(cmd ? 1 : 0);
     }
@@ -316,9 +412,9 @@ function main() {
 }
 
 module.exports = {
-  storeEntry, recallEntries, retireEntry, rebuildIndex, stats,
-  embedRecord, embedQuery, cosine, tokenize, fnv1a32,
-  STORE_FILE, INDEX_FILE, DIM, DEFAULT_LIMIT, MIN_SCORE,
+  storeEntry, recallEntries, recallHybrid, reembedAll, retireEntry, rebuildIndex, stats,
+  embedRecord, embedQuery, cosine, tokenize, fnv1a32, denseText,
+  STORE_FILE, INDEX_FILE, DIM, DEFAULT_LIMIT, MIN_SCORE, DENSE_ALPHA,
 };
 
 if (require.main === module) main();

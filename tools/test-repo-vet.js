@@ -222,6 +222,11 @@ const tmpFile = (...names) => path.join(TMP, ...names);
     assert.strictEqual(refs.wstg[0], 'WSTG-ATHZ-04');
     assert.strictEqual(refs.owasp_api[0], 'API1');
     assert.strictEqual(M.refsFor('no-such-class'), null);
+    // G3: map.js CLASSES is the single source of truth (derived from the registry) plus the
+    // non-web coverage surfaces mobile/container that coverage.js tracks as EXTRA_CLASSES.
+    assert.ok(M.CLASSES.includes('redirect') && M.CLASSES.includes('wireless'), 'map classes include registry classes');
+    assert.ok(M.CLASSES.includes('mobile') && M.CLASSES.includes('container'), 'map keeps non-web coverage surfaces');
+    assert.ok(M.validate({ host: 'h', path: '/x', candidates: { redirect: ['next'], wireless: ['ssid'] } }) === null, 'portal/wireless candidate classes accepted');
     const RF = require('./record-finding');
     assert.ok(RF.registryClasses().includes('idor'));
     assert.strictEqual(String(RF.validate({ severity: 'High', title: 't', host: 'h', poc: 'p', class: 'bogus' })).startsWith('unknown class'), true);
@@ -229,6 +234,12 @@ const tmpFile = (...names) => path.join(TMP, ...names);
     assert.strictEqual(st.class, 'sqli');
     assert.deepStrictEqual(st.wstg, ['WSTG-INPV-05']);
     assert.strictEqual(RF.standardsFor({ class: 'idor', standards: { class: 'custom' } }).class, 'custom', 'operator-provided standards win');
+    // G2: wireless finding classes (open network / weak cipher / WPS) reverse-map from their CWE.
+    const wl = RF.standardsFor({ cwe: 'CWE-326' });
+    assert.strictEqual(wl.class, 'wireless');
+    assert.strictEqual(wl.wstg[0], 'WSTG-CRYP-01');
+    assert.strictEqual(RF.standardsFor({ cwe: 'CWE-311' }).class, 'wireless');
+    assert.ok(!String(RF.validate({ severity: 'Medium', title: 't', host: 'h', poc: 'p', class: 'wireless' }) || '').includes('unknown class'), 'wireless is a known class');
   }
 
   // ---------- QW10: kb-search ----------

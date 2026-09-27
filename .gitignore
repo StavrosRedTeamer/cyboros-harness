@@ -23,18 +23,41 @@ residue.md
 evidence/
 engagements/
 recon/
+# Probe one-off: contengono target/host/session-key reali.
+# Nota: il trattino in "probe-*" non copriva "probe_ajax.py" — da qui il secondo pattern.
 scripts/probe-*.py
+scripts/probe_*.py
+scripts/debug_session.py
+scripts/record-*-findings.js
+# Dump di sessione/engagement grezzi (tracciato di un device reale, id installazione,
+# chiavi di sessione). I tool generici stanno in tools/.
+freebuff-blocchi-*.txt
 
 # Tool vendored (binari grandi, obscura/frida) e mirror: mai nel repo
 vendor/
 
 # Runtime
+# Self-referential symlink accidentalmente creato dentro il progetto (recursione scan)
+Scrivania
+# temp/ = dump di lavoro per-engagement (apk decompilati, HTML di target, cache,
+# evidenze, IP/host reali). Non è "temporaneo": contiene dati cliente. Mai nel repo.
+temp/
+# Backup di scope con target reali (scope.*.bak.json): solo *.example.json è versionato.
+scope.*.bak.json
 tools/.pace.json
 tools/.test-routes.txt
 node_modules/
 npm-debug.log*
 __pycache__/
 *.pyc
+
+# Command Center — engagement data (client names, RoE contacts, approvals).
+# These are local engagement state: never commit them.
+campaign.json
+campaigns/
+reports/approvals.jsonl
+reports/campaign-history.jsonl
+reports/app/
 
 # OS
 .DS_Store

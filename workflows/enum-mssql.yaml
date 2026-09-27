@@ -1,0 +1,24 @@
+# Workflow seed — enum-mssql (dialetto workflow, Ondata servizi P1.2)
+# Audit MSSQL read-only: login validi, cataloghi e permessi IMPERSONATE (modulo mssql_priv
+# di netexec, detection-only). Un "can impersonate" registra il finding che il planner
+# (next-actions) usa per proporre la catena coercion→relay (sempre confirm-tier su ad.js).
+name: enum-mssql
+description: Enumerazione MSSQL autorizzata (login/db/impersonation audit, read-only)
+vars:
+  out: reports
+requires:
+  - netexec
+steps:
+  - id: mssql-users-dbs
+    cmd: node tools/run.js netexec mssql {target} -u '' -p '' --users --db
+    on_error: continue
+    artifacts:
+      - path: "{out}/enum-{target}-mssql.txt"
+        surface: scan
+  - id: mssql-impersonation-audit
+    cmd: node tools/run.js netexec mssql {target} -u '' -p '' -M mssql-priv
+    when:
+      exit_code: [0, 1, 2]
+    artifacts:
+      - path: "{out}/enum-{target}-mssql-priv.txt"
+        surface: scan

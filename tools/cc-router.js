@@ -198,7 +198,31 @@ async function handle(req, res, ctx) {
   if (url === '/api/cc/arsenal' && req.method === 'GET') {
     const plane = u.runToolJson([path.join('tools', 'tool-plane.js'), 'table']);
     const doctor = u.runToolJson([path.join('tools', 'doctor.js'), '--json']);
-    return send(res, 200, { tool_plane: plane.json || { raw: (plane.raw || '').slice(0, 400) }, doctor: doctor.json || null });
+    // One doctor call feeds both the legacy `doctor` block and the structured inventory.
+    const inventory = doctor.json ? lazy('cc-arsenal').build({ doctor: doctor.json }) : lazy('cc-arsenal').build();
+    return send(res, 200, {
+      tool_plane: plane.json || { raw: (plane.raw || '').slice(0, 400) },
+      doctor: doctor.json || null,
+      inventory,
+    });
+  }
+  // Install / plan the missing tooling. The argv comes from the module (fixed), never from
+  // the request; the typed confirmation is enforced here, not only in the UI.
+  if (url === '/api/cc/arsenal/install' && req.method === 'POST') {
+    if (ctx.readOnly) return send(res, 403, { error: 'read-only mode' });
+    const A = lazy('cc-arsenal');
+    const b = await body();
+    const mode = b.mode === 'plan' ? 'plan' : b.mode === 'run' ? 'run' : null;
+    if (!mode) return send(res, 400, { error: "mode must be 'plan' or 'run'", hint: 'POST {"mode":"plan"|"run","confirm":"' + A.CONFIRM_PHRASE + '"}' });
+    // A read-only preview needs no confirmation; installing does, and it is checked HERE.
+    if (mode === 'run') {
+      const conf = A.confirmOk(b.confirm);
+      if (!conf.ok) return send(res, 400, { error: conf.error, expected: conf.expected, hint: 'type ' + A.CONFIRM_PHRASE + ' in the Arsenal tab, then press install' });
+    }
+    const spec = A.installSpec(mode);
+    if (!spec.ok) return send(res, 400, spec);
+    const id = ctx.runJob('arsenal-install', spec.argv, {});
+    return send(res, 202, { jobId: id, argv: spec.argv, mode, confirm_phrase: A.CONFIRM_PHRASE });
   }
   if (url === '/api/cc/knowledge' && req.method === 'GET') {
     if (!q.q) return send(res, 400, { error: 'missing ?q=' });
