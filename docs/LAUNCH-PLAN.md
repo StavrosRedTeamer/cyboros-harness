@@ -16,6 +16,7 @@
 | De-identification | tailnet IP, adb serial and login user gone; they are required arguments now |
 | `refs/` provenance | the licensing gap made visible instead of silent, then the directory unpublished until it is recoverable |
 | `tools/ensure-test-scope.js` | a clean clone can now run its own suite: 91 pass, 0 fail, verified from scratch |
+| `tools/demo.sh` + `docs/demo.tape` + `docs/RECORDING.md` | the README demo, deterministic and one command away from a GIF |
 
 ## Strategy correction
 
@@ -92,12 +93,12 @@ test being wrong.
 ## Next, in order
 
 **5. Record the demo.**
-`./tools/demo.sh` is tested and isolated. Two commands:
-```bash
-asciinema rec -c ./tools/demo.sh demo.cast && agg demo.cast demo.gif
-```
-The GIF goes in the README next to the Command Center screenshot, which is
-currently the only visual. `asciinema` and `agg` are not installed here.
+`tools/demo.sh` is tested, isolated and deterministic, and now takes `DEMO_FAST`
+(a real 4-test subset, not a canned summary) and `DEMO_PACE` (a hold between
+steps, so a one-second run becomes a readable GIF). `docs/demo.tape` is a VHS
+tape that renders it in one command. Full procedure, tool comparison and the
+size budget: [`RECORDING.md`](RECORDING.md). The only reason it is not done is
+that recording needs a terminal, and the agent session does not have one.
 
 **6. Publish the challenge.**
 `docs/THREAT-MODEL.md` is written. It needs a bounty amount or a deadline to be
