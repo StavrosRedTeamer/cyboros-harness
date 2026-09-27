@@ -95,10 +95,11 @@ of `npm test`. A benchmark whose scoring function is untested is not a benchmark
 
 ## Relationship to external benchmarks
 
-This measures something different from ExploitGym (898 real-world CVEs) and similar
-model-development suites. ExploitGym asks: *given a known vulnerability, can an agent
-write the exploit?* That is a **model capability** question, and it is largely independent
-of harness design — a better harness does not make a model smarter.
+This measures something different from [ExploitGym](https://arxiv.org/abs/2605.11086)
+(898 real-world CVEs) and similar model-development suites. ExploitGym asks: *given a known
+vulnerability, can an agent write the exploit?* That is a **model capability** question,
+and it is largely independent of harness design — a better harness does not make a model
+smarter.
 
 This asks: *given a target the model has never seen, does the harness report only what
 it can prove?* That is a **harness discipline** question, and the two compose: a

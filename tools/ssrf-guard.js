@@ -17,7 +17,7 @@
 //   PRIVATE tier — RFC1918 (10/8, 172.16/12, 192.168/16) and v6 ULA fc00::/7:
 //     denied UNLESS the first layer positively authorized this exact pinned/host verdict
 //     (opts.scopeAuthorized === true, i.e. inScope/pin already passed) OR the explicit
-//     opt-in is present. This keeps internal-lab engagements (e.g. 192.168.0.94) fully
+//     opt-in is present. This keeps internal-lab engagements (e.g. an RFC1918 range) fully
 //     working with zero flags while still refusing private pivots that scope never
 //     authorized (the case the first layer cannot see: proxy-chained DNS, raw literals
 //     reached without a pin).

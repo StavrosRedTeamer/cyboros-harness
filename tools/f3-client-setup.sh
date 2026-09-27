@@ -14,11 +14,14 @@
 #
 # Uso (DENTRO Termux, utente normale):
 #   pkg install -y curl git openssh rsync
-#   bash f3-client-setup.sh --pc-user stavros --pc-host 100.83.109.28
+#   bash f3-client-setup.sh --pc-user <utente> --pc-host <ip-tailscale-del-pc>
 # Idempotente: rilanciabile, salta i passi già fatti.
+#
+# --pc-user e --pc-host sono OBBLIGATORI e non hanno default: questo script non porta con
+# sé l'host o l'utente di nessuno. Dichiarali a ogni run, come si dichiara uno scope.
 set -euo pipefail
 
-PC_USER="stavros"; PC_HOST="100.83.109.28"
+PC_USER=""; PC_HOST=""
 while [ $# -gt 0 ]; do
   case "$1" in
     --pc-user) PC_USER="$2"; shift 2 ;;
@@ -30,6 +33,13 @@ done
 say()  { printf '\n\033[1;36m[*]\033[0m %s\n' "$*"; }
 ok()   { printf '\033[1;32m[+]\033[0m %s\n' "$*"; }
 warn() { printf '\033[1;33m[!]\033[0m %s\n' "$*"; }
+
+if [ -z "$PC_USER" ] || [ -z "$PC_HOST" ]; then
+  warn "--pc-user e --pc-host sono obbligatori."
+  warn "  Dal PC, l'IP tailscale si trova con:  tailscale ip -4 | head -1"
+  warn "  Esempio:  bash f3-client-setup.sh --pc-user \"\$(whoami)\" --pc-host <ip-tailscale>"
+  exit 2
+fi
 
 # ---- 0. sanity: sei davvero in Termux? --------------------------------------
 if [ -z "${TERMUX_VERSION:-}" ] && ! [[ "${PREFIX:-}" == *com.termux* ]]; then

@@ -12,7 +12,7 @@
 //                                              (a) host:port  -> ONLY loopback ReDroid instances;
 //                                                  a non-loopback host:port (LAN IP, 0.0.0.0,
 //                                                  remote host) is ALWAYS rejected, even if listed.
-//                                              (b) USB/hardware serial (e.g. "bb83609b") -> a
+//                                              (b) USB/hardware serial (e.g. "R5CT30XXXXX") -> a
 //                                                  physically-attached authorized device. It has
 //                                                  no network host to pin to loopback, so it is
 //                                                  gated PURELY on exact allowlist membership
@@ -73,7 +73,7 @@ function parseSerial(s) {
   if (/^(emulator-\d+)$/.test(t)) return { host: null, local: true, token: t };
   const m = t.match(/^(.*?):(\d{1,5})$/);
   if (m) return { host: m[1].replace(/^\[|\]$/g, ''), port: Number(m[2]), token: t };
-  // USB/hardware adb serial (no host:port), e.g. "bb83609b" or "emulator" transport ids that
+  // USB/hardware adb serial (no host:port), e.g. "R5CT30XXXXX" or "emulator" transport ids that
   // are bare alphanumerics. Packages always contain a dot (PKG_RE) and sha256 is 64 hex, so a
   // dotless 4-24 char alphanumeric token is unambiguously a serial. Loopback cannot apply
   // (there is no host); serialInScope() gates it on exact allowlist membership.

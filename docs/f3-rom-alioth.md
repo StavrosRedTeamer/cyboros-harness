@@ -78,7 +78,7 @@ Dalla pagina ufficiale (wiki.lineageos.org/devices/alioth — verifica lì le UR
 wget <link dal wiki>...
 
 # 1. bootloader mode
-adb -s bb83609b reboot bootloader
+adb -s <serial> reboot bootloader
 fastboot flash boot boot.img
 fastboot flash dtbo dtbo.img
 fastboot reboot bootloader
@@ -110,12 +110,12 @@ Primo boot: fino a 15 minuti.
 
 1. **Niente account Google, niente SIM** (se non serve), WiFi della lab-net o hotspot dedicato.
 2. **Developer options** → USB debugging ON; `adb` dal PC si ricollega come prima
-   (serial `bb83609b` — mobile-scope.json resta valido: stesso serial fisico).
+   (serial del tuo device — mobile-scope.json resta valido: stesso serial fisico).
 3. **Termux da F-Droid** (NON Play Store: è fork vecchio). Poi:
    ```bash
    pkg update && pkg upgrade
    # transport dal PC (come runbook §2):
-   bash f3-client-setup.sh --pc-user stavros --pc-host 100.83.109.28
+   bash f3-client-setup.sh --pc-user <utente> --pc-host <ip-tailscale-del-pc>
    ```
 4. **Phantom process killer** (Android 16 lo ha ancora; con LOS la cosa pulita è da adb, PC):
    ```bash
@@ -143,7 +143,7 @@ Primo boot: fino a 15 minuti.
 [ ] Termux (F-Droid) + f3-client-setup.sh completato senza errori
 [ ] f3-tunnel && hermes-f3 -z "scope-guard check example.com" → verdetto reale
 [ ] f3-kali → node tools/doctor.js → nessun errore bloccante
-[ ] adb dal PC vede ancora bb83609b (mobile-scope.json coerente)
+[ ] adb dal PC vede ancora il tuo serial (mobile-scope.json coerente)
 [ ] phantom killer disattivato (device_config, post-boot)
 [ ] Tailscale attivo e reachable dalla tailnet
 ```

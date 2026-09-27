@@ -20,6 +20,8 @@
 #           + split_config.it.apk  (nomi liberi; il "base" e' l'APK che contiene lo smali PairIP)
 #   Senza --install: produce ./out/*-signed.apk e stampa il comando install-multiple.
 #   Con --install: adb uninstall + adb install-multiple sul device in scope.
+#     Il serial NON ha default: passalo con --serial <serial> o STAVROS_ADB_SERIAL=<serial>.
+#     Senza --install non serve (lo script non tocca nessun device).
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
@@ -28,7 +30,7 @@ APKEDITOR="${APKEDITOR_JAR:-$HOME/tools/APKEditor-1.4.9.jar}"
 KS="${DEBUG_KEYSTORE:-$HOME/.android/debug.keystore}"
 KS_PASS="${DEBUG_KS_PASS:-android}"
 KS_ALIAS="${DEBUG_KS_ALIAS:-androiddebugkey}"
-SERIAL="${STAVROS_ADB_SERIAL:-bb83609b}"
+SERIAL="${STAVROS_ADB_SERIAL:-}"
 DO_INSTALL=0
 
 SRC=""
@@ -103,6 +105,11 @@ echo; echo "[+] APK firmati in: $OUT"; ls -1 "$OUT"/*-signed.apk
 INSTALL_CMD="adb -s $SERIAL install-multiple -r $(printf '%q ' "$OUT"/*-signed.apk)"
 
 if [ "$DO_INSTALL" -eq 1 ]; then
+  if [ -z "$SERIAL" ]; then
+    echo "[!] --install richiede un serial esplicito: --serial <serial> (o STAVROS_ADB_SERIAL)."
+    echo "    Questo script non indovina quale device e' quello in scope."
+    exit 2
+  fi
   echo "[*] Scope check serial $SERIAL ..."
   node tools/mobile-guard.js check "$SERIAL" >/dev/null || { echo "[!] serial fuori scope"; exit 1; }
   echo "[*] adb uninstall $PKG (ignora se assente) ..."

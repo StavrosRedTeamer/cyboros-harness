@@ -119,7 +119,7 @@ function auditMobile(entry) {
 
 // ---- pure command builders (no exec; tested offline) ----
 // Default adb target. ReDroid loopback historically; override with STAVROS_ADB_SERIAL to
-// point at a physically-attached authorized device (e.g. Poco F3 USB serial "bb83609b").
+// point at a physically-attached authorized device (e.g. Poco F3 USB serial "R5CT30XXXXX").
 // The serial is still scope-checked by mobile-guard.js regardless of this default.
 const DEFAULT_SERIAL = process.env.STAVROS_ADB_SERIAL || '127.0.0.1:5555';
 

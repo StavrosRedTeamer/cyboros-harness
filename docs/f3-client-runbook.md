@@ -35,8 +35,10 @@ bash tools/f3-client-parrot.sh
 **Telefono (Termux, da F-Droid — NON Play Store):**
 ```bash
 pkg install -y curl git openssh rsync
-bash f3-client-setup.sh --pc-user stavros --pc-host 100.83.109.28
+bash f3-client-setup.sh --pc-user <utente> --pc-host <ip-tailscale-del-pc>
 ```
+(`--pc-user` e `--pc-host` sono obbligatori e non hanno default: l'IP tailscale del PC si
+trova con `tailscale ip -4 | head -1`.)
 Poi verifica:
 ```bash
 f3-tunnel &                        # llama di casa su 127.0.0.1:8080 del telefono
@@ -53,7 +55,7 @@ Il ROM custom serve a QUESTO, non al client in sé:
 1. **Nandroid da TWRP** prima di toccare qualsiasi cosa.
 2. **Phantom process killer** (se il passo 1 dello script da Termux è fallito), da PC:
    ```bash
-   adb -s bb83609b shell device_config put activity_manager max_phantom_processes 2147483647
+   adb -s <serial> shell device_config put activity_manager max_phantom_processes 2147483647
    ```
    Persistente finché non si svuota `device_config` (alcuni ROM lo azzerano a boot: ripetere).
 3. **Batteria**: Impostazioni → App → Termux → Batteria → *Nessuna restrizione*.
@@ -63,23 +65,23 @@ Il ROM custom serve a QUESTO, non al client in sé:
 ## 4. Mobile: il F3 come target di se stesso
 
 Root + TWRP rendono il telefono anche **device mobile in scope** (`mobile-scope.json`,
-serial `bb83609b` già autorizzato):
+serial del tuo device già autorizzato):
 
 ```bash
 # dentro proot Kali (o Termux: adb c'è in entrambi)
-node tools/mobile.js check bb83609b          # fail-closed come sempre
-adb -s bb83609b shell getprop ro.product.device   # shell_read, auto-tier
+node tools/mobile.js check <serial>          # fail-closed come sempre
+adb -s <serial> shell getprop ro.product.device   # shell_read, auto-tier
 ```
 
 **frida-server arm64** (il vendor è x86_64 ReDroid — qui serve quello giusto, pushato sul device):
 ```bash
 VER=$(frida --version)
 curl -fsSL "https://github.com/frida/frida/releases/download/$VER/frida-server-$VER-android-arm64.xz" -o /tmp/fs.xz
-unxz /tmp/fs.xz && adb -s bb83609b push /tmp/fs /data/local/tmp/frida-server-arm64
-adb -s bb83609b shell su -c 'chmod 755 /data/local/tmp/frida-server-arm64'
-adb -s bb83609b shell su -c '/data/local/tmp/frida-server-arm64 &'   # root: solo sul TUO device
+unxz /tmp/fs.xz && adb -s <serial> push /tmp/fs /data/local/tmp/frida-server-arm64
+adb -s <serial> shell su -c 'chmod 755 /data/local/tmp/frida-server-arm64'
+adb -s <serial> shell su -c '/data/local/tmp/frida-server-arm64 &'   # root: solo sul TUO device
 # attach (confirm-tier, serve --confirm):
-node tools/mobile.js frida bb83609b <pkg> --confirm "motivo"
+node tools/mobile.js frida <serial> <pkg> --confirm "motivo"
 ```
 
 **CA mitm nello store di sistema**: `tools/mobile-physical-setup.sh` è già pensato per il device
@@ -116,13 +118,13 @@ Pattern utili:
 
 ```bash
 # PC → telefono (workspace): dentro Termux
-bash ~/stavros/tools/f3-client-setup.sh --pc-user stavros --pc-host 100.83.109.28   # idempotente, ri-rsync
+bash ~/stavros/tools/f3-client-setup.sh --pc-user <utente> --pc-host <ip-tailscale>   # idempotente, ri-rsync
 
 # Aggiornare il fork hermes-stavros: SI FA DAL PC (rsync upstream + riapplica patch, vedi
 # STAVROS-PATCHES.md), poi ri-rsync PC → telefono (passo 5 dello script di setup).
 
 # Evidence produce sul telefono? riportale al PC (il report vive nel PC master):
-rsync -az ~/stavros/reports/ stavros@100.83.109.28:Desktop/stavrosredteamer/reports/
+rsync -az ~/stavros/reports/ <utente>@<ip-tailscale>:Desktop/stavrosredteamer/reports/
 ```
 
 ## 8. Sicurezza
@@ -149,7 +151,7 @@ Dal telefono, via tunnel (il backend resta su loopback del PC):
 
 ```bash
 # PC
-ssh -L 8787:127.0.0.1:8787 stavros@100.83.109.28   # dal telefono verso il PC
+ssh -L 8787:127.0.0.1:8787 <utente>@<ip-tailscale>   # dal telefono verso il PC
 # telefono
 node tools/cc-instance.js status    # dal PC: porta registrata
 # nel browser del telefono apri l'URL tokenizzato stampato da: node tools/cc-instance.js url

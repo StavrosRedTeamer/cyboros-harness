@@ -7,11 +7,11 @@
 #   3. llama-server in ascolto su 127.0.0.1:8080 (il tunnel ssh del telefono lo inoltra)
 #   4. adb locale non esposto (il telefono fa adb da sé quando è scollegato)
 #
-# Uso (sul PC):  bash tools/f3-client-parrot.sh [--pc-user stavros]
+# Uso (sul PC):  bash tools/f3-client-parrot.sh [--pc-user <utente>]
 # Idempotente.
 set -euo pipefail
 
-PC_USER="${SUDO_USER:-${USER:-stavros}}"
+PC_USER="${SUDO_USER:-${USER:-}}"
 [ "${1:-}" = "--pc-user" ] && PC_USER="$2"
 
 say()  { printf '\n\033[1;36m[*]\033[0m %s\n' "$*"; }
@@ -49,7 +49,7 @@ if command -v ufw >/dev/null 2>&1 && sudo ufw status | grep -q "Status: active";
     ok "ufw: 22/tcp consentito solo su tailscale0" || warn "ufw rule non aggiunta (già presente?)"
 else
   warn "ufw non attivo: sshd resta raggiungibile su tutte le interfacce."
-  warn "  Opzione dura (consigliata): /etc/ssh/sshd_config → ListenAddress 100.83.109.28 (IP tailscale), poi riavvia sshd."
+  warn "  Opzione dura (consigliata): /etc/ssh/sshd_config → ListenAddress \$(tailscale ip -4 | head -1), poi riavvia sshd."
 fi
 
 say "4/5 llama-server (per il tunnel f3-tunnel del telefono)"
@@ -70,6 +70,6 @@ fi
 
 ok "Parrot pronto per il client F3."
 echo "
-Lato telefono (una volta):  bash f3-client-setup.sh --pc-user $PC_USER --pc-host $(tailscale ip -4 2>/dev/null | head -1 || echo 100.83.109.28)
+Lato telefono (una volta):  bash f3-client-setup.sh --pc-user $PC_USER --pc-host $(tailscale ip -4 2>/dev/null | head -1)
 Uso quotidiano (telefono):  f3-tunnel &  →  hermes-f3
 "
