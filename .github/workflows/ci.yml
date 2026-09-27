@@ -1,0 +1,79 @@
+name: CI
+
+on:
+  push:
+    branches: [master, main]
+  pull_request:
+    branches: [master, main]
+  workflow_dispatch:
+
+# The suite has no network and no third-party dependencies: zero npm install
+# step, by design. Node is the only requirement (engines: >=22, because the
+# Command Center backend uses node:sqlite).
+jobs:
+  test:
+    name: tests (node ${{ matrix.node }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        node: ['22', '24']
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check toolchain
+        run: |
+          node --version
+          npm --version
+
+      - name: Confirm zero dependencies
+        # The zero-dependency claim is load-bearing: it is why the harness runs
+        # air-gapped. Fail if a dependency ever sneaks in unnoticed.
+        run: |
+          if [ -s package-lock.json ]; then
+            echo "::error::package-lock.json exists - this project is meant to have zero dependencies"
+            exit 1
+          fi
+          deps=$(node -p "Object.keys(require('./package.json').dependencies||{}).length")
+          devdeps=$(node -p "Object.keys(require('./package.json').devDependencies||{}).length")
+          echo "runtime deps: $deps, dev deps: $devdeps"
+          if [ "$deps" != "0" ] || [ "$devdeps" != "0" ]; then
+            echo "::error::expected zero dependencies, found $deps runtime / $devdeps dev"
+            exit 1
+          fi
+
+      - name: Self-check (no credentials required)
+        run: node tools/doctor.js || true
+
+      - name: Test suite (offline)
+        # tools/test-*.js, classified offline/loopback/e2e by the runner.
+        # Default `npm test` excludes e2e: those need live targets and a browser.
+        # `npm test` stays sequential on purpose (deterministic local runs);
+        # CI uses 2 workers because hosted runners have 2 cores.
+        run: npm run test:ci
+
+      - name: List the excluded e2e tests
+        if: always()
+        run: npm run test:list
+
+  hygiene:
+    name: repo hygiene
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fail if engagement data is ever tracked
+        # The .gitignore is the only thing keeping client data out of history.
+        # A regression here is a confidentiality incident, so make it loud.
+        run: |
+          set -e
+          bad=0
+          for pat in '^temp/' '^scope\.json$' '^auth\.json$' '^c2\.json$' '\.bak\.json$' '^reports/' '^artifacts/'; do
+            hits=$(git ls-files | grep -E "$pat" || true)
+            if [ -n "$hits" ]; then
+              echo "::error::tracked files matching '$pat' must not be committed:"
+              echo "$hits"
+              bad=1
+            fi
+          done
+          exit $bad

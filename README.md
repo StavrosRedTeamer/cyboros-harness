@@ -1,144 +1,166 @@
-# StavrosRedTeamer — workspace standalone (Freebuff)
+<div align="center">
 
-Harness di **web/host penetration testing** su **Freebuff (Codebuff)**: un orchestratore
-multi-agente, **Stavros**, che pianifica l'assessment e delega a sub-agent specializzati.
-Questa cartella è **auto-contenuta**: motore tool zero-dipendenze (`tools/`), agenti
-(`.agents/*.ts`), metodologia (`knowledge.md`, `skills/`, `refs/`, `ops/harness.md`) e
-tool vendored (`vendor/`). Nessuna dipendenza da altri progetti o cartelle esterne.
+# StavrosRedTeamer
 
-> Uso consentito SOLO su sistemi tuoi o con **autorizzazione scritta** (pentest concordato,
-> bug bounty in-scope, lab). Lo scope-guard è **fail-closed**: con `scope.json` vuoto
-> blocca tutto.
+**A penetration-testing harness where a finding is only a finding if code can prove it —
+and where the agent cannot violate scope, because the enforcement is beneath it.**
 
-## Avvio
+[Apache-2.0](LICENSE) · zero dependencies · offline-capable · 89 tests in ~3 min
+
+</div>
+
+---
+
+Most AI pentest agents are built to *find* things. This one is built to *refuse to
+report things it cannot prove*. That is a different engineering problem, and it is the
+one that keeps the whole field honest: the published lab-to-real gap is brutal — GPT-4
+exploits 87% of one-day CVEs *when handed the advisory description*, but only 13% of
+real CVEs in CVE-Bench, and near 0% of hard HackTheBox boxes. The bottleneck is not
+generation. It is **proof**.
+
+So this harness moves the policy out of the prompt and into the runtime.
+
+## Two ideas
+
+**1. The agent is not the policy. The runtime is.**
+
+Every other agent in this space handles authorization with a sentence in its README
+and then gives the model a shell. Here, the guards are separate programs that run
+*below* the model, and they are fail-closed:
+
+- `scope-guard.js` — nothing runs against a host absent from `scope.json`. Empty
+  `scope.json` means everything is blocked. There is no flag to disable it.
+- A **DNS-rebinding guard**: an in-scope hostname that resolves to a private,
+  loopback or link-local address is refused unless that subnet is in `allowed_ips`.
+- **Tiered confirmation** for destructive or high-impact actions, and **consent
+  tokens** so a confirm-tier action cannot start without an explicit operator grant.
+- Rate limits and pacing enforced in-process, not suggested to the model.
+
+The agent can decide to attack. It cannot decide *whether it is allowed to*. The
+design principle is simple enough to state in a code review: **a refusal by the
+model is a bug, because the guard already made that decision.** Policy belongs in
+something the model cannot talk its way past.
+
+**2. Severity can never exceed evidence.**
+
+`record-finding.js` enforces a verification ladder, and rejects incoherent records
+rather than warning about them:
+
+| `verify_level` | means | severity ceiling |
+|---|---|---|
+| `suspected` | plausible, not reproduced | Low |
+| `triggered` | condition triggered, not exploited | Medium |
+| `exploited` | full exploit chain demonstrated | High |
+| `proven_impact` | real impact proven (data read, ATO, RCE) | Critical |
+
+Declare `proven_impact` without a valid oracle and the finding is refused. A finding
+that claims reality — `status: verified`, or `exploited`/`proven_impact` — must carry
+an **oracle**: a machine-re-executed proof the harness runs itself, N/N times, live.
+
+```json
+"verify": {
+  "method": "GET", "url": "https://HOST/api/x", "as": "user_a",
+  "expect": { "status": 200, "body_contains": "unique-marker" }
+}
+```
+
+Beyond `status` and `body_contains`, `body_similarity_to` catches the same-length
+IDOR that a substring check misses. Every finding also gets an independent
+re-verification pass by a separate verifier agent, and `gen-poc.js` writes a
+parameterized Python reproducer (`exit 0` = reproduced) so a human can re-run it
+without trusting the harness.
+
+Stage gates close the loop: coverage matrix complete, no pending findings, at least
+one verified, or **no report is produced at all**.
+
+## Why it might interest you
+
+- **Zero dependencies.** No lockfile, no transitive supply chain, nothing to audit but
+  the 53k lines in this repository. CI fails the build if that ever stops being true.
+  On a client network, `npm install` does nothing.
+- **Runs air-gapped.** `local/` drives the same deterministic engine against a local
+  model. No API key, no data leaving the engagement laptop.
+- **89 tests, ~3 minutes, no network.** Offline and loopback tests, classified by the
+  runner; `npm test` is the gate, `npm run test:all` includes the live e2e set.
+- **Evidence memory that compounds.** `memory/` keeps sanitized technique→outcome
+  lessons across engagements, with a sanitizer that refuses to store in-scope hosts,
+  emails, tokens or credentials.
+
+## Quick start
+
+Requires **Node ≥ 22** (the Command Center backend uses `node:sqlite`).
 
 ```bash
-./launch-freebuff.sh        # pre-flight (scope, CLI, Chrome) + avvio TUI
-# equivalente:
-freebuff --cwd "$(pwd)"
+git clone https://github.com/CSI-entitymorton/stavrosredteamer.git
+cd stavrosredteamer
+npm test                 # 89 tests, no install, no network
 ```
 
-Poi chiedi, es.: *"Stavros, assess https://target.com — full web pentest"*.
-Stavros legge `knowledge.md` + playbook + `scope.json`, lancia recon → mapper → tester →
-reporter (stage-gate + coverage matrix) e scrive i risultati in `reports/`.
-
-Launcher grafico: `stavros-freebuff.desktop` (Exec già puntato a questa cartella).
-Console web opzionale: `node tools/gui-server.js` → http://127.0.0.1:8787 (o `npm run console`).
-
-## Parrot OS (questo dispositivo)
-
-Adattato a **Parrot Security (echo / Debian 13)** con KDE Plasma:
-
-- **Node ≥ 22 obbligatorio** per il Command Center (`tools/gui-server.js` usa `node:sqlite`).
-  L'apt di Parrot fornisce solo Node 20 → installa la 22 LTS:
-  `curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash - && sudo apt-get install -y nodejs`
-  (in alternativa `nvm install 22`). La TUI `freebuff` gira anche su Node 20.
-- **Chromium** non è preinstallato (solo Firefox): serve per `dom-check.js` (CDP) e per l'MCP
-  `chrome-devtools`. `./install-tools.sh` lo installa (`apt install chromium`).
-- **Terminale**: `open-freebuff-terminal.sh` usa **konsole** (default KDE su Parrot); fallback
-  qterminal / mate-terminal / x-terminal-emulator / xterm.
-- **Pacchetti**: alcuni nomi differiscono da Kali — `bind9-dnsutils` (era `dnsutils`),
-  `httpx-toolkit` (era `httpx`), `naabu` al posto di `rustscan`. Tool solo-Kali
-  (`ghauri`, `xsstrike`, `lfimap`) sono installati via `pipx`; `linkfinder`/`tplmap`/`nosqlmap`
-  via git upstream (l'installer lo segnala). Verifica finale: `node tools/doctor.js`.
-
-
-## Struttura
-
-```
-stavrosredteamer/
-├── .agents/*.ts        # 28 agenti Freebuff (orchestratore + specialisti) — il cuore
-├── ops/harness.md      # regole condivise (disciplina, tool-wiring, MCP) — grep su richiesta
-├── skills/pentest-playbook/  # playbook operativo: SKILL.md = scheletro; references/ = dettaglio (tool-manual, hunting-surface, client-side, verification-reporting)
-├── refs/               # knowledge base per classe di vulnerabilità
-├── knowledge.md        # metodologia + regole di engagement (contratto compatto; il dettaglio è in docs/)
-├── docs/               # dettaglio metodologico per-tool (toolbox, host-exploitation, egress-opsec, wireless, methodology-classes) — indicizzato da kb-search.js
-├── tools/              # motore zero-dipendenze (scope-guard, repeater, pipeline, C2, wifi, GUI, test)
-├── vendor/             # tool vendored: script vetted piccoli (noauth_finder, aptpp); i binari grossi (obscura, frida-server) li installa install-tools.sh fuori dal repo
-├── memory/             # memoria RAG locale delle soluzioni
-├── reports/            # output run: findings.jsonl, state.db, report HTML (storico incluso)
-├── scope.json          # COMPILA QUESTO: fail-closed finché non autorizzi i target
-├── auth.json           # (opzionale) identità per il pass autenticato
-├── wifi-scope.example.json  # (opzionale) template scope wireless — copia in wifi-scope.json (gitignorato)
-├── c2.json             # (opzionale) profili listener host exploitation
-└── install-tools.sh    # installer binari (Parrot OS/Debian; equivalente .ps1 per Windows)
-```
-
-## Scope (obbligatorio, prima cosa)
-
-Compila `scope.json`:
+Then write your authorization. `scope.json` **is** the written authorization, and the
+harness is fail-closed until you fill it in:
 
 ```json
 {
-  "allowed_hosts": ["target.com", "api.target.com"],
-  "allowed_ips": ["127.0.0.1", "10.0.0.0/8"],
+  "allowed_hosts": ["target.example"],
+  "allowed_ips": ["10.0.0.0/8"],
   "max_requests_per_second": 2
 }
 ```
 
-Verifica: `node tools/scope-guard.js check https://target.com` (exit 0 = consentito).
-Vale anche per `auth.json` (verifica identità: `node tools/login.js <identità>`) e
-`wifi-scope.json` (`node tools/wifi-guard.js check <BSSID>`). Per la modalità wireless copia il
-template versionato `wifi-scope.example.json` in `wifi-scope.json` (gitignorato) e compila BSSID/
-ESSID/stations/channels — il modello wireless è separato da `scope.json` (IP/host).
-
-## Test
-
-`npm test` — un unico gate per tutta la suite (`tools/test-*.js`, classificati
-offline/loopback/e2e). `npm run test:list` mostra la classificazione, `npm run test:all`
-include i test live.
-
-## Workflow di modifica
-
-Questa è la **fonte**: per modificare un agente edita direttamente `.agents/<id>.ts`
-(poi riavvia Freebuff per ricaricarlo). Per la metodologia: `knowledge.md` (contratto) +
-`docs/` (dettaglio), `ops/harness.md`, `refs/`, `skills/pentest-playbook/` (SKILL.md scheletro +
-`references/` per il dettaglio). Non c'è alcun passaggio di generazione/sync in questa cartella.
-
-## MCP nativo (Freebuff >= 0.0.156)
-
-Il campo `mcpServers` nelle definizioni `.ts` attiva i server MCP: i tool compaiono come
-`<server>__<tool>` (es. `chrome-devtools__navigate_page`). Attivo di default:
-`chrome-devtools` (browser headless, richiede Chrome) solo sugli agenti di superficie
-browser/DOM. Config di riferimento: `mcp.example.json`.
-
-> ⚠️ **Sicurezza**: i tool MCP NON passano dai guard in-process (`repeater.js`/`run.js`).
-> L'agente è istruito a scope-checkare manualmente (`node tools/scope-guard.js check <url>`)
-> prima di usare un tool MCP su un target, e a preferire run.js/repeater.js per il tampering.
-
-## Command Center (desktop)
-
-Il Command Center è un programma desktop (`stavros-cc`) che governa l'harness a 360°: campagna →
-missione → approvazione → esecuzione → verifica → report → prova. È una **superficie**, non un gate:
-non bypassa nessun guard, ogni scrittura resta wrapper sui tool esistenti.
-
 ```bash
-./install-scc-launcher.sh      # installa launcher + .desktop (idempotente)
-stavros-cc                     # finestra nativa PyQt6 con la SPA dentro
-bash scripts/demo-command-center.sh   # demo end-to-end di 2 minuti (root temporaneo)
+node tools/scope-guard.js check https://target.example   # exit 0 = authorized
+node tools/stavros.js recon target.example
+node tools/stavros.js scan target.example
+node tools/stavros.js status
 ```
 
-Fallback: se PyQt6/QtWebEngine non c'è, `stavros-cc` apre Chromium in app-mode, poi il browser
-(`--web` per il browser diretto, es. telefono via tunnel). Backend unico: `tools/gui-server.js`
-con lockfile in `reports/app/server.lock` (un secondo avvio fa **attach**, non spawn).
-Finestra unica: cliccando di nuovo l'icona il secondo processo chiede alla finestra viva di
-sollevarsi e **aspetta la conferma**; se il peer non risponde (istanza vecchia o bloccata) il nome
-del socket viene scavalcato e si apre comunque una finestra — il launcher non muore più in
-silenzio. Se il backend non parte, l'errore compare in un dialog invece che solo nel log.
-Token di sessione obbligatorio su ogni write e sugli stream interattivi; senza token la SPA mostra
-il banner read-only.
+Install the external tool binaries with `./install-tools.sh` (Parrot/Debian) or
+`install-tools.ps1` (Windows), then verify with `node tools/doctor.js`.
 
-Comandi utili:
+The full operator surface — gateway launchers, the desktop Command Center, the local
+runner — is documented in [`docs/command-center-desktop.md`](docs/command-center-desktop.md)
+and the harness contract in [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
+
+## What is in here
 
 | | |
 |---|---|
-| `node tools/cc-campaign.js show` | campagna attiva + validazione + drift di scope |
-| `node tools/cc-mission.js show` | next-actions/coverage/gate/budget con perché e tier |
-| `node tools/request-approval.js --host H --action C --command "..."` | l'agente chiede il consenso |
-| `node tools/cc-approvals.js grant <id>` | l'operatore lo concede (pannello Approvals) |
-| `node tools/run.js ... --approval <id>` | esecuzione con token (policy `host_ops.require_approval`) |
-| `node tools/cc-ledger.js evidence` | evidence bundle tar.gz + manifest con hash |
-| `node tools/cc-panic.js` | ferma SOLO i processi posseduti dall'harness (idempotente) |
+| `tools/` | the engine: 217 tools, scope guards, repeater, oracle, pipeline, C2, wifi, GUI, tests |
+| `local/fleet/` | 28 agent definitions (orchestrator + specialists) |
+| `local/` | standalone runner against a local model — no cloud, no Freebuff |
+| `workflows/` | 14 reusable `enum-*` / `attack-*` pipelines |
+| `knowledge.md` | the engagement contract: rules, toolbox, verification discipline |
+| `docs/` | per-tool and per-class methodology, retrieved with `node tools/kb-search.js` |
+| `memory/` | sanitized cross-engagement lessons |
 
-Doc: `docs/command-center-desktop.md` (piano e stato WP), `docs/f3-client-runbook.md` §9 (client
-desktop di un backend tunnelato). Test: `tools/test-cc-*.js` dentro `npm test`.
+## Scope of use
+
+Authorized testing only: your own systems, a signed engagement scope, in-scope bug
+bounty targets, or a lab. `scope.json` names which hosts may be tested; it does not
+pre-authorize destructive actions, which still need explicit in-session confirmation.
+
+One honest caveat, stated in [`SECURITY.md`](SECURITY.md) too: the guards run
+in-process and are not a sandbox. Tools reached through **MCP** bypass them entirely —
+if you mount one, you are outside the guard and responsible for it yourself.
+
+## Documentation
+
+- [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — guard → model → tool, and why
+- [`knowledge.md`](knowledge.md) — engagement rules and toolbox (the contract)
+- [`docs/toolbox.md`](docs/toolbox.md) — full flags per tool
+- [`docs/methodology-classes.md`](docs/methodology-classes.md) — testing by vulnerability class
+- [`docs/host-exploitation.md`](docs/host-exploitation.md) — post-ex, privesc, C2
+- [`docs/wireless.md`](docs/wireless.md) — wireless assessment, tier model
+- [`CHANGELOG.md`](CHANGELOG.md) — release history
+- [`SECURITY.md`](SECURITY.md) — disclosure policy, safe harbor, in-scope bugs
+
+## Contributing
+
+Issues and pull requests are welcome. Before contributing, please read
+[`SECURITY.md`](SECURITY.md) — contributions that weaken the guardrails are treated as
+security bugs, not feature requests. Run `npm test` before opening a PR; it is the
+same gate CI uses.
+
+## License
+
+Apache-2.0. See [LICENSE](LICENSE).

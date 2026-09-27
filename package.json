@@ -8,6 +8,7 @@
   },
   "scripts": {
     "test": "node tools/run-tests.js",
+    "test:ci": "node tools/run-tests.js --jobs 2",
     "test:all": "node tools/run-tests.js --e2e",
     "test:list": "node tools/run-tests.js --list",
     "console": "node tools/gui-server.js",

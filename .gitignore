@@ -59,6 +59,14 @@ reports/approvals.jsonl
 reports/campaign-history.jsonl
 reports/app/
 
+# File di backup sparsi: mai committarne di nuovi. Gli esistenti
+# (tools/gui/*.bak, *.v1-forensic) sono storico della GUI redesign e restano
+# finché non li rimuovi esplicitamente.
+*.bak
+*.v1-forensic
+*.orig
+*.rej
+
 # OS
 .DS_Store
 Thumbs.db
