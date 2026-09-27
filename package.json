@@ -16,6 +16,36 @@
     "benchmark"
   ],
   "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/CSI-entitymorton/stavrosredteamer.git"
+  },
+  "bugs": {
+    "url": "https://github.com/CSI-entitymorton/stavrosredteamer/issues"
+  },
+  "homepage": "https://github.com/CSI-entitymorton/stavrosredteamer#readme",
+  "bin": {
+    "stavros": "tools/stavros.js",
+    "stavros-doctor": "tools/doctor.js",
+    "stavros-record-finding": "tools/record-finding.js",
+    "stavros-gen-bench": "tools/gen-bench.js",
+    "stavros-mcp-guard-proxy": "tools/mcp-guard-proxy.js"
+  },
+  "files": [
+    "tools/",
+    "docs/",
+    "local/",
+    "skills/",
+    "workflows/",
+    "templates/",
+    "ops/",
+    "knowledge.md",
+    "README.md",
+    "SECURITY.md",
+    "CHANGELOG.md",
+    "BENCHMARK.md",
+    "LICENSE"
+  ],
   "scripts": {
     "test": "node tools/run-tests.js",
     "test:ci": "node tools/run-tests.js --jobs 2",
@@ -24,6 +54,7 @@
     "console": "node tools/gui-server.js",
     "radar": "node tools/radar.js run",
     "galaxy": "node tools/attack-galaxy.js",
-    "doctor": "node tools/doctor.js"
+    "doctor": "node tools/doctor.js",
+    "demo": "bash tools/demo.sh"
   }
 }

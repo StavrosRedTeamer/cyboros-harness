@@ -70,3 +70,14 @@ reports/app/
 # OS
 .DS_Store
 Thumbs.db
+
+# refs/ — knowledge corpus, non sorgente del progetto. contiene ampie sezioni riprese
+# testualmente da documenti di terzi (fonti e licenze per gruppo non registrate), quindi
+# non e' ridistribuibile finche' quei crediti non sono recuperati. Fuori dal repository
+# pubblico: l'harness non lo legge mai in codice (niente in npm test, doctor --check o
+# tools/ lo richiede) e i file restano su disco. Per riportarlo: git add -f refs/
+# — vedi docs/LAUNCH-PLAN.md, blocker 1.
+refs/
+
+# Runbook interno di una postazione specifica, non un documento del progetto.
+session-prompt-egress-f3.md
