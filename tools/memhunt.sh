@@ -19,7 +19,7 @@ trap cleanup EXIT
 # All readable regions (field2 has r; includes file-backed paths, unlike v2).
 # Skip huge device/framework mappings to stay fast; keep app .so/.art/.vdex + anon.
 awk '$2 ~ /^r/ {
-  if ($6 == "" || $6 ~ /fest|libapp|app_flutter|base\.(art|oat|vdex)/) print $1, $2, $6
+  if ($6 == "" || $6 ~ /com\.example\.fest|libapp|app_flutter|base\.(art|oat|vdex)/) print $1, $2, $6
 }' /proc/$PID/maps | while read rng perm path; do
   start=$(echo "$rng" | cut -d- -f1); end=$(echo "$rng" | cut -d- -f2)
   s=$((16#$start)); e=$((16#$end))
