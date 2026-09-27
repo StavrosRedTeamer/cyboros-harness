@@ -15,6 +15,9 @@
 //   7. segreti      auth.json/c2.json/scope/... leggibili solo dall'operatore (--fix-perms).
 //                   L'output umano non elenca gli host per default (finisce in screenshot e
 //                   report): --show-hosts li mostra. `--json` resta completo, è l'input del CC.
+//   8. spazio       occupazione per directory e cosa è archiviabile in temp/ (solo informativo:
+//                   non incide su exit code né installazione). Lo spostamento lo fa
+//                   tools/workspace-gc.js, che verifica con sha256 e non cancella mai.
 //
 // Installazione: SOLO dopo conferma interattiva (o --yes). Best-effort, in gruppi:
 //   runtime (apt) -> arsenal (apt/go/pipx) -> suggerimenti manuali (sliver, cloud CLI).
@@ -144,6 +147,18 @@ function checkSecrets() {
     rows.push({ file: f, mode: mode.toString(8).padStart(3, '0'), ok: !exposed, exposed, path: p });
   }
   return rows;
+}
+
+// Occupazione del workspace. Perché è qui: `temp/` è 268 MB su 19.671 file di dati di engagement
+// e finora niente lo diceva — `doctor` era l'unico posto in cui un operatore guarda, e taceva
+// sulla voce più grande. Solo informativo: nessun exit code dipende da questo.
+function checkSpace() {
+  try {
+    const GC = require('./workspace-gc');
+    return GC.scanWorkspace(ROOT, { days: 30 });
+  } catch {
+    return null;
+  }
 }
 
 function checkProject() {
@@ -377,6 +392,7 @@ async function main() {
   const extras = checkBins(EXTRAS);
   const vendor = checkVendor();
   const scope = checkScope(opts);
+  const space = checkSpace();
   let secrets = checkSecrets();
   if (opts.fixPerms) {
     for (const r of secrets.filter((s) => s.exposed)) {
@@ -397,6 +413,15 @@ async function main() {
       extras: extras.map(({ bin, installed, pkg, manual, note }) => ({ bin, installed, pkg: pkg || null, manual: manual || null, note: note || null })),
       vendor: vendor.map(({ p, ok, what, fix }) => ({ path: p, ok, what: what || null, fix: fix || null })),
       scope,
+      // Additivo: l'occupazione per directory e i candidati all'archiviazione. La Console lo
+      // mostra; nessun campo esistente cambia forma.
+      space: space ? {
+        archive_root: space.archive_root,
+        archivable_roots: space.archivable_roots,
+        total_bytes: space.total_bytes,
+        dirs: space.dirs,
+        top_candidates: space.candidates.slice(0, 10),
+      } : null,
       summary: {
         registry_total: registry.length,
         registry_present: registry.filter((r) => r.installed).length,
@@ -454,6 +479,27 @@ async function main() {
     section('7. Segreti di engagement (permessi)');
     for (const s of secrets) {
       printRow(s.ok, s.file, s.ok ? `0${s.mode}` : `0${s.mode} — leggibile da altri utenti (node tools/doctor.js --fix-perms)`);
+    }
+  }
+
+  // 8. spazio
+  if (space) {
+    const GC = require('./workspace-gc');
+    section('8. Spazio (occupazione)');
+    // Nessun OK/MISS: è una misura, non un verdetto — `printRow` direbbe "OK" a una riga che non
+    // ha passato niente. Stessa spaziatura, senza il giudizio.
+    for (const d of space.dirs) {
+      const label = `${d.name}/`;
+      console.log(`  ${label}${' '.repeat(Math.max(1, 26 - label.length))}${dimS(`${GC.human(d.disk_bytes)} · ${d.files} file`)}`);
+    }
+    const top = space.candidates.slice(0, 5);
+    if (top.length) {
+      console.log(`\n  ${dimS('archiviabile in ' + space.archivable_roots.map((r) => r + '/').join(', ') + ':')}`);
+      for (const c of top) {
+        const stale = c.stale && c.age_days !== null ? ` — inattivo da ${c.age_days}g` : '';
+        console.log(`    ${(c.root + '/' + c.name).padEnd(30)} ${GC.human(c.disk_bytes).padStart(9)}${stale}`);
+      }
+      console.log(`  ${dimS(`sposta con: node tools/workspace-gc.js archive <nome> — archivio ${space.archive_root}, verifica sha256, nessuna cancellazione`)}`);
     }
   }
 

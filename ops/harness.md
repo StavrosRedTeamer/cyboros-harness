@@ -134,3 +134,18 @@ progetto.
   al primo messaggio, e la cartella non cambia l'identità. Se la TUI intercetta la `@`, il
   fallback è un token senza `@` (`stavros:`), da cambiare in router e `AGENTS.md` insieme.
 
+## Spazio del workspace — cosa è archiviabile
+
+`temp/` è la voce più grande della cartella (268 MB su ~19.700 file: APK decompilati, HTML di
+target, cache, evidenze, host reali) e **nessun modulo la legge** — a differenza di `reports/tmp/`,
+che è usata da `mcp-guard`, `oob`, `privacy`, `scope-guard` e `record-finding` e non si sposta.
+
+- `node tools/workspace-gc.js report` — occupazione per directory (spazio su disco, come `du`, non
+dimensione apparente) e cosa è archiviabile, per voce e per età. Non scrive niente.
+- `node tools/workspace-gc.js archive <nome-di-temp>` — **sposta, non cancella**: sha256 dell'albero
+prima e dopo, e l'originale viene rimosso solo a verifica riuscita (o solo dopo una copia
+verificata, se la destinazione è su un altro filesystem). Destinazione
+`$STAVROS_ARCHIVE_DIR` → `$XDG_DATA_HOME/stavros/archive` → `~/.local/share/stavros/archive`, un
+anno per sottocartella; **deve stare fuori dal workspace**, altrimenti finirebbe in un commit.
+- `node tools/doctor.js` la riporta come sezione 8, e `doctor --json` la espone in `space`.
+

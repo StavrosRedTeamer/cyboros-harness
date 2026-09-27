@@ -5,7 +5,7 @@
 **A penetration-testing harness where a finding is only a finding if code can prove it —
 and where the agent cannot violate scope, because the enforcement is beneath it.**
 
-[Apache-2.0](LICENSE) · zero dependencies · offline-capable · 93 tests in ~1 min
+[Apache-2.0](LICENSE) · zero dependencies · offline-capable · 94 tests in ~1 min
 
 ![Command Center overview](docs/assets/command-center-overview.png)
 
@@ -86,7 +86,7 @@ one verified, or **no report is produced at all**.
   On a client network, `npm install` does nothing.
 - **Runs air-gapped.** `local/` drives the same deterministic engine against a local
   model. No API key, no data leaving the engagement laptop.
-- **93 tests, ~1 minute, no network.** Offline and loopback tests, classified by the
+- **94 tests, ~1 minute, no network.** Offline and loopback tests, classified by the
   runner; `npm test` is the gate, `npm run test:all` includes the live e2e set.
 - **Evidence memory that compounds.** `memory/` keeps sanitized technique→outcome
   lessons across engagements, with a sanitizer that refuses to store in-scope hosts,
@@ -99,7 +99,7 @@ Requires **Node ≥ 22** (the Command Center backend uses `node:sqlite`).
 ```bash
 git clone https://github.com/CSI-entitymorton/stavrosredteamer.git
 cd stavrosredteamer
-npm test                 # 93 tests, no install, no network
+npm test                 # 94 tests, no install, no network
 ```
 
 Then write your authorization. `scope.json` **is** the written authorization, and the
