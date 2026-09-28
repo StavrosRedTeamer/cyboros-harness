@@ -52,6 +52,38 @@ function fixture(tag) {
   return fs.mkdtempSync(path.join(os.tmpdir(), `${tag || 'test'}-`));
 }
 
+// Rende ermetico un test rispetto allo STATO CONDIVISO del workspace: i file che i tool usano
+// come stato globale — il limitatore di rate (`tools/.pace.json`), l'audit delle esecuzioni
+// (`reports/tmp/run-audit.jsonl`), l'ancora della testa dei finding
+// (`reports/tmp/findings-head-anchor.jsonl`), lo stato del proxy di egress
+// (`reports/tmp/egress-proxy.json`) — finiscono in una fixture invece che nelle path reali.
+//
+// Perché serve: senza, due esecuzioni si influenzano a vicenda. Misurato il 2026-09-28: un `last`
+// lasciato in `tools/.pace.json` ha portato `test-repeater-e2e` da 3,5 s a 8,3 s (il limitatore
+// globale fa attendere la prima richiesta) e un `reports/tmp/egress-proxy.json` di un test ucciso
+// a metà forza `HTTP_PROXY=http://127.0.0.1:9098` su OGNI binario spawnato da `run.js` — anche per
+// l'operatore, dopo la suite.
+//
+// Chiamala PRIMA dei `require()` dei moduli che leggono quei path a load-time (`pace.js`,
+// `egress-proxy.js`, `proxy-route.js`, `run.js`): come per `PACE_FILE` nei test già ermetici,
+// l'ordine conta. Un valore già impostato esplicitamente dal test vince (non lo sovrascrive).
+const STATE_ENV = {
+  PACE_FILE: 'pace.json',                              // limitatore di rate globale (pace.js)
+  RUN_AUDIT_FILE: 'run-audit.jsonl',                   // audit delle esecuzioni (accounting.js, run.js)
+  FINDINGS_HEAD_ANCHOR_FILE: 'findings-head-anchor.jsonl', // ancora anti-tamper dei finding
+  EGRESS_STATE_FILE: 'egress-proxy.json',              // stato del proxy di egress (run.js inietta HTTP_PROXY)
+  OBSCURA_EGRESS_STATE: 'egress-proxy.json',           // stesso stato, letto da obscura.js
+  ARTIFACT_LEDGER_FILE: 'artifact-ledger.jsonl',       // registro degli artefatti
+  AUDIT_DIR: 'audit',                                  // audit-trail: default <ws>/artifacts/audit
+};
+function hermetic(tag) {
+  const dir = fixture(tag || 'hermetic');
+  for (const [k, f] of Object.entries(STATE_ENV)) {
+    if (process.env[k] === undefined) process.env[k] = path.join(dir, f);
+  }
+  return dir;
+}
+
 // Scope di comodo per un test: scrive il file e restituisce il path da mettere in SCOPE_JSON.
 function writeScope(dir, obj) {
   const file = path.join(dir, 'scope.json');
@@ -82,6 +114,6 @@ function runCliAsync(args, opts) {
 }
 
 module.exports = {
-  ok, okAsync, summary, fixture, writeScope, runCli, runCliAsync,
+  ok, okAsync, summary, fixture, writeScope, runCli, runCliAsync, hermetic,
   counts: () => ({ pass, fail }),
 };

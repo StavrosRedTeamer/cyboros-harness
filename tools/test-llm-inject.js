@@ -13,6 +13,7 @@ const os = require('os');
 const path = require('path');
 const http = require('http');
 const { spawn } = require('child_process');
+require('./testkit').hermetic('llm-inject'); // stato condiviso in fixture, non nel workspace (vedi testkit.js)
 
 const WS = path.resolve(__dirname, '..');
 const li = require('./llm-inject');

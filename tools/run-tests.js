@@ -20,7 +20,11 @@
 //   node tools/run-tests.js --e2e           # include anche i test e2e-live
 //   node tools/run-tests.js --list          # mostra la classificazione senza eseguire
 //   node tools/run-tests.js --only scope    # esegue solo i test il cui nome contiene "scope"
-//   node tools/run-tests.js --jobs 4        # parallelo (default 1 = sequenziale/deterministico)
+//   node tools/run-tests.js --jobs 4        # parallelo (default 2; --jobs 1 = sequenziale/deterministico)
+//                                          # default 2 misurato il 2026-09-28: 42,2 s -> 22,7 s (mediana di 5
+//                                          # round interlacciati, stessa macchina, stesso lavoro, 94 PASS
+//                                          # invariati; --jobs 4 = 13,6 s). Sicuro solo perché i test
+//                                          # sono ermetici sullo stato condiviso: vedi `hermetic()` in testkit.js
 //   node tools/run-tests.js --timeout 120000
 //   node tools/run-tests.js --json          # output machine-readable su stdout (per CI)
 //
@@ -36,7 +40,7 @@ const SELF = path.basename(__filename);
 
 // ---- CLI ---------------------------------------------------------------------
 function parseArgs(argv) {
-  const o = { e2e: false, list: false, json: false, jobs: 1, timeout: 90000, only: [] };
+  const o = { e2e: false, list: false, json: false, jobs: 2, timeout: 90000, only: [] };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a === '--e2e') o.e2e = true;

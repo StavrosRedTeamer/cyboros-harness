@@ -34,7 +34,7 @@ const { loadScope, inScope, hostOf, cidrInScope } = require('./scope-guard');
 const { scanAll } = require('./enforce');
 const privacy = require('./privacy');
 const { hasBin } = require('./tool-plane');
-const EGRESS_STATE = path.join(__dirname, '..', 'reports', 'tmp', 'egress-proxy.json');
+const EGRESS_STATE = process.env.EGRESS_STATE_FILE || path.join(__dirname, '..', 'reports', 'tmp', 'egress-proxy.json'); // vedi egress-proxy.js
 
 // ─── Ondata 2 additions (D2/B8/E10 + budget hook) ─────────────────────────────
 // All additions are SUPERSET: original behavior, exit codes and audit fields are kept;

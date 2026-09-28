@@ -9,6 +9,7 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const crypto = require('crypto');
+require('./testkit').hermetic('repo-vet'); // stato condiviso in fixture, non nel workspace (vedi testkit.js)
 
 const TMP = fs.mkdtempSync(path.join(os.tmpdir(), 'stavros-rv-'));
 process.on('exit', () => { try { fs.rmSync(TMP, { recursive: true, force: true }); } catch {} });

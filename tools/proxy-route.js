@@ -22,7 +22,7 @@ const net = require('net');
 const fs = require('fs');
 const path = require('path');
 
-const STATE = path.join(__dirname, '..', 'reports', 'tmp', 'egress-proxy.json');
+const STATE = process.env.EGRESS_STATE_FILE || path.join(__dirname, '..', 'reports', 'tmp', 'egress-proxy.json'); // vedi egress-proxy.js
 
 // Read the running egress-proxy daemon state. Returns { port, socks5, started } or null.
 function loadEgressProxy() {

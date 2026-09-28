@@ -10,6 +10,7 @@ const scopePath = path.join(os.tmpdir(), 'pr-scope-' + process.pid + '.json');
 fs.writeFileSync(scopePath, JSON.stringify({ allowed_hosts: [], allowed_url_prefixes: [], allowed_ips: ['127.0.0.1'], max_requests_per_second: 100 }));
 process.env.SCOPE_JSON = scopePath;
 process.env.EGRESS_AUDIT = path.join(os.tmpdir(), 'pr-audit-' + process.pid + '.jsonl');
+require('./testkit').hermetic('proxy-route'); // stato condiviso in fixture, non nel workspace (vedi testkit.js)
 const ROOT = path.join(__dirname, '..');
 
 const { socks5Connect, buildTarget } = require('./socks5');

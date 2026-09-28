@@ -100,16 +100,15 @@ function docCorpus() {
 // La lista può solo ACCORCIARSI — documenta il modulo (una riga in docs/toolbox.md o in
 // knowledge.md) e rimuovi la voce qui. Un modulo nuovo senza documentazione fa fallire il check.
 const UNDOCUMENTED_BASELINE = [
-  'accounting.js', 'addon-fit.js', 'anti-anti.js', 'api-authz.js', 'authn-oracle.js',
-  'autopilot-checkpoint.js', 'backfill-findings-tab.js', 'cachepoison.js', 'cc-arsenal.js',
-  'check-identity.js', 'circuit-breaker.js', 'component-fuzz.js', 'continuation.js',
-  'crypto-dump.js', 'daily-maintenance.js', 'embeddings.js', 'entity-taxonomy.js',
-  'eval-juice-shop.js', 'gen-bench.js', 'install-all.js', 'key-hunt.js', 'listen-audit.js',
-  'llm-inject.js', 'login.js', 'loop-watch.js', 'memory-recall.js', 'memory-store.js',
-  'model-routing.js', 'oracle.js', 'planner-demo.js', 'planner.js', 'poc-replay.js',
-  'privacy.js', 'proc-registry.js', 'proxy-route.js', 'radar-analyst.js', 'radar-profiler.js',
-  'radar-scout.js', 'recover.js', 'reflector.js', 'retrieval-budget.js', 'saml.js', 'spray.js',
-  'ssrf-guard.js', 'storage-triage.js', 'tool-path.js', 'vet-agents-vs-freebuff.js',
+  'accounting.js', 'anti-anti.js', 'api-authz.js', 'authn-oracle.js', 'autopilot-checkpoint.js',
+  'backfill-findings-tab.js', 'cachepoison.js', 'cc-arsenal.js', 'circuit-breaker.js',
+  'component-fuzz.js', 'continuation.js', 'crypto-dump.js', 'daily-maintenance.js',
+  'embeddings.js', 'entity-taxonomy.js', 'eval-juice-shop.js', 'install-all.js', 'key-hunt.js',
+  'listen-audit.js', 'llm-inject.js', 'login.js', 'loop-watch.js', 'model-routing.js', 'oracle.js',
+  'planner-demo.js', 'planner.js', 'poc-replay.js', 'privacy.js', 'proc-registry.js',
+  'proxy-route.js', 'radar-analyst.js', 'radar-profiler.js', 'radar-scout.js', 'recover.js',
+  'reflector.js', 'retrieval-budget.js', 'saml.js', 'spray.js', 'ssrf-guard.js',
+  'storage-triage.js', 'tool-path.js',
 ];
 
 console.log('repo-invariants — documenti vs realtà');

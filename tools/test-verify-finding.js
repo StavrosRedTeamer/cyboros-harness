@@ -2,6 +2,7 @@
 // Run: node tools/test-verify-finding.js
 const assert = require('assert');
 const fs = require('fs'), os = require('os'), path = require('path');
+require('./testkit').hermetic('verify-finding'); // stato condiviso in fixture, non nel workspace (vedi testkit.js)
 const { verifyOne, checkExpect } = require('./verify-finding');
 
 // mock exec: returns canned responses in order, repeating the last one.

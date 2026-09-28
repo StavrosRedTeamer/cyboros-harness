@@ -7,6 +7,7 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const { spawnSync } = require('child_process');
+require('./testkit').hermetic('cache'); // stato condiviso in fixture, non nel workspace (vedi testkit.js)
 
 const ROOT = path.resolve(__dirname, '..');
 const RUN = path.join(ROOT, 'tools', 'run.js');

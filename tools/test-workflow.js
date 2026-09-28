@@ -8,6 +8,7 @@ const os = require('os');
 const path = require('path');
 const { spawnSync } = require('child_process');
 const assert = require('assert');
+require('./testkit').hermetic('workflow'); // stato condiviso in fixture, non nel workspace (vedi testkit.js)
 
 let pass = 0; let fail = 0;
 function ok(name, fn) {

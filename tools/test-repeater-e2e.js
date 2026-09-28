@@ -8,6 +8,7 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const { spawn } = require('child_process');
+require('./testkit').hermetic('repeater-e2e'); // stato condiviso in fixture, non nel workspace (vedi testkit.js)
 
 const ROOT = path.join(__dirname, '..');
 const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'stavros-e2e-'));

@@ -35,7 +35,11 @@ const { resolveAndGuard } = require('./net');
 const { socks5Connect } = require('./socks5');
 const { rotateUA, scrubForwardHeaders } = require('./proxy-route');
 
-const STATE = path.join(__dirname, '..', 'reports', 'tmp', 'egress-proxy.json');
+// Stato condiviso del proxy: `EGRESS_STATE_FILE` permette ai test di tenerlo in una fixture.
+// Un file lasciato qui da un test ucciso a metà (o da un run interrotto) farebbe iniettare
+// HTTP_PROXY su ogni binario spawnato da run.js: il default resta la path reale, l'override è
+// per chi non deve toccarla.
+const STATE = process.env.EGRESS_STATE_FILE || path.join(__dirname, '..', 'reports', 'tmp', 'egress-proxy.json');
 const AUDIT = () => process.env.EGRESS_AUDIT || path.join(__dirname, '..', 'reports', 'tmp', 'egress-audit.jsonl');
 const DEFAULT_PORT = 9098;
 // Public IP-echo endpoints used by `check`; each returns the exit IP as plain text.

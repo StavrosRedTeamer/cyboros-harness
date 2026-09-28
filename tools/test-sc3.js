@@ -15,6 +15,7 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const crypto = require('crypto');
+require('./testkit').hermetic('sc3'); // stato condiviso in fixture, non nel workspace (vedi testkit.js)
 const { spawnSync } = require('child_process');
 const assert = require('assert');
 

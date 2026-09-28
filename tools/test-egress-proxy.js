@@ -11,6 +11,7 @@ fs.writeFileSync(scopePath, JSON.stringify({ allowed_hosts: [], allowed_url_pref
 const auditPath = path.join(os.tmpdir(), 'egr-audit-' + process.pid + '.jsonl');
 process.env.SCOPE_JSON = scopePath;
 process.env.EGRESS_AUDIT = auditPath;
+require('./testkit').hermetic('egress-proxy'); // stato condiviso in fixture, non nel workspace (vedi testkit.js)
 const ROOT = path.join(__dirname, '..');
 const { serve } = require('./egress-proxy');
 

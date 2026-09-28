@@ -15,6 +15,7 @@ const { spawnSync } = require('child_process');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
+require('./testkit').hermetic('record-finding'); // stato condiviso in fixture, non nel workspace (vedi testkit.js)
 
 const RF = path.join(__dirname, 'record-finding.js');
 const ORACLE = path.join(__dirname, 'oracle.js');

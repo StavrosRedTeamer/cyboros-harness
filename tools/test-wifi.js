@@ -5,6 +5,7 @@ const assert = require('assert');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
+require('./testkit').hermetic('wifi'); // stato condiviso in fixture, non nel workspace (vedi testkit.js)
 const wifi = require('./wifi');
 
 const BSSID = 'AA:BB:CC:DD:EE:FF';

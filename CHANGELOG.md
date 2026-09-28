@@ -60,6 +60,37 @@ rather than by version number.
   them is exposed.
 
 ### Changed
+- The test suite is hermetic on shared state and parallel by default. An fs-audit preload
+  attributed every in-repo write to a test: **22 of 94 tests wrote into the workspace, 130
+  distinct paths, 6 destinations shared by two or more tests** — including three shared files
+  (`reports/tmp/run-audit.jsonl` ×6, `reports/tmp/findings-head-anchor.jsonl` ×5,
+  `reports/tmp/egress-proxy.json` ×3) and the global rate limiter `tools/.pace.json`. Both
+  interference channels were then exercised, not assumed: a leftover `last` in the pace file
+  took `test-repeater-e2e` from 3.5 s to **8.3 s** (the limiter blocks the thread for the
+  global gap), and a leftover egress state file made `run.js` inject
+  `HTTP_PROXY=http://127.0.0.1:9098` — a dead port — into **every** binary it spawns, i.e. the
+  environment of every other test, and of the operator after the suite. `tools/testkit.js` now
+  exports `hermetic()`, which points the eight state env knobs the engine already had
+  (`PACE_FILE`, `RUN_AUDIT_FILE`, `FINDINGS_HEAD_ANCHOR_FILE`, `ARTIFACT_LEDGER_FILE`,
+  `AUDIT_DIR`, `EGRESS_STATE_FILE`, `OBSCURA_EGRESS_STATE`) at a fixture; 16 tests call it.
+  `run.js`, `egress-proxy.js` and `proxy-route.js` gained the one knob they lacked
+  (`EGRESS_STATE_FILE`, default unchanged). Result: **11 of 94 tests write in-repo, 44 paths,
+  and zero files shared with another test** (the three remaining shared destinations are
+  directory `mkdir`s). The two re-run experiments now come back clean (3.5 s, assertions
+  unaffected).
+- `npm test` runs with 2 workers by default (`--jobs 1` still serializes). Measured before the
+  change at `--jobs 1`, five interleaved rounds on the same 12-core machine, same work: 42.2 s
+  median (one round 194 s — a uniformly ×5–6 slower run across *all* tests, i.e. the shared
+  machine, reported rather than averaged away); `--jobs 2` 22.7 s median, `--jobs 4` 13.6 s,
+  with PASS=94 / FAIL=0 / SKIP=1 in all nine runs. CI stays on `--jobs 2` on purpose: GitHub's
+  runners were not measurable from here.
+- `UNDOCUMENTED_BASELINE` tightened 47 → 41: six entries had become stale (reality was 41), so
+  the gate was carrying six names it no longer needed to excuse — two of them
+  (`memory-recall.js`, `memory-store.js`) because `ops/harness.md` now owns the RAG rule. The
+  other ratchet, `OWN_SCAFFOLD_BASELINE` (39 tests that still copy the counter/`ok()` instead of
+  importing `tools/testkit.js`), is unchanged: hermeticity moved *state* into fixtures, it did
+  not touch the scaffolding, and migrating a file is a different job with a different contract
+  (several tests use `ok(name, condition)` while the kit takes `ok(name, fn)`).
 - Agent-fleet prompts de-duplicated against their single owner. The eight discipline rules and
   the RAG recall paragraph were copied verbatim into 19–29 of the 29 `.ts` files in
   `local/fleet/` + `.agents/`: 86 KB of the fleet's 185 KB, up to 29 byte-identical copies of the
