@@ -154,6 +154,15 @@ ok('AGENTS.md: contratto dentro il budget del prompt', () => {
     `prompt assemblato ${total} caratteri (tetto ${PROMPT_BUDGET}): AGENTS.md ${n} + ~/.AGENTS.md ${total - n}`);
 });
 
+// L'indice della documentazione è GENERATO: se i file cambiano e lui no, mente. Qui si rigenera
+// in memoria (--check non scrive) invece di fidarsi di averlo fatto a mano.
+ok('docs/INDEX.md è aggiornato (indice generato dai file reali)', () => {
+  const r = spawnSync(process.execPath, [path.join(WS, 'tools', 'docs-index.js'), '--check'],
+    { cwd: WS, encoding: 'utf8', timeout: 30000 });
+  assert.strictEqual(r.status, 0,
+    'indice non aggiornato: ' + String(r.stderr || r.stdout || '').split('\n')[0]);
+});
+
 ok('CHANGELOG: nessuna voce "`X` → `X`"', () => {
   const bad = read('CHANGELOG.md').split('\n').filter((l) => {
     const m = l.match(/`([^`]+)`\s*→\s*`([^`]+)`/);

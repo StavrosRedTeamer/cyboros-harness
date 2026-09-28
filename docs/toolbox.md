@@ -166,3 +166,16 @@
   `frida` picks the hook from the static pass (Flutter → `disable-flutter-tls.js`, PairIP → repack hint);
   `surface` records exported components/deeplinks into `reports/<pkg>-map.json`; `firebase-audit` does
   ONE read-only existence probe per Firebase asset. Full detail in docs/mobile.md.
+- **Autopilot (opt-in):** `node tools/autopilot.js` — the deterministic outer control loop
+  (plan/loop/stop/checkpoint) for a long engagement; it runs other tools through the guarded
+  entrypoints and *returns* directives instead of calling a model, so the flow is replayable and
+  fail-closed. `tools/autopilot-checkpoint.js` persists the checkpoint it resumes from.
+- **Test gate:** `node tools/run-tests.js` discovers `tools/test-*.js`, classifies each by its
+  `// test-tags:` header (offline / loopback / e2e) and runs them with a per-test timeout; it is
+  the only gate (`npm test`). `--jobs N` sets the workers (default 2), `--only <substring>`,
+  `--list`, `--json`, `--e2e`. A test that rewrites an engagement file (`scope.json`, `auth.json`…)
+  is reported as a violation, not just a failure.
+- **Documentation index:** `node tools/docs-index.js` regenerates `docs/INDEX.md` from the real files
+  (title, first paragraph, size, plan checkbox progress); `--check` writes nothing and exits 1 when the
+  index is stale, which is what `test-repo-invariants` runs. The superseded plans it lists live in
+  `docs/archive/`, with the landing evidence for each move in `docs/archive/README.md`.

@@ -1,6 +1,6 @@
 {
   "name": "stavrosredteamer",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "private": true,
   "description": "A penetration-testing harness where a finding is only a finding if code can prove it: policy enforced in the runtime, severity capped by evidence. Zero dependencies, offline-capable.",
   "engines": {

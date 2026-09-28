@@ -2,11 +2,18 @@
 
 All notable changes to this project are documented here. Dates are commit dates.
 
-The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the
-project does not yet publish tagged releases, so entries are grouped by milestone
-rather than by version number.
+The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); entries are
+grouped by milestone, and `v0.1.0` (2026-09-28) is the first tagged release.
 
 ## [Unreleased]
+
+_Niente dopo la prima release._
+
+## [0.1.0] — 2026-09-28
+
+Prima release taggata. Il tag `v0.1.0` è su un albero verificato **al momento del tag**:
+`npm test` 94 PASS / 0 FAIL / 1 SKIP, `doctor --check` exit 0, `check-identity` coerente,
+`test-repo-invariants` verde. Tutto ciò che segue è quanto si è accumulato fino a qui.
 
 ### Added
 - `tools/test-repo-history.js` — a gate on the git **history**, which nothing checked before:
@@ -60,6 +67,21 @@ rather than by version number.
   them is exposed.
 
 ### Changed
+- Documentation has an index again, and it is **generated**: `docs/INDEX.md` is written by
+  `node tools/docs-index.js` from the real files (title, first paragraph, size, and for plans the
+  checkbox progress), so it cannot drift the way a hand-maintained index does —
+  `test-repo-invariants` runs it with `--check` and fails if the index is stale. It also gave the
+  live surface its shape back: the root and `docs/` listed reference documents and plans side by
+  side with nothing saying which was which.
+- Superseded plans moved to `docs/archive/` (three files: the Command Center redesign plan, the
+  desktop WP2–WP9 mission brief, and the never-wired design draft), with the landing evidence for
+  each move in `docs/archive/README.md` and the archive listed from the generated index. The
+  criterion is evidence, not ticks: `docs/superpowers/plans/2026-09-08-stavros-radar.md` has 26 of
+  26 checkboxes open while its three `radar-*.js` tools shipped, so a checked box proves nothing
+  here. `piano-ottimizzazione-stavros.md` stays on the live surface on purpose — its Fase B (stop
+  vendoring binaries) has not landed.
+- `README.md` engine-module count corrected 139 → 140: `tools/workspace-gc.js` had been added
+  without updating it, so `test-repo-invariants` was failing on a clean checkout of `master`.
 - The test suite is hermetic on shared state and parallel by default. An fs-audit preload
   attributed every in-repo write to a test: **22 of 94 tests wrote into the workspace, 130
   distinct paths, 6 destinations shared by two or more tests** — including three shared files
@@ -110,8 +132,6 @@ rather than by version number.
   config), the canonical blocks must still be present in every file that must carry them (so the
   first check cannot be passed by deleting them), and every rule compressed out of the prompts
   must still exist in `ops/harness.md` — "no instruction lost" as a machine check.
-- `README.md` engine-module count corrected 139 → 140: `tools/workspace-gc.js` had been added
-  without updating it, so `test-repo-invariants` was failing on a clean checkout of `master`.
 - `README.md` rewritten in English around the evidence-discipline and guardrail
   positioning, with the previously unstated differentators (zero dependencies,
   air-gapped operation, offline test suite) stated up front. Corrects stale
