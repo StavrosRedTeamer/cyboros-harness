@@ -20,10 +20,22 @@
 'use strict';
 const fs = require('fs');
 const path = require('path');
+const { execFileSync } = require('child_process');
 
 const WS = path.resolve(__dirname, '..');
 const OUT = path.join(WS, 'docs', 'INDEX.md');
 const ARCHIVE_DIR = path.join(WS, 'docs', 'archive');
+
+// Cosa entra nell'indice lo decide git, non il disco: un file locale e gitignorato
+// (es. `evidence-index.md`, `session-prompt-egress-f3.md`) comparirebbe qui e non in un
+// checkout pulito, e l'indice committato non sarebbe più riproducibile — l'invariante
+// fallirebbe al primo clone. Meglio: l'indice descrive ciò che è versionato.
+const TRACKED = (() => {
+  try {
+    const out = execFileSync('git', ['ls-files', '-z'], { cwd: WS, encoding: 'utf8', maxBuffer: 32 * 1024 * 1024 });
+    return new Set(out.split('\0').filter(Boolean));
+  } catch { return null; }   // niente git (export, tarball): si torna a leggere il disco
+})();
 
 const kb = (n) => (n / 1024).toFixed(1).replace('.', ',') + ' KB';
 const read = (p) => fs.readFileSync(p, 'utf8');
@@ -33,6 +45,10 @@ function listing(dir, filter) {
   if (!fs.existsSync(dir)) return [];
   return fs.readdirSync(dir)
     .filter((f) => filter(f))
+    .filter((f) => {
+      const p = path.join(dir, f);
+      return !TRACKED || fs.statSync(p).isDirectory() || TRACKED.has(rel(p));
+    })
     .sort()
     .map((f) => path.join(dir, f));
 }
