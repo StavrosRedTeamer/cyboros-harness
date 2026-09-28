@@ -7,7 +7,15 @@ grouped by milestone, and `v0.1.0` (2026-09-28) is the first tagged release.
 
 ## [Unreleased]
 
-_Niente dopo la prima release._
+### Added
+
+- `tools/verify-tag.js`: verifica un ref **in un clone temporaneo** invece che nell'albero di lavoro,
+  eseguendoci i quattro gate di release (`test-repo-invariants`, `doctor --check`, `check-identity`,
+  `npm test`) e stampando il commit risolto. È la lezione di `v0.1.0`, che era stato dichiarato verde
+  misurandolo nell'albero locale mentre un clone pulito dello stesso tag falliva l'indice della
+  documentazione. `tools/test-verify-tag.js` prova la proprietà che conta — con l'albero di lavoro
+  sporco il tag committato resta verde, con lo stesso guasto committato e taggato esce 1 ed è il
+  clone conservato a dirlo. La suite passa da 94 a 95 test.
 
 ## [0.1.0] — 2026-09-28
 

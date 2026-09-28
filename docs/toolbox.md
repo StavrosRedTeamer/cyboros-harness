@@ -175,6 +175,13 @@
   the only gate (`npm test`). `--jobs N` sets the workers (default 2), `--only <substring>`,
   `--list`, `--json`, `--e2e`. A test that rewrites an engagement file (`scope.json`, `auth.json`…)
   is reported as a violation, not just a failure.
+- **Release verification:** `node tools/verify-tag.js [ref]` clones the ref into a temp dir and runs
+  the four release gates **in that clone** (`test-repo-invariants`, `doctor --check`, `check-identity`,
+  `npm test`), printing the commit it resolved and a per-check line; exit 1 keeps the clone for
+  diagnosis. Defaults to the last tag; `--remote` clones from `origin` instead of the local repo,
+  `--repo <path>` / `--ref <r>` point elsewhere, `--keep` leaves the clone. Why it exists: a tag
+  measured in the working tree is not verified — `v0.1.0` was declared green that way, and a clean
+  clone of the same tag had a red gate.
 - **Documentation index:** `node tools/docs-index.js` regenerates `docs/INDEX.md` from the real files
   (title, first paragraph, size, plan checkbox progress); `--check` writes nothing and exits 1 when the
   index is stale, which is what `test-repo-invariants` runs. The superseded plans it lists live in

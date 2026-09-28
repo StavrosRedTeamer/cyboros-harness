@@ -10,7 +10,7 @@
 
 - [**AGENTS.md — StavrosRedTeamer**](AGENTS.md) — Operatore AI per operazioni di pentest autorizzate (web/host, wireless, mobile). · 5,0 KB
 - [**Benchmark**](BENCHMARK.md) — Public security benchmarks are in the model's training data. "Solved" on OWASP Juice · 7,0 KB
-- [**Changelog**](CHANGELOG.md) — All notable changes to this project are documented here. Dates are commit dates. · 18,1 KB
+- [**Changelog**](CHANGELOG.md) — All notable changes to this project are documented here. Dates are commit dates. · 18,7 KB
 - [**StavrosRedTeamer**](README.md) — A penetration-testing harness where a finding is only a finding if code can prove it — · 10,8 KB
 - [**Security Policy**](SECURITY.md) — StavrosRedTeamer is offensive-security tooling. It executes reconnaissance and · 4,1 KB
 - [**Stavros — Web Red Team Methodology & Rules of Engagement**](knowledge.md) — Shared brain for every Stavros agent — read before acting. Detail lives in docs/ (map at bottom); · 12,3 KB
@@ -35,7 +35,7 @@
 - [**Testing by class — dettaglio metodologico**](docs/methodology-classes.md) — Class names for `record-finding.js` are the canonical keys of `tools/test-registry.json` — · 4,8 KB
 - [**Mobile (Android) — methodology & tool detail**](docs/mobile.md) — (`127.0.0.1`, `localhost`) o un serial USB esplicitamente in allowlist (device fisico autorizzato). · 4,9 KB
 - [**System Prompt Dump — StavrosRedTeamer**](docs/system-prompt-dump.md) — Nessun dato di target, credenziale o output di engagement lascia la macchina. Vedi `docs/egress-opsec.md`. · 4,8 KB
-- [**Toolbox — dettaglio per-tool (knowledge.md tiene la tabella compatta)**](docs/toolbox.md) — (it refuses out-of-scope hosts; supports `-l -`/`--stdin` AND a piped stdin for target lists; every · 16,8 KB
+- [**Toolbox — dettaglio per-tool (knowledge.md tiene la tabella compatta)**](docs/toolbox.md) — (it refuses out-of-scope hosts; supports `-l -`/`--stdin` AND a piped stdin for target lists; every · 17,5 KB
 - [**Wireless (modalità separata)**](docs/wireless.md) — WiFi is a SEPARATE mode from the web/network pipeline: targets are BSSIDs/ESSIDs/stations/channels, · 6,1 KB
 
 ## `ops/` — regole della harness
