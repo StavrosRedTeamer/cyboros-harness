@@ -37,7 +37,7 @@
 - [**Testing by class — dettaglio metodologico**](docs/methodology-classes.md) — Class names for `record-finding.js` are the canonical keys of `tools/test-registry.json` — · 4,8 KB
 - [**Mobile (Android) — methodology & tool detail**](docs/mobile.md) — (`127.0.0.1`, `localhost`) o un serial USB esplicitamente in allowlist (device fisico autorizzato). · 4,9 KB
 - [**System Prompt Dump — StavrosRedTeamer**](docs/system-prompt-dump.md) — Nessun dato di target, credenziale o output di engagement lascia la macchina. Vedi `docs/egress-opsec.md`. · 4,8 KB
-- [**Toolbox — dettaglio per-tool (knowledge.md tiene la tabella compatta)**](docs/toolbox.md) — (it refuses out-of-scope hosts; supports `-l -`/`--stdin` AND a piped stdin for target lists; every · 16,0 KB
+- [**Toolbox — dettaglio per-tool (knowledge.md tiene la tabella compatta)**](docs/toolbox.md) — (it refuses out-of-scope hosts; supports `-l -`/`--stdin` AND a piped stdin for target lists; every · 16,8 KB
 - [**Wireless (modalità separata)**](docs/wireless.md) — WiFi is a SEPARATE mode from the web/network pipeline: targets are BSSIDs/ESSIDs/stations/channels, · 6,1 KB
 
 ## `ops/` — regole della harness
