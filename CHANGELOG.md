@@ -9,6 +9,105 @@ grouped by milestone, and `v0.1.0` (2026-09-28) is the first tagged release.
 
 ### Added
 
+- `tools/f3-client-setup.sh` — l'arsenale arm64 dentro il proot Kali ora include l'intera linea
+  mobile (`apktool`, `jadx`, `apksigner`, `zipalign`, `androguard`, jar `libsmali-java`, `apkid` e
+  `drozer`) e un installer proot-safe: due bug reali lo tenevano fuori dal telefono. `apkid` e
+  `smali` non esistono nei repo Kali e un nome sconosciuto **aborta l'intera transazione apt**
+  (nessun pacchetto installato, in silenzio); inoltre `jadx`/`apksigner` tirano `default-jre` e con
+  esso `systemd`/`dbus`/`gtk`, i cui postinst falliscono sotto proot (niente PID1) lasciando `dpkg`
+  mezzo-configurato. L'installer neutralizza quei postinst durante l'installazione, completa con
+  `dpkg --configure -a`, riprova e li ripristina: `dpkg --audit` resta vuoto a fine run. Una nuova
+  invariante in `tools/test-repo-invariants.js` impedisce il ritorno dei due bug.
+- `tools/chain-log.js`, `tools/verification-log.js`, `tools/effective-findings.js` — la verifica come
+  **fatto nuovo** invece che come modifica di un fatto vecchio. `findings.jsonl` è append-only,
+  incatenato (A3) e ancorato esternamente, quindi una verifica fatta *dopo* la registrazione non
+  aveva un posto dove finire, e l'unico percorso esistente (vedi sotto) riscriveva il file. Ora i
+  fatti di verifica vivono in un side log con la stessa disciplina (`reports/verifications.jsonl`:
+  append-only, catena, ancora esterna — la meccanica in un solo posto, `chain-log.js`), e lo stato
+  di un finding è una **vista calcolata**: `findings.jsonl` fuso col side log, fail-closed verso il
+  basso e con l'oracle **ri-validato su disco al momento del fold**, così un artefatto cancellato
+  toglie la promozione. Il gate legge la vista per `verify`, `noPending`, `oracle`, `evidenceQuote` e
+  `pocReplay`; gli altri consumer continuano a vedere lo stato registrato (la direzione prudente).
+- `tools/rechain.js` — l'unica via di ripristino per una catena rotta, che finora non esisteva (la
+  parola "riconciliata" compariva una volta sola, in un commento nel sorgente). Backup prima di
+  scrivere, ricostruzione della catena sul contenuto **esistente** (cambia solo `chain`), e una voce
+  `findings-rechain` con testa vecchia, testa nuova e **motivo obbligatorio** prima della nuova
+  ancora: una riscrittura diventa un fatto leggibile nella storia invece di un'anomalia
+  indistinguibile da un attacco. `--confirm "<motivo>"` è obbligatorio, come per le altre azioni
+  distruttive del repo.
+- Cinque file di test nuovi (`tools/test-verification-log.js`, `test-effective-findings.js`,
+  `test-rechain.js`, `test-vendor-dir.js`, `test-request-approval.js`) e tre estesi
+  (`test-verify-finding.js`, `test-gate-chain.js`, `test-cc-approvals.js`). Due di questi moduli —
+  `vendor-dir.js` e `request-approval.js` — non erano menzionati in **nessun** test, e `vendor-dir.js`
+  decide quale binario viene risolto ed eseguito.
+- `docs/superpowers/specs/2026-09-28-findings-integrity-design.md` — il design (le evidenze E1–E4, le
+  regole del fold, la sequenza).
+- `tools/permission-matrix.js` — la campagna di autorizzazione multi-identità (BOLA/BFLA, artefatto
+  Gate P1, batch2 WS1): ripete ogni endpoint come ogni identità e produce la matrice chi-vede-cosa,
+  con i candidati a `verify_level: 'suspected'` — la registrazione resta di `record-finding.js,
+  perché solo lì esistono il ceiling di severità e la disciplina dell'oracolo. Solo metodi sicuri di
+  default; un metodo state-changing richiede `--methods` **e** `--confirm "<motivo>"`. Un'identità che
+  risolve a zero header non diventa una richiesta anonima (fail-closed; `anon` è l'unica identità
+  senza header, ed è esplicita). `exec` è iniettabile, quindi i test girano offline.
+- `parsers.parseOpenApi` + `target-model.js ingest openapi <spec> --target <host>` (batch2 WS2) —
+  OpenAPI 3.x e Swagger 2.0 → endpoint nel target model, idempotente. Fail-soft come tutti i
+  `parse*`: input degradato → `[]`, mai un throw; un `$ref` non risolto non diventa un parametro
+  inventato; un path relativo senza `--target` non inventa un host (conteggio 0 + nota). Serve a
+  dare alla campagna di autorizzazione l'elenco REALE degli endpoint invece di indovinarli.
+- `daily-maintenance.js` guadagna la rotazione di `temp/` (step 4): **report** delle voci stantie per
+  default, archiviazione solo con `--rotate-temp`, soglia `--rotate-days`/`$STAVROS_TEMP_ROTATE_DAYS`
+  (default 7). Non cancella: usa `workspace-gc.js`, che copia e verifica sha256 prima di toccare la
+  sorgente e annulla se la verifica non torna. Su questa macchina sono 268 MB di lavoro di engagement
+  in 19.661 file, che prima crescevano senza una policy.
+
+### Fixed
+
+- **Un percorso documentato poteva congelare la prova.** `knowledge.md` indicava
+  `verify-finding.js batch` per la verifica batch: quella modalità riscriveva le righe di
+  `findings.jsonl` in place, rompendo la catena A3 per costruzione, e da lì `record()` rifiuta ogni
+  append e il gate `chain` fallisce. `batch` ora verifica, scrive il receipt dell'oracolo e **appende**
+  al side log; `verifyFile()` resta esportato ma è **fail-closed** su un log incatenato (`refusing to
+  rewrite`). Il test lo prova in modo diretto: `findings.jsonl` è byte-identico prima e dopo il batch.
+- **Promuovere `confirmed` → `verified` era impossibile in append-only.** `record()` deduplica su
+  `host|endpoint|title` e rispondeva `deduped:true` senza aggiornare nulla: l'unico modo di registrare
+  l'esito di una verifica successiva era la riscrittura del file, cioè il guasto qui sopra.
+  `recordWithVerify` su una chiave già presente appende ora il record di verifica al side log (e il
+  risultato deduplicato porta il `seq` della riga esistente, che è ciò a cui il record punta).
+- **`checkNoPending` era vacuo.** `pending` era definito come `status === 'pending'`, ma `validate()`
+  impone lo status e ammette solo `confirmed|inconclusive|verified`: su un corpus registrato dal
+  validator attuale il check **non poteva fallire**, quindi uno dei tre criteri dichiarati del gate
+  ("nessun report senza copertura completa, nessun pending, almeno un verificato") era decorativo.
+  La definizione nuova è falsificabile: pendente è una rivendicazione di realtà la cui prova non
+  regge su disco (verifica fallita, oracle non più valido, o esito `verified` che non promuove).
+- `tools/vendor-dir.js` rifiuta ora i percorsi con `..` o NUL: l'helper sceglie *quale binario* viene
+  eseguito, quindi un percorso che esce dalla root non si risolve (prima veniva composto).
+
+### Security
+
+- **La race grant/use del consent token.** `cc-approvals.consume()` è read-then-write: due processi
+  che consumavano lo **stesso** token nello stesso istante vedevano entrambi `granted` e appendeva
+  entrambi la riga `consume` — un token dichiarato "single-use" non era atomico, ed è esattamente la
+  superficie che `docs/THREAT-MODEL.md` §5 nomina ("the race between grant and use"). La sezione
+  critica è ora protetta da un lock file (`openSync(..., 'wx')`, atomico sul filesystem; lock stantio
+  rotto dopo 30 s; lock non acquisibile entro 3 s → `blocked`, fail-closed). Il test lancia **quattro
+  consumatori concorrenti** sullo stesso id e pretende che ne vinca esattamente uno — la proprietà,
+  non l'implementazione. Replay, host sbagliato, comando diverso e scadenza erano invece **già**
+  coperti da `test-cc-approvals.js`: la voce del threat model si riduce a questo caso, e questo è il
+  motivo per cui era scritto come caso singolo e non come cantiere.
+
+### Changed
+
+- `daily-maintenance.js` si esegue solo come CLI: un `require()` del modulo avviava una manutenzione
+  completa (refresh KEV, mirror dei repo, reindex della knowledge base) come effetto collaterale
+  dell'import. Ora `main()` è protetto come nel resto del repo, e il modulo espone `rotateTemp`
+  perché i test possano esercitarlo.
+- La meccanica di catena e ancora esterna è uscita da `record-finding.js` in `tools/chain-log.js`
+  (comportamento invariato: le sue export restano, `test-record-finding` 31/31 e `test-ondata6`
+  36/36 sul refactor). Prima di estrarla ho **misurato** i consumer: 28 file leggono
+  `findings.jsonl`, quindi il fold è rimasto nella vista — `gate.js` ci passa subito, gli altri no.
+- La suite passa da 95 a **103 test** e il motore da 142 a **147 moduli**; i conteggi dichiarati in
+  `README.md` seguono la realtà, come impone `tools/test-repo-invariants.js`.
+
 - `tools/verify-tag.js`: verifica un ref **in un clone temporaneo** invece che nell'albero di lavoro,
   eseguendoci i quattro gate di release (`test-repo-invariants`, `doctor --check`, `check-identity`,
   `npm test`) e stampando il commit risolto. È la lezione di `v0.1.0`, che era stato dichiarato verde
