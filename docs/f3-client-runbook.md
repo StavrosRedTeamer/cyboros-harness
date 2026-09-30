@@ -48,6 +48,24 @@ f3-kali -c "cd /root/stavros && node tools/doctor.js"
 Il one-shot deve restituire il verdetto REALE dello scope-guard (esito hard-coded:
 `example.com` fuori scope ⇒ `{"ok":false,...}`, exit 1).
 
+## 2-bis. Arsenale dentro il proot: cosa è locale e cosa no
+
+Il Kali del F3 è l'immagine **minimale**: il bootstrap di `f3-client-setup.sh` (o
+`~/f3bot/setup-official.sh`) è l'unica cosa che popola l'arsenale. Due trappole del proot:
+
+- **Niente systemd/PID1.** `jadx`/`apksigner` tirano `default-jre` → `dbus`/`gtk`/`systemd`, i cui
+  postinst falliscono (`Protocol driver not attached`) e fanno abortire `apt` senza configurare
+  nulla. Il bootstrap neutralizza quei postinst durante l'installazione e li ripristina dopo.
+- **Nomi pacchetto che non esistono.** `apkid` e `smali` non sono nei repo Kali: in una riga
+  `apt-get install` fanno fallire **tutta** la transazione. `apkid`/`drozer` vanno da `pip3`, i jar
+  smali da `libsmali-java`.
+
+Dopo l'arsenale ampio (recon, dir-busting, web, creds, AD, services, host, wireless, cloud,
+wordlist, template nuclei) il tool-plane locale copre le stesse categorie del PC, tranne:
+monitor-mode WiFi (firmware NIC), `tcpdump` raw (vuole root sul kernel Android) e i binari x86-only.
+`chromium` (arm64) e `obscura` (asset `obscura-aarch64-linux-stealth.tar.gz`) restano i due backend
+CDP per `node tools/dom-check.js` (`--backend chrome` o `--backend obscura`).
+
 ## 3. Hardening Android (root/TWRP)
 
 Il ROM custom serve a QUESTO, non al client in sé:
