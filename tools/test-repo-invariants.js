@@ -163,6 +163,30 @@ ok('docs/INDEX.md è aggiornato (indice generato dai file reali)', () => {
     'indice non aggiornato: ' + String(r.stderr || r.stdout || '').split('\n')[0]);
 });
 
+// Il bootstrap del F3 gira in proot, dove non esiste un PID1 systemd: i postinst di
+// systemd/dbus/gtk falliscono e apt non configura nulla. Inoltre apkid e smali NON sono nei
+// repo Kali e un nome sconosciuto fa abortire l'INTERA transazione apt. Questa invariante
+// impedisce il ritorno dei due bug trovati il 2026-09-30.
+ok('f3-client-setup: arsenale android proot-safe (no apkid/smali in apt)', () => {
+  const src = read('tools/f3-client-setup.sh');
+  // Ancora l'heredoc al bootstrap dentro proot: il file ne ha altri (f3-kali, config) e il
+  // primo `<<'EOF'` non è quello giusto.
+  const m = src.match(/f3-kali-bootstrap\.sh"\s*<<'EOF'\n([\s\S]*?)\nEOF\n/);
+  assert.ok(m, 'heredoc del bootstrap non trovato in tools/f3-client-setup.sh');
+  const body = m[1];
+  const code = body.split('\n').filter((l) => !/^\s*#/.test(l)).join('\n').replace(/\\\n/g, ' ');
+  const aptCmds = code.match(/apt-get install[^\n]*/g) || [];
+  assert.ok(aptCmds.length > 0, 'nessun apt-get install nel bootstrap F3');
+  for (const c of aptCmds) {
+    assert.ok(!/\bapkid\b/.test(c), 'apkid non è nei repo Kali: niente apt — ' + c.trim());
+    assert.ok(!/(^|\s)smali(\s|$)/.test(c), 'smali non è nei repo Kali: usa libsmali-java — ' + c.trim());
+  }
+  assert.ok(/proot_neutralize_postinst/.test(body), 'manca la neutralizzazione dei postinst (proot)');
+  assert.ok(/proot_restore_postinst/.test(body), 'manca il ripristino dei postinst (proot)');
+  assert.ok(/libsmali-java/.test(body), 'libsmali-java atteso per i jar smali');
+  assert.ok(/pip3 install[^\n]*\bapkid\b/.test(body), 'apkid deve essere installato da pip');
+});
+
 ok('CHANGELOG: nessuna voce "`X` → `X`"', () => {
   const bad = read('CHANGELOG.md').split('\n').filter((l) => {
     const m = l.match(/`([^`]+)`\s*→\s*`([^`]+)`/);

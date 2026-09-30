@@ -231,6 +231,54 @@ apt-get install -y --no-install-recommends \
   nmap sqlmap nikto ffuf nuclei wafw00f hydra hashid \
   dnsutils netcat-openbsd curl wget git jq unzip zip file procps sudo mitmproxy
 
+# P2 — arsenale ANDROID (idempotente). Serve alla linea mobile della harness:
+#   static/surface/firebase di mobile.js (apktool/jadx), repack firmabile
+#   (apksigner/zipalign, il pezzo che manca a mobile-pairip-repack.sh),
+#   triage APK (androguard/apkid) e componenti esportate (drozer).
+# Senza questi il tool-plane mobile resta 3/5 (adb+frida+objection) — vedi
+# setup-official.sh in f3bot, che ha lo stesso blocco.
+# ATTENZIONE: apkid e smali NON sono nei repo Kali. Metterli nella riga apt
+# fa abortire l'INTERA installazione (apt-get install fallisce se un nome è
+# sconosciuto e non installa NULLA) — per questo apkid/drozer vanno da pip e
+# per smali restano i jar di libsmali-java. Non rimettere apkid/smali in apt.
+#
+# PROOT: jadx/apksigner tirano default-jre (JRE completo) -> cups/dbus/gtk -> systemd.
+# In proot non c'è un PID1 systemd e i postinst di systemd/dbus/gtk falliscono
+# (`Protocol driver not attached`): apt abortisce e NON configura nulla, in silenzio.
+# Perciò: installa, e se fallisce neutralizza (no-op) i postinst dei pacchetti che
+# restano iF/iU, completa con `dpkg --configure -a`, riprova; poi ripristina i
+# postinst. Alla fine dpkg resta coerente e i binari girano con la JRE headless.
+proot_neutralize_postinst() {
+  local p f
+  for p in $(dpkg -l 2>/dev/null | awk '$1=="iF"||$1=="iU"{print $2}'); do
+    f="/var/lib/dpkg/info/$p.postinst"
+    [ -e "$f" ] || continue
+    [ -e "$f.real" ] || mv "$f" "$f.real"
+    ln -sf /bin/true "$f"
+  done
+}
+proot_restore_postinst() {
+  local f
+  for f in /var/lib/dpkg/info/*.postinst.real; do
+    [ -e "$f" ] || continue
+    rm -f "${f%.real}"; mv "$f" "${f%.real}"
+  done
+}
+proot_install() {
+  local i
+  for i in 1 2 3; do
+    apt-get install -y --no-install-recommends "$@" && return 0
+    proot_neutralize_postinst
+    dpkg --configure -a || true
+  done
+  return 1
+}
+proot_install apktool jadx apksigner zipalign androguard libsmali-java \
+  || echo '[i] arsenale android incompleto (vedi /root/android-apt*.log)'
+proot_restore_postinst
+pip3 install --break-system-packages apkid drozer \
+  || echo '[i] apkid/drozer non installati (best-effort: mobile.js funziona senza)'
+
 # Node >= 22 (NodeSource): richiesto da gui-server.js e dalla harness
 if [ "$(node -v | cut -dv -f2 | cut -d. -f1)" -lt 22 ]; then
   curl -fsSL https://deb.nodesource.com/setup_22.x | bash -
