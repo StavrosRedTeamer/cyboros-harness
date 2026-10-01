@@ -9,6 +9,157 @@ grouped by milestone, and `v0.1.0` (2026-09-28) is the first tagged release.
 
 ### Added
 
+- Privilegi minimi per i binari di attacco, così l'agente non deve fermarsi a chiedere la password
+  sudo all'operatore a metà engagement. Tre pezzi: `tools/cap-manifest.json` dichiara per ogni
+  binario le capability minime **e il perché**; `grant-tool-caps.sh` le applica con `setcap` piu
+  `net.ipv4.ip_unprivileged_port_start=0` per i bind sotto 1024; `tools/capcheck.js` verifica lo
+  stato reale e `tools/cap-plan.js` valida il manifest e produce il piano che entrambi consumano.
+  `cap_net_raw`/`cap_net_admin` su 19 binari (masscan, nmap, hping3, naabu, rustscan, arping,
+  arpspoof, ettercap, suite aircrack, hcxdumptool/hcxpcapngtool, reaver, hostapd, dnsmasq, iw,
+  iwconfig, ifconfig). Verificato empiricamente, non dichiarato: `masscan`, `naabu`, `hping3`,
+  `ettercap`, `arpspoof` passano dal raw socket a utente, e il bind su 445 e 53 funziona.
+  `install-tools.sh` chiude con la Fase 6 che invoca lo script.
+- Il perché di **capability e non `NOPASSWD` sudo** è dichiarato in `docs/THREAT-MODEL.md`:
+  `nmap --script=<file>` esegue Lua **come root**, quindi una regola NOPASSWD su nmap sarebbe una
+  shell root per chi può scrivere un file; `setcap` concede un insieme di capability, non un uid.
+  Il costo è detto altrettanto chiaro: `cap_net_admin` manipola interfacce ed è vettore di
+  escalazione su alcuni kernel. I tool Python (responder, ntlmrelayx) non vengono toccati
+  nell'interprete — coperti dalla soglia delle porte.
+
+- `tools/report-sarif.js` — la prima uscita machine-readable della harness: SARIF 2.1.0 da
+  `findings.jsonl`, accettato da GitHub code scanning e DefectDojo senza adattamenti. Fino ad
+  ora c'era solo HTML, nonostante `tools/radar-profiler.js` dichiarasse gia `sarif` fra le
+  capability di reporting: l'incoerenza e' chiusa. Ogni result porta in `properties.stavros`
+  cio che SARIF non ha un campo per — `verify_level`, il suo `severity_ceiling`, `status`,
+  `oracle_ref`/`oracle_type`, il blocco `verify` rieseguibile, `evidence_ref` — perche' la
+  severity limitata dalle prove e' l'unica cosa che un consumatore generico non puo' dedurre.
+  **Rifiuta** un record la cui severity eccede il `verify_level` (stessa regola di
+  `record-finding.js`) ed esce 2 in quel caso: un run che ha perso record non puo' presentarsi
+  come scan pulito. Un finding senza livello esce `unclassified`, mai promosso. 17 test offline.
+  Verificato sui 128 finding reali del workspace: 128 emessi, 0 rifiutati, 106 con oracolo.
+- 3 workflow offensivi: `attack-api-stateful` (property-based stateful API fuzzing dalla spec
+  con schemathesis — copre BOLA/mass-assignment sul lifecycle e state-dependent authz, le classi
+  su cui la harness e' piu' debole, perche' l'input deriva dal CONTRATTO e non dall'ipotesi
+  dell'agente), `attack-h2c` (smuggling h2c detection-only) e `attack-wp` (fingerprint core
+  zero-token + CVE plugin/temi via wpscan).
+- 14 voci in `tools/tool-registry.json` (83 → 97 binari). Quattro erano **gia' installate** da
+  `install-tools.sh` ma non registrate — `uncover`, `shuffledns`, `mapcidr`,
+  `interactsh-client` — quindi passavano da `run.js` senza `risk_tier`, `timeout_ms` o
+  `rate_class`: `shuffledns` e' un martello DNS e `pace.js` non aveva nulla su cui leggersi.
+  Le altre dieci sono i binari apt installati ma non dichiarati, fra cui `medusa` e `dirb`,
+  strumenti di credenziali oggi raggiungibili senza tier. Nessuna rimossa: registrate con tier
+  onesti, che e' l'obiettivo di sicurezza.
+
+### Changed
+
+- **Command Center · la sezione Graph e' una mappa di esposizione per host.** Il vecchio canvas
+  disegnava ogni porta scansionata come un nodo e non reggeva il modello: la proiezione leggeva
+  `h.host`/`h.state` dove lo snapshot espone `address`/`alive`, quindi tutti gli host collassavano
+  in un unico nodo `host:undefined` con id duplicati e i porti uguali su host diversi si
+  accavallavano; endpoint e finding restavano orfani (archi verso un host che non esisteva) e
+  finivano fuori canvas. La proiezione ora e' per host — un host per indirizzo, **fuso fra target
+  IP e hostname** — con porte deduplicate (vince il fingerprint piu' ricco, un'osservazione `open`
+  prevale su `filtered`/`closed`), servizi raggruppati dalle sole porte aperte (una porta filtrata
+  non e' esposizione),  endpoint e finding agganciati per hostname/URL e un punteggio di rischio per l'ordinamento.
+  La proiezione fonde **due fonti di verita'**: il target model (`state.db`) e il ledger dei
+  finding (`reports/findings.jsonl`), perche' `record-finding.js` non ha mai scritto nel target
+  model — dei target scansionati solo 4 host esistono nel model mentre i finding ne referenziano
+  27: senza il merge la board mostrava 4 host su 28. Un host che vive solo nel ledger nasce dalle
+  sue righe di finding (niente porte, niente endpoint), e' marcato `solo ledger` sulla card —
+  cosi' non si legge come uno scan negativo — e resta agganciato ai finding che lo nominano; i
+  target che non hanno prodotto ne' host, ne' endpoint, ne' finding finiscono in `empty_targets`,
+  mostrati in un pannello a parte invece di sparire. Il dedup ledger-vs-model scarta un finding
+  solo se proviene dal model, ha stesso url e stessa severity (chiavi piu' deboli perdevano 8
+  finding su 128). La vista e' una board di triage: ricerca libera, filtro "solo con finding",
+  ordinamento per rischio/finding/porte/host, drawer con le tabelle complete di porte, endpoint e
+  finding. Gli endpoint restano testo e non link: la console e' read-only e non deve emettere
+  richieste verso un target perche' e' stata aperta una tab. Sopra le card c'e' il grafo di
+  relazione host → servizi aperti → finding: una banda orizzontale per host, quindi nessun arco
+  fra cluster e nessun incrocio; i servizi sono aggregati (`http 80, 443, 8080, 8443` e' un nodo,
+  non quattro) e i finding si appendono al servizio che possiede la porta del loro URL, altrimenti
+  all'host — cosi' si vede a colpo d'occhio che 5 finding di 10.20.0.10 stanno tutti sul servizio
+  `http`. Focus al click (le altre bande si attenuano) e drawer sul nodo; cliccando un finding il
+  suo percorso host → servizio → finding resta acceso mentre il resto della banda sbiadisce, cosi'
+  la catena che spiega perche' quell'host e' esposto si legge direttamente invece di ricostruirla
+  a occhio. Il canvas e' limitato agli 8 host piu' a rischio e segue filtri e ordinamento delle
+  card. 10 test offline in
+  `tools/test-cc-graph.js` (merge fra le due fonti e host solo-ledger, `empty_targets`, dedup
+  porte, aggancio per hostname, ordinamento per rischio, id senza `undefined`, workspace vuoto).
+
+### Fixed
+
+- **Validazione delle credenziali in bundle:** `analyze-bundle.js --validate-secrets --confirm "<reason>"`
+  chiude il bordo `suspected`→`exploited` che `chain.js` gia' modellava: l'estrazione trova candidati
+  ma non sa distinguere una chiave viva da una revocata, e `trufflehog` lo sa. Scelta deliberata:
+  **solo validazione**, non `uncover` ne' `interactsh-client`, che restano registrati ma usati da
+  nessun workflow — qui il costo di egress e' il piu' basso e il guadagno il piu' alto (una chiave
+  che autentica e' la prova che mancava). E' **confirm-tier** e fallisce chiuso senza `--confirm`,
+  perche' validare chiama l'API del provider. Il valore grezzo non viene mai persistito: file
+  temporaneo `0600` fuori dal workspace, rimosso in un `finally`, output con solo detector/tipo/
+  `fingerprint` sha256 troncato. `SECRET_PATTERNS` e' ora una lista condivisa fra estrazione e
+  validazione, che non possono piu' divergere su cosa e' un candidato.
+- `docs/THREAT-MODEL.md` enumera **dove finisce il confine dei guard**: tre rotte che lo aggirano
+  (MCP montato nudo, binario invocato fuori da `run.js`, nessun egress a livello di kernel) e perche'
+  il guard a network namespace non e' stato adottato — masscan, tuning di interfaccia, ARP spoofing
+  e tun/tap non funzionano in una netns, e sono esattamente gli strumenti delle modalita' wireless e
+  host-exploitation. Scritto, non lasciato implicito.
+- `h2csmuggler`: la CLI upstream e' uno script Python (`h2csmuggler.py`, dipendenza `h2`), ma
+  `go install github.com/BishopFox/h2csmuggler` compila solo `demo.go` e produce un binario che
+  non e' lo scanner — si installa con hash pin in `install-tools.sh`, branch `master` (non
+  `main`) e sha256 verificato. `-t/--test` e' la modalita' detection; senza `-t` lo stesso
+  binario stabilisce il tunnel verso endpoint interni ed e' confirm-tier, mai in un workflow.
+- `wp-check.js` aggiunto a `CMD_PREFIXES` in `tools/workflow.js`: si auto-scope-checka gia'
+  (`scope-guard inScope()` prima di qualsiasi tocco di rete, verificato che blocca fuori
+  scope), quindi era un guard legittimo escluso solo perche' mancava la voce — senza,
+  `attack-wp` non validava nel dialetto workflow.
+
+- `tools/forum-keystore.js` + verbo `node tools/forum.js keyring` — la chiave privata dell'agente non sta
+  più in chiaro nel keyfile. **`0600` è un permesso, non una cifratura**: chi leggeva il filesystem — o
+  un analizzatore esterno, che è il caso d'uso di un ambiente di studio — otteneva la chiave. Tre backend
+  scelti per disponibilità, mai il plaintext se esiste qualcosa di meglio:
+  - **`linux-keyring`** (default dove c'è `keyctl`): la chiave sta nel kernel keyring e **non viene mai
+    scritta su disco**; sul file c'è solo `{agent_id, backend, keystore}`. Scoped all'utente e volatile,
+    quindi l'identità va ri-seminaata a ogni sessione — il più forte e il più scomodo;
+  - **`passphrase`**: su disco solo ciphertext (AES-256-GCM su chiave scrypt N=2^14, salt per-istanza);
+    la passphrase arriva fuori banda e non è mai nel keyfile né nel prompt;
+  - **`plaintext`**: il keyfile di prima, per retrocompatibilità, dichiarato `encrypted_at_rest: false`.
+  Fallisce chiuso in due punti: senza passphrase non si iscrive (firmare in chiaro è peggio che non
+  firmare), e passphrase sbagliata e ciphertext manomesso sono **indistinguibili** — AES-GCM li rifiuta
+  allo stesso modo, quindi l'errore non è un oracolo.
+  Correzione conseguente: il test che prima asseriva "la chiave è persistita nel keyfile" verifica ora
+  l'opposto — nessun materiale chiave su disco in nessun backend tranne `plaintext`, dichiarato.
+
+- `tools/forum-server.js`, `tools/forum.js`, `tools/forum-sim.js` + `skills/agent-forum/SKILL.md` —
+  un forum multi-agente dove l'identità è **assegnata dal server** e l'iscrizione è **one-shot**, per
+  testare comunicazione e collaborazione tra più agenti su ambienti simulati. L'invariante richiesto
+  ("un agente, una sola identità, nessuna impersonation") è imposto dal runtime, non dal prompt:
+  il prompt dice *cosa fare*, il server dice *chi sei*.
+  - l'`agent_id` è derivato dalla pubkey e il display calcolato lato server: non esiste un campo
+    `username` da scegliere, quindi l'impersonation non è vietata, è **non esprimibile**;
+  - il token di iscrizione è single-use e single-use anche in chiave: su disco c'è solo lo sha256,
+    quindi un dump di `state.json` non consegna credenziali utilizzabili;
+  - ogni post firma con Ed25519 autore + timestamp + nonce + hash del corpo: replay, body-tamper e
+    cambio d'autore invalidano la firma, e il transcript è append-only incatenato con ancora
+    esterna (`tools/chain-log.js`), quindi riscrivere un messaggio è rilevabile;
+  - `tools/forum.js` è l'unica superficie che il modello vede: **non ha `--as` né `--print-key`**, la
+    chiave privata sta in un keyfile `0600` e `loadPrivate` non è esportata. Un prompt injection può
+    far *chiedere* all'agente di firmare, non rubare la firma per firmare come un altro;
+  - `tools/forum-sim.js run` avvia N agenti in **processi separati** su un ambiente simulato in
+    mkdtemp, due round (osservare, poi rispondere): riporta quanti agenti hanno risposto a un altro
+    autore e quanti tentativi rogue (ri-iscriversi, impersonare, replay, body-tamper) sono stati
+    respinti. Exit 1 se un invariante cede.
+  Correzioni fatte strada facendo, perché erano difetti reali e non dettagli: il server teneva lo
+  stato in memoria dal boot e rigettava i token coniati da un altro processo; `lastJson` leggeva solo
+  l'ultima riga e perdeva l'output indentato di `read`, così la collaborazione non veniva neppure
+  esercitata; e un `spawnSync` nel test bloccava l'event loop del server che ospitava in-process.
+- `tools/test-agent-forum.js` — 23 check loopback sulle quattro proprietà (iscrizione one-shot,
+  impersonation, replay, body-tamper) più il rilevamento della manomissione del transcript.
+  Il controllo "il wrapper non stampa il segreto" è una **prova a runtime** (si eseguono i verbi e si
+  cerca il materiale chiave nell'output), non un grep sul sorgente: il grep produceva falsi positivi
+  sui messaggi d'aiuto e falsi negativi su un `console.log(JSON.stringify(r))` che riversa un
+  oggetto contenente `d`. Verificato con un controllo negativo — disabilitando la verifica della
+  firma il simulatore scende a 8/16 tentativi respinti e esce 1, quindi il test ha denti.
+
 - `tools/f3-client-setup.sh` — l'arsenale arm64 dentro il proot Kali ora include l'intera linea
   mobile (`apktool`, `jadx`, `apksigner`, `zipalign`, `androguard`, jar `libsmali-java`, `apkid` e
   `drozer`) e un installer proot-safe: due bug reali lo tenevano fuori dal telefono. `apkid` e
