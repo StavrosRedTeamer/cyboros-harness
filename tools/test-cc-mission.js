@@ -85,7 +85,9 @@ if (bundle.ok) assert.ok(fs.existsSync(bundle.tar), 'tar.gz produced when tar is
 
 // ── graph + coverage are read-only projections that never throw ─────────────
 const g = graph.build();
-assert.ok(Array.isArray(g.nodes) && Array.isArray(g.edges));
+assert.ok(Array.isArray(g.hosts), 'graph exposes the host exposure map');
+assert.ok(g.unassigned && Array.isArray(g.unassigned.endpoints) && Array.isArray(g.unassigned.vulns));
+assert.ok(g.counts && typeof g.counts.hosts === 'number' && typeof g.counts.open_ports === 'number');
 const cov = coverage.build();
 assert.ok(Array.isArray(cov.hosts));
 assert.ok(cov.attack && 'executed' in cov.attack);

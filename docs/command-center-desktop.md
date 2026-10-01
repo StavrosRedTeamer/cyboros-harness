@@ -203,9 +203,13 @@ nessun dispatch parte fuori da `run.js`/`workflow.js`/`stavros.js`.
 - `tools/cc-ledger.js`: unione di transizioni opstate, `gate-log.md`, `artifacts/audit/*.jsonl`,
   `artifact-ledger.jsonl`, stato della hash-chain (riuso di `gate.js`/`record-finding`), approvazioni;
   **evidence bundle** (tar/zip con manifest + hash) e export PDF (`printToPdf`).
-- `tools/cc-graph.js`: proiezione da `reports/<host>-map.json` / `state.db` → nodi/archi (SVG,
-  click-through ai findings). `tools/cc-coverage.js`: matrice classi + ATT&CK
-  (`attack-coverage.js --json`).
+- `tools/cc-graph.js`: proiezione read-only da `state.db` → **mappa di esposizione per host**
+  (un host per indirizzo, fuso fra target IP e hostname; servizi aperti raggruppati, conteggi di
+  stato delle porte, endpoint e finding agganciati, punteggio di rischio). Il pannello Graph è una
+  board di triage con ricerca, filtri, ordinamento e drawer di dettaglio; sopra le card, il grafo
+  di relazione host → servizi aperti → finding con una banda per host (servizi aggregati, finding
+  appesi al servizio che possiede la porta del loro URL, focus al click).
+  `tools/cc-coverage.js`: matrice classi + ATT&CK (`attack-coverage.js --json`).
 - Pannelli *Ledger* (timeline con badge chain), *Graph*, *Coverage*, *Reports* (ciclo del finding,
   **retest diff**, `artifact-ledger evidence` con dialogo nativo, export).
 

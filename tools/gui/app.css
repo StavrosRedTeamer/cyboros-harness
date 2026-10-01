@@ -749,16 +749,67 @@ th.sortable:focus-visible { outline: 2px solid var(--cyan); outline-offset: -2px
 .cc-install input[type="text"] { padding: 6px 9px; min-width: 170px; background: var(--bg2); color: var(--ink); border: 1px solid var(--line-2); border-radius: var(--r2); font: 12px/1.4 var(--mono); letter-spacing: .1em; text-transform: uppercase; }
 .cc-install input[type="text"]:focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; }
 .btn:disabled { opacity: .42; cursor: not-allowed; }
-.cc-graph { overflow: auto; background: var(--bg2); border: 1px solid var(--line); border-radius: var(--r2); }
-.cc-graph svg { display: block; }
-.cc-graph .cc-edge { stroke: var(--line-2); stroke-width: 1; }
-.cc-graph .cc-node-label { font: 9px var(--mono); fill: var(--muted); }
-.cc-legend { display: flex; flex-wrap: wrap; gap: 5px 8px; }
-.cc-legend-btn { display: inline-flex; align-items: center; gap: 6px; padding: 2px 8px; border: 1px solid var(--line-2); border-radius: 999px; background: var(--surface-2); color: var(--muted); font: 10px/1.6 var(--mono); text-transform: uppercase; letter-spacing: .08em; }
-.cc-legend-btn:hover { color: var(--ink); border-color: var(--cyan); }
-.cc-legend-btn i { display: inline-block; width: 9px; height: 9px; border-radius: 50%; }
-.cc-legend-btn.off { opacity: .45; text-decoration: line-through; }
-.cc-legend-btn.off i { background: var(--faint) !important; }
+/* ── Graph · host exposure map ── */
+.cc-graph-controls { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.cc-graph-controls input[type="search"] { flex: 1 1 260px; width: auto; }
+.cc-graph-controls select { flex: 0 0 auto; width: auto; min-width: 8.5em; }
+.cc-hosts { display: grid; gap: 8px; }
+.cc-host { border: 1px solid var(--line); border-left: 3px solid var(--line-2); background: var(--bg2); border-radius: var(--r2); }
+.cc-host.crit { border-left-color: var(--crit); }
+.cc-host.high { border-left-color: var(--high); }
+.cc-host-head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 8px 10px; border-bottom: 1px solid var(--line); background: var(--surface-2); }
+.cc-host-id { font: 600 13px/1.4 var(--mono); color: var(--ink); }
+.cc-host-name, .cc-host-os { font-size: 11.5px; }
+.cc-spacer { flex: 1 1 auto; }
+.cc-host-targets { padding: 5px 10px 0; font-size: 10px; }
+.cc-host-body { display: grid; gap: 4px; padding: 7px 10px 9px; }
+.cc-host-row { display: grid; grid-template-columns: 78px 1fr; gap: 8px; align-items: baseline; }
+.cc-host-k { font: 9.5px/1.6 var(--mono); text-transform: uppercase; letter-spacing: .8px; color: var(--faint); }
+.cc-host-v { display: flex; flex-wrap: wrap; gap: 5px 8px; align-items: baseline; min-width: 0; }
+.cc-svc { font: 11px/1.5 var(--mono); color: var(--muted); border: 1px solid var(--line-2); border-radius: 999px; padding: 1px 8px; }
+.cc-svc b { color: var(--cyan); font-weight: 600; }
+.cc-ep { font: 11px/1.5 var(--mono); color: #9fd8ef; max-width: 320px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cc-finding { font: 11.5px/1.5 var(--sans); color: var(--ink); }
+
+/* topology canvas — one band per host, no cross-cluster edges */
+.cc-topo { max-height: 560px; overflow: auto; background: var(--bg2); border: 1px solid var(--line); border-radius: var(--r2); }
+.cc-topo svg { display: block; }
+.cc-topo .cc-edge { fill: none; stroke: var(--line-2); stroke-width: 1; }
+.cc-topo .cc-edge.sev-critical { stroke: var(--crit); opacity: .6; }
+.cc-topo .cc-edge.sev-high { stroke: var(--high); opacity: .55; }
+.cc-topo .cc-edge.sev-medium { stroke: var(--med); opacity: .5; }
+.cc-topo .cc-edge.sev-low { stroke: var(--low); opacity: .45; }
+.cc-topo .cc-edge.sev-info { stroke: var(--info); opacity: .35; }
+.cc-topo .cc-band { transition: opacity .12s; }
+.cc-topo .cc-band.dim { opacity: .2; }
+.cc-topo .cc-band.dim:hover, .cc-topo .cc-band:hover { opacity: 1; }
+.cc-topo .cc-node { cursor: pointer; }
+.cc-topo .cc-hostnode rect { fill: var(--surface-2); stroke: var(--cyan); }
+.cc-topo .cc-hostnode:hover rect { fill: var(--hover-bg); }
+.cc-topo .cc-hid { font: 600 11.5px var(--mono); fill: var(--ink); }
+.cc-topo .cc-hsub { font: 9.5px var(--mono); fill: var(--faint); }
+.cc-topo .cc-svcnode rect { fill: var(--bg2); stroke: var(--line-2); }
+.cc-topo .cc-svcnode:hover rect { stroke: var(--cyan); }
+.cc-topo .cc-lbl { font: 11px var(--mono); fill: var(--muted); }
+.cc-topo .cc-svcname { fill: var(--cyan); font-weight: 600; }
+.cc-topo .cc-svcports { fill: var(--muted); }
+.cc-topo .cc-findnode:hover .cc-lbl { fill: var(--ink); }
+.cc-topo .cc-findnode circle.sev-critical { fill: var(--crit); }
+.cc-topo .cc-findnode circle.sev-high { fill: var(--high); }
+.cc-topo .cc-findnode circle.sev-medium { fill: var(--med); }
+.cc-topo .cc-findnode circle.sev-low { fill: var(--low); }
+.cc-topo .cc-findnode circle.sev-info { fill: var(--info); }
+
+/* selected-finding path: host → service → finding stays lit, the rest of the band fades */
+.cc-topo .cc-band.path .cc-node.faded, .cc-topo .cc-band.path .cc-edge.faded { opacity: .16; }
+.cc-topo .cc-edge.on-path { stroke: var(--cyan); stroke-width: 2; opacity: 1; }
+.cc-topo .cc-node.on-path rect { stroke-width: 2; }
+.cc-topo .cc-hostnode.on-path rect { fill: #0a2d33; stroke: var(--cyan); }
+.cc-topo .cc-svcnode.on-path rect { stroke: var(--cyan); }
+.cc-topo .cc-findnode.on-path circle { stroke: var(--ink); stroke-width: 2; }
+.cc-topo .cc-findnode.on-path .cc-lbl { fill: var(--ink); }
+.cc-topo .cc-hostnode.noports rect { stroke-dasharray: 4 3; }
+.cc-topo .cc-more { fill: var(--faint); font-style: italic; }
 .chip.ok  { color: var(--green); border-color: var(--green); }
 .chip.warn { color: var(--yellow); border-color: var(--yellow); }
 .chip.crit { color: var(--crit); border-color: var(--crit); }
