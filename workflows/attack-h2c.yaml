@@ -1,0 +1,35 @@
+# Workflow offensivo — attack-h2c (dialetto workflow)
+# h2c smuggling: rileva se un proxy in forwarding lascia passare gli header di upgrade
+# HTTP/2 cleartext verso un back-end h2c, permettendo di aggirare le regole di accesso del
+# proxy (BishopFox/h2csmuggler, Apache-2.0). È l'unica classe di request smuggling con
+# sfruttamento documentato in-the-wild (SL Cyber, "H2C Smuggling in the Wild") e quella che
+# colpisce esattamente i front-end nginx/CDN che stanno davanti alle bersaglie di questa harness.
+#
+# `-t/--test` è la modalità DETECTION: sonda e riporta, non tunnella. Senza `-t` lo stesso
+# binario stabilisce il tunnel e va a prendere endpoint interni — quello è sfruttamento ed
+# è confirm-tier per la regola tier-2 di knowledge.md: mai in un workflow automatico.
+#
+# CAVEAT FALSO POSITIVI (dall'upstream, rispettato qui): su HTTPS il rilevamento è
+# praticamente sempre un vero positivo; su HTTP in chiaro può essere un FALSO POSITIVO,
+# perché un proxy h2c può rispondere all'upgrade senza inoltrarlo. Su target http:// questo
+# workflow produce `triggered`, mai `exploited`: la conferma resta a `desync.js`/prove
+# differenziali. Questo è il motivo per cui il finding nasce `triggered` e non `verified`.
+#
+# Il singolo endpoint da sondare va passato con `target` — è l'URL del PROXY (l'edge), non
+# l'host interno.
+# Uso: node tools/workflow.js run workflows/attack-h2c.yaml -t <https://proxy.example/path>
+name: attack-h2c
+description: Rilevamento h2c smuggling (upgrade inoltrato dal proxy) in sola modalità detection
+vars:
+  tag: target
+  outdir: reports
+  max_time: "10"
+requires:
+  - h2csmuggler
+steps:
+  - id: h2c-detect
+    cmd: node tools/run.js h2csmuggler -x {target} -t -m {max_time} -v
+    artifacts:
+      - path: "{outdir}/attack-{tag}-h2c.txt"
+        surface: smuggling
+        from: stdout

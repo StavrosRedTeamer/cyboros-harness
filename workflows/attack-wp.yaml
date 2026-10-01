@@ -1,0 +1,47 @@
+# Workflow offensivo — attack-wp (dialetto workflow)
+# Superficie WordPress in due passate. Prima wp-check.js, che è il percorso zero-API-token e
+# zero-egress: fingerprintha la versione core dagli artefatti pubblici (meta/feed generator,
+# readme.html, /wp-json/) e dice se una CVE WordPress core è applicabile. Poi wpscan, che
+# trasforma versione + plugin + theme in un elenco CVE dal database WPScan.
+#
+# L'ordine non è decorativo: wpscan da solo fa richieste molto più invasive e ha bisogno del
+# token API per il database completo. Con wp-check.js prima, se il fingerprint fallisce o il
+# sito non è WordPress, il secondo step non parte (when exit_code) e non si spara un
+# enumeratore pesante contro un host che non è WP.
+#
+# `api_token` : token WPScan (https://wpscan.com/registrations/registration). SENZA token
+#               wpscan funziona in modalità free con una copertura CVE molto ridotta — utile
+#               comunque per l'enumerazione dei plugin. Nel token non mettere altro.
+# `enumerate` : vp (versioni plugin), ve (plugin), vu (vulnerabilità), vt (temi). Default
+#               "vp,ve,vu" — la CVE è il motivo per cui il tool esiste.
+#
+# Rischio: active. wpscan lancia centinaia di richieste: su WAF o rate limit abbassare il ritmo
+# con `run.js` --rate invece che alzarlo. Nessun payload di exploit viene inviato: è
+# enumerazione + lookup CVE, i CVE applicabili finiscono a `record-finding.js` come
+# `verify_level: suspected` finché non sono provati in lab.
+# Uso: node tools/workflow.js run workflows/attack-wp.yaml -t https://<host> --var api_token=<WPScanToken>
+name: attack-wp
+description: WordPress — fingerprint core (wp-check) poi enumerazione plugin/temi e CVE (wpscan), detection-only
+vars:
+  tag: target
+  outdir: reports
+  api_token: ""
+  enumerate: "vp,ve,vu"
+requires:
+  - wpscan
+steps:
+  - id: wp-fingerprint
+    cmd: node tools/wp-check.js {target}
+    artifacts:
+      - path: "{outdir}/attack-{tag}-wp-fingerprint.txt"
+        surface: fingerprint
+        from: stdout
+  - id: wp-enumerate
+    cmd: node tools/run.js wpscan --url {target} --enumerate {enumerate} --api-token {api_token}
+    when:
+      exit_code: [0, 1]
+    on_error: continue
+    artifacts:
+      - path: "{outdir}/attack-{tag}-wpscan.txt"
+        surface: fingerprint
+        from: stdout

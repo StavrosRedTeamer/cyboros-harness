@@ -262,7 +262,7 @@ async function main() {
     const r = cli(RUN, ['--registry-check']);
     const o = JSON.parse(r.stdout);
     assert.strictEqual(o.ok, true, r.stdout);
-    assert.strictEqual(o.bins, 83); // 35 iniziali + 19 (T1: pipeline/AD/wireless) + 26 (inventario Parrot) + 3 (coercer + impacket-findDelegation/findDelegation.py: gap-chiusura dfscoerce assente da impacket)
+    assert.strictEqual(o.bins, 97); // 35 iniziali + 19 (T1: pipeline/AD/wireless) + 26 (inventario Parrot) + 3 (coercer + impacket-findDelegation/findDelegation.py: gap-chiusura dfscoerce assente da impacket) + 14 (audit alternative: 4 gia' installate e mai registrate — uncover/shuffledns/mapcidr/interactsh-client — + 9 apt non dichiarati fra cui medusa e dirb + schemathesis e h2csmuggler)
   });
   ok('chiave mancante → exit 1, audit {gate:tool_requires_key, missing_keys}, classe key_missing (anche dry-run)', () => {
     const audit = path.join(T, 'audit-e12.jsonl');

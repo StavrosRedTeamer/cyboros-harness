@@ -138,6 +138,94 @@ contain a process that has already been talked into running something. The MCP
 proxy exists because that boundary is real, and it is the shape of the problem
 rather than a complete answer to it.
 
+### What the guard boundary actually covers — and what it does not
+
+Stated precisely, because "policy in the runtime" is a strong claim and it is
+only true inside a boundary. (Decision of record, 2026-10-01: keep it this way
+rather than adding a network-namespace guard; the trade-off is written down
+below instead of being left implied.)
+
+**Enforced in code, not in the prompt.** Anything reached through `run.js`,
+`repeater.js`, `desync.js`, `oob.js`, the `wifi`/`mobile`/`ad` wrappers, and
+`mcp-guard-proxy.js` inherits scope-checking, tiering and rate limiting. Those
+guards are separate processes running below the model, and they are fail-closed:
+empty `scope.json` blocks everything and there is no flag to turn that into a
+warning. Inside that boundary the claim holds.
+
+**Outside the boundary, by three routes.**
+
+1. **An MCP server mounted raw.** It bypasses every guard. `mcp-guard-proxy.js`
+   is the supported path and puts `scope-guard` + `ssrf-guard` in front of every
+   `tools/call`, but nothing enforces that you used it — mounting `npx
+   chrome-devtools-mcp` directly is outside the guard and the operator's
+   responsibility. This is the route most likely to be taken by accident.
+2. **A binary invoked outside `run.js`.** Direct `nmap`, `curl` or `sqlmap` from
+   a shell skips scope, audit and pacing entirely. The convention is documented;
+   only `run.js` makes it true.
+3. **No kernel-level egress enforcement.** Even inside the boundary the harness
+   confines *itself*: nothing stops a spawned binary from opening its own socket
+   to a host `scope.json` never saw. `--dry-run` shows what the harness believes
+   it is touching; it does not constrain what a child process then does.
+
+**What we chose not to add, and why.** The available answer is a network
+namespace (`bwrap --unshare-net` plus an nftables allowlist derived from
+`scope.json`), which would put an enforceable egress boundary under the guards
+rather than beside them. It was declined for a concrete reason, not waved away:
+masscan, interface tuning, ARP spoofing and tun/tap do not work inside such a
+namespace, and those are exactly the tools the wireless and host-exploitation
+modes depend on. Making it the default would trade the capability to test
+wireless networks for a stronger boundary on everything else. An operator who
+wants it should run that surface under `bwrap` explicitly rather than have the
+harness force it on the paths that cannot work inside it.
+
+So: **the guard architecture is sound inside its boundary and is not a
+containment mechanism outside it.** Treat the boundary as the thing to protect,
+not the code inside it.
+
+### The privilege the operator's own tools carry
+
+The harness runs as the operator's user, not as root, and the attack binaries
+need privileges the user does not have by default: raw sockets for SYN scanning
+and packet crafting, `net_admin` for monitor mode, and privileged ports for the
+services that impersonate one. Rather than leave that to a password prompt
+mid-engagement, the operator grants the **minimum**, once, and the harness
+verifies it instead of assuming it.
+
+**What is granted, and by what mechanism.** `tools/cap-manifest.json` declares
+per binary the minimum capability set and the reason for it.
+`sudo ./grant-tool-caps.sh` applies it with `setcap`, plus
+`net.ipv4.ip_unprivileged_port_start=0` for the binds below 1024. `node
+tools/capcheck.js` reports the real state; `sudo ./grant-tool-caps.sh --check`
+applies nothing and exits non-zero if anything is missing. `tcpdump` and
+`tshark` need nothing: the operator is already in `dialout`.
+
+**Why capabilities and not `NOPASSWD` sudo.** A `NOPASSWD` rule grants the
+ability to *execute those programs as root*, and some of these programs execute
+arbitrary code: `nmap --script=evil.lua` runs inside the Lua interpreter as root,
+so the rule is a root shell for anyone who can write a file. `setcap` grants a
+set of capabilities, not a uid, and no flag of nmap, hping3 or masscan turns a
+capability into a shell. Python tools (responder, ntlmrelayx) would need
+capabilities on the interpreter, which would be root for everything, so they are
+covered by the port threshold instead — no interpreter is touched.
+
+**What it costs, stated plainly.** This is a real privilege, not a formality.
+`cap_net_admin` permits interface manipulation and is a known escalation vector on
+some kernels; anyone who can replace a binary in the grant list inherits its
+capabilities. It is still narrower than the password-authenticated sudo the
+operator already holds — the difference is only that nothing has to be typed —
+but the narrower thing is not the same as the safe thing, and an operator who
+wants zero capability on the box should not run `grant-tool-caps.sh`.
+
+**What it does not buy, so nobody assumes it did.** `nmap` still refuses raw
+scan types (`-sS`, `-sU`, `-sA`) with its own `geteuid()` check regardless of
+capabilities; `-sT` and `-sV` work as the user, and SYN scanning is covered by
+`masscan` and `naabu`, which do work. Monitor mode still requires hardware that
+advertises it — measured on this box, `wlo1` offers `managed`/`IBSS`/`AP` and
+not `monitor`, so `airodump-ng` clears the privilege check and then fails the
+`SIOCSIWMODE` ioctl. And capabilities do not survive a package upgrade: an
+`apt upgrade` rewrites the binary and clears the xattr, which is why the state is
+checked by a tool rather than asserted in prose.
+
 ## How to report
 
 GitHub **Security → Report a vulnerability** on this repository. Tell us the

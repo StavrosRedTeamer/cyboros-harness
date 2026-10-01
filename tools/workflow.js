@@ -121,6 +121,10 @@ const CMD_PREFIXES = [
   'node tools/dom-check.js ',
   'node tools/header-check.js ',
   'node tools/verify-finding.js ',
+  // wp-check.js scope-guarda da sé (scope-guard inScope() prima di qualsiasi tocco di rete,
+  // verificato: blocca fuori scope con ok:false) — stessa disciplina dei wrapper qui sopra,
+  // quindi ammesso come guard nei workflow.
+  'node tools/wp-check.js ',
 ];
 const CMD_PREFIX = CMD_PREFIXES[0]; // legacy hint text
 function cmdAllowed(cmd) {

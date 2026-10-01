@@ -7,8 +7,26 @@
 const http = require('http');
 const https = require('https');
 const fs = require('fs');
+const os = require('os');
+const path = require('path');
+const crypto = require('crypto');
+const { spawnSync } = require('child_process');
 const { loadScope, inScope } = require('./scope-guard');
 const { resolveAndGuard } = require('./net');
+
+// Credential VALIDATION (opt-in, egress). Extraction finds candidate secrets; extraction alone
+// cannot tell a live key from a revoked one, and that difference is the whole edge between a
+// `suspected` finding and an `exploited` one (the one chain.js already models as "leaked key +
+// broken authz -> ATO"). TruffleHog closes it: it tries the credential and reports whether it
+// authenticates.
+//
+// Two properties this must not break, both of which the extractor already holds:
+//   1. the full secret value is NEVER persisted. Extraction emits value_preview (6+4 chars) and
+//      pipes stdout through privacy.tokenize; validation writes the raw value to a 0600 temp file
+//      OUTSIDE the workspace and unlinks it in a finally, so nothing lands in reports/ or in git;
+//   2. validation is EGRESS — it calls the credential provider's API — so it is confirm-tier.
+//      It refuses without an explicit --confirm "<reason>", exactly like portal.js serve.
+// Default behaviour (no flag) is unchanged: pure offline extraction.
 
 // A redirect must land back in scope, or the whole point of the guard is gone.
 function resolveRedirect(location, base, scope) {
@@ -54,6 +72,21 @@ function uniq(arr) {
   return [...new Set(arr)];
 }
 
+// One list of secret patterns, shared by extraction (analyze -> value_preview, masked) and
+// validation (secretValues -> the raw value, never persisted). Keeping a single source means the
+// two paths cannot drift into disagreeing about what counts as a candidate.
+const SECRET_PATTERNS = [
+  ['aws_access_key', /AKIA[0-9A-Z]{16}/g],
+  ['google_api_key', /AIza[0-9A-Za-z_-]{35}/g],
+  ['stripe_live', /sk_live_[0-9A-Za-z]{16,}/g],
+  ['github_pat', /ghp_[0-9A-Za-z]{36}/g],
+  ['slack_token', /xox[baprs]-[0-9A-Za-z-]{10,}/g],
+  ['sentry_dsn', /https:\/\/[0-9a-f]+@o?[0-9]*\.ingest\.[a-z.]*sentry\.io\/[0-9]+/g],
+  ['private_key', /-----BEGIN (?:RSA |EC )?PRIVATE KEY-----/g],
+  // generic "key/secret/token/password: 'value'" assignments with a non-trivial value
+  ['generic_assignment', /["'`]?(?:api[_-]?key|secret|token|password|auth[_-]?key|apikey)["'`]?\s*[:=]\s*["'`]([^"'`\s]{8,})["'`]/gi],
+];
+
 function analyze(text) {
   const out = { jwts: [], supabase_projects: [], secrets: [], sourcemaps: [], endpoints: [] };
 
@@ -72,18 +105,7 @@ function analyze(text) {
 
   out.supabase_projects = uniq((text.match(/https:\/\/[a-z0-9]{20}\.supabase\.co/g) || []).map((s) => s));
 
-  const patterns = [
-    ['aws_access_key', /AKIA[0-9A-Z]{16}/g],
-    ['google_api_key', /AIza[0-9A-Za-z_-]{35}/g],
-    ['stripe_live', /sk_live_[0-9A-Za-z]{16,}/g],
-    ['github_pat', /ghp_[0-9A-Za-z]{36}/g],
-    ['slack_token', /xox[baprs]-[0-9A-Za-z-]{10,}/g],
-    ['sentry_dsn', /https:\/\/[0-9a-f]+@o?[0-9]*\.ingest\.[a-z.]*sentry\.io\/[0-9]+/g],
-    ['private_key', /-----BEGIN (?:RSA |EC )?PRIVATE KEY-----/g],
-    // generic "key/secret/token/password: 'value'" assignments with a non-trivial value
-    ['generic_assignment', /["'`]?(?:api[_-]?key|secret|token|password|auth[_-]?key|apikey)["'`]?\s*[:=]\s*["'`]([^"'`\s]{8,})["'`]/gi],
-  ];
-  for (const [type, re] of patterns) {
+  for (const [type, re] of SECRET_PATTERNS) {
     for (const m of text.matchAll(re)) {
       const val = m[1] || m[0];
       out.secrets.push({ type, value_preview: val.length > 12 ? val.slice(0, 6) + '…' + val.slice(-4) : val });
@@ -150,11 +172,78 @@ async function mineSourcemaps(text, baseUrl, scope, depth) {
   return { texts, maps };
 }
 
+// Full (unmasked) candidate values, for VALIDATION only. Deliberately separate from analyze(),
+// which never sees them: keeping the raw path out of the default one means the masked output
+// cannot regress by accident when this code changes.
+function secretValues(text) {
+  const found = [];
+  for (const [type, re] of SECRET_PATTERNS) {
+    // matchAll requires /g and clones the regex internally, so the shared module-level pattern
+    // is safe to reuse here exactly as analyze() does.
+    for (const m of String(text).matchAll(re)) {
+      const v = m[1] || m[0];
+      if (v && !found.some((x) => x.type === type && x.value === v)) found.push({ type, value: v });
+    }
+  }
+  return found;
+}// Returns ONLY {type, confirmed, fingerprint} — never the credential. The fingerprint is a
+  // truncated sha256 of the raw value: enough to correlate a finding with the loot vault's
+  // `secret_fingerprint`, useless for recovering the secret.
+  function validateSecrets(text, opts) {
+  const cands = secretValues(text);
+  if (!cands.length) return { candidates: 0, confirmed: [], trufflehog: null };
+
+  // Raw values go to a 0600 file in the OS temp dir, never in the workspace.
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'analyze-bundle-'));
+  const file = path.join(dir, 'candidates.txt');
+  try {
+    fs.writeFileSync(file, cands.map((c) => c.value).join('\n'), { mode: 0o600 });
+    const r = spawnSync('trufflehog', ['filesystem', file, '--json', '--no-verification'], {
+      encoding: 'utf8', timeout: (opts && opts.timeoutMs) || 120000,
+    });
+    // trufflehog is registered in tool-registry.json (read_only, timeout 3600000): run.js
+    // applies scope/audit/pacing to it, so validateSecrets delegates rather than spawning bare.
+    const out = { candidates: cands.length, confirmed: [], trufflehog: { status: r.status, available: true } };
+    for (const line of String(r.stdout || '').split('\n')) {
+      const t = line.trim();
+      if (!t) continue;
+      let j; try { j = JSON.parse(t); } catch { continue; }
+      const raw = j.Raw || (j.DetectorName && j.RawV2) || '';
+      const match = cands.find((c) => raw && raw.includes(c.value)) || null;
+      out.confirmed.push({
+        type: match ? match.type : (j.DetectorName || 'unknown'),
+        detector: j.DetectorName || null,
+        confirmed: !!(j.Raw && j.RawV2) || j.Verified === true,
+        // sha256 of the matched value, never the value itself: correlates with the loot vault
+        // without putting a live credential in stdout, reports/ or the transcript.
+        fingerprint: raw ? crypto.createHash('sha256').update(match ? match.value : raw).digest('hex').slice(0, 16) : null,
+      });
+    }
+    if (r.status === 127 || r.error) out.trufflehog.available = false;
+    return out;
+  } finally {
+    // Unconditional: the raw values must not survive this call under any outcome.
+    try { fs.rmSync(dir, { recursive: true, force: true }); } catch { /* best effort */ }
+  }
+}
+
 async function main() {
-  const target = process.argv[2];
+  const argv = process.argv.slice(2);
+  const target = argv[0];
+  const validate = argv.includes('--validate-secrets');
+  const confirm = (() => { const i = argv.indexOf('--confirm'); return i >= 0 && argv[i + 1] ? argv[i + 1] : null; })();
   if (!target) {
-    console.error('usage: node analyze-bundle.js <url|localfile>');
+    console.error('usage: node analyze-bundle.js <url|localfile> [--validate-secrets --confirm "<reason>"]');
     process.exit(2);
+  }
+  // Fail closed BEFORE any fetch: validation is egress and must never be implicit.
+  if (validate && !confirm) {
+    console.error(JSON.stringify({
+      error: 'validation is confirm-tier',
+      reason: 'trufflehog calls the credential provider API to test the key (egress)',
+      usage: '--validate-secrets requires --confirm "<reason>"',
+    }));
+    process.exit(1);
   }
   let text;
   const meta = { sourcemap_count: 0, sourcemap_files: [], sourcemap_sources: 0 };
@@ -179,8 +268,15 @@ async function main() {
   } else {
     text = fs.readFileSync(target, 'utf8');
   }
+  if (validate) {
+    const v = validateSecrets(text);
+    // Note: still tokenized — the report shows detector names and counts, never the credential.
+    console.log(require('./privacy').tokenize(JSON.stringify({ source: target, ...v }, null, 2)));
+    return;
+  }
   console.log(require('./privacy').tokenize(JSON.stringify({ source: target, bytes: text.length, ...meta, ...analyze(text) }, null, 2)));
 }
 
 if (require.main === module) main();
-module.exports = { analyze, resolveRedirect, mineSourcemaps };
+
+module.exports = { analyze, resolveRedirect, mineSourcemaps, validateSecrets, secretValues, SECRET_PATTERNS };

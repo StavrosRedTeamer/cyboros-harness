@@ -5,7 +5,7 @@
 **A penetration-testing harness where a finding is only a finding if code can prove it —
 and where the agent cannot violate scope, because the enforcement is beneath it.**
 
-[Apache-2.0](LICENSE) · zero dependencies · offline-capable · 95 tests, hermetic and parallel
+[Apache-2.0](LICENSE) · zero dependencies · offline-capable · 99 tests, hermetic and parallel
 
 ![Command Center overview](docs/assets/command-center-overview.png)
 
@@ -79,6 +79,13 @@ without trusting the harness.
 Stage gates close the loop: coverage matrix complete, no pending findings, at least
 one verified, or **no report is produced at all**.
 
+Findings also leave as **SARIF 2.1.0** (`tools/report-sarif.js`), which GitHub code scanning
+and DefectDojo consume unmodified. The evidence ceiling travels with each result in
+`properties.stavros` — `verify_level`, its severity ceiling, the oracle reference — because a
+generic consumer cannot infer it. A record whose severity exceeds its verification level is
+**refused** and the exporter exits non-zero, so a run that dropped findings cannot pass as a
+clean scan.
+
 ## Why it might interest you
 
 - **Zero dependencies.** No lockfile, no transitive supply chain, nothing to audit but
@@ -86,7 +93,7 @@ one verified, or **no report is produced at all**.
   On a client network, `npm install` does nothing.
 - **Runs air-gapped.** `local/` drives the same deterministic engine against a local
   model. No API key, no data leaving the engagement laptop.
-- **95 tests, hermetic and parallel by default, no network.** Offline and loopback tests,
+- **99 tests, hermetic and parallel by default, no network.** Offline and loopback tests,
   classified by the runner; `npm test` is the gate, `npm run test:all` includes the live e2e
   set. Tests keep the engine's shared state — the global rate limiter, the run audit, the
   findings head-anchor, the egress-proxy state — in a fixture (`hermetic()` in
@@ -104,7 +111,7 @@ Requires **Node ≥ 22** (the Command Center backend uses `node:sqlite`).
 ```bash
 git clone https://github.com/CSI-entitymorton/stavrosredteamer.git
 cd stavrosredteamer
-npm test                 # 95 tests, no install, no network, 2 workers (--jobs 1 to serialize)
+npm test                 # 99 tests, no install, no network, 2 workers (--jobs 1 to serialize)
 ```
 
 Then write your authorization. `scope.json` **is** the written authorization, and the
@@ -151,10 +158,10 @@ only the processes the harness owns.
 
 | | |
 |---|---|
-| `tools/` | the engine: 142 modules, scope guards, repeater, oracle, pipeline, C2, wifi, GUI, tests |
+| `tools/` | the engine: 145 modules, scope guards, repeater, oracle, pipeline, C2, wifi, GUI, tests |
 | `local/fleet/` | 28 agent definitions (orchestrator + specialists) |
 | `local/` | standalone runner against a local model — no cloud, no Freebuff |
-| `workflows/` | 14 reusable `enum-*` / `attack-*` pipelines |
+| `workflows/` | 17 reusable `enum-*` / `attack-*` pipelines |
 | `knowledge.md` | the engagement contract: rules, toolbox, verification discipline |
 | `docs/` | per-tool and per-class methodology, retrieved with `node tools/kb-search.js` |
 | `memory/` | sanitized cross-engagement lessons |
@@ -190,6 +197,7 @@ yourself; going through the proxy is the supported path.
 - [`docs/GLOSSARY.md`](docs/GLOSSARY.md) — canonical terminology for levels, status and guards
 - [`knowledge.md`](knowledge.md) — engagement rules and toolbox (the contract)
 - [`docs/toolbox.md`](docs/toolbox.md) — full flags per tool
+- [`docs/TOOL-ALTERNATIVES-AUDIT.md`](docs/TOOL-ALTERNATIVES-AUDIT.md) — cosa è stato valutato e respinto, e perché
 - [`docs/methodology-classes.md`](docs/methodology-classes.md) — testing by vulnerability class
 - [`docs/host-exploitation.md`](docs/host-exploitation.md) — post-ex, privesc, C2
 - [`docs/wireless.md`](docs/wireless.md) — wireless assessment, tier model

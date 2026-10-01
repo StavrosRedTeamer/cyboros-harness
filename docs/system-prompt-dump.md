@@ -36,6 +36,22 @@ Nessun dato di target, credenziale o output di engagement lascia la macchina. Ve
 | Copertura/gap | `node tools/coverage-loop.js` |
 | Registrare un finding | `node tools/record-finding.js` |
 | Stage-gate / report | `node tools/gate.js`, output in `reports/` |
+| Privilegi della macchina | `node tools/capcheck.js` (`--require network\|wireless` per il preflight) |
+
+## Privilegi (nessun prompt sudo per i tool)
+I tool di attacco girano **senza password sudo**: capability file sui binari con raw socket
+(`masscan`, `naabu`, `hping3`, `arping`, `ettercap`, `arpspoof`, suite aircrack, `hcxdumptool`,
+`reaver`, `hostapd`, `dnsmasq`) e soglia porte sotto 1024 a 0 per i bind su 445/139/53/80
+(`responder`, `impacket-ntlmrelayx`, `chisel`). `tcpdump`/`tshark` non ne hanno bisogno (`dialout`).
+Non chiedere la password all'operatore. Non e' permanente — le capability spengono a ogni
+`apt upgrade` — quindi se un tool da `permission denied` / `Operation not permitted` /
+`requires root`, verifica `node tools/capcheck.js` prima didiagnosticarlo come errore tuo.
+`sudo ./grant-tool-caps.sh` ripristina: e' un intervento sulla macchina dell'operatore, dillo e
+lascia decidere, non lo eseguire di tua iniziativa.
+Eccezioni note: **`nmap`** ignora le capability (controlla `geteuid()` lui) e rifiuta
+`-sS`/`-sU`/`-sA` — usa `-sT`/`-sV`, o `masscan`/`naabu` per il SYN scan; **monitor mode** dipende
+dalla scheda (`SIOCSIWMODE` fallito = hardware, non permessi). Non aggiungere sudoers per
+aggirarli: `nmap --script=<file>` esegue Lua come root.
 
 ## Runtime Environment
 - **Host:** Linux (7.0.13+parrot7-amd64)

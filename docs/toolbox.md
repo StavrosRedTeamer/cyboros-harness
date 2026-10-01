@@ -13,6 +13,16 @@
   Supabase projects, secrets, endpoints. It FOLLOWS `sourceMappingURL` into `.map` files and extracts
   `sourcesContent` — reconstructed source is where the richest secrets live. Run this on every
   JS/HTML bundle FIRST.
+  - **Credential validation (opt-in, EGRESS, confirm-tier):**
+    `node tools/analyze-bundle.js <url|localfile> --validate-secrets --confirm "<reason>"`
+    L'estrazione trova candidati ma non distingue una chiave viva da una revocata — ed è
+    esattamente il bordo `suspected`→`exploited` che `chain.js` già modella (leaked key +
+    broken authz → ATO). `trufflehog` chiude quel bordo: prova la credenziale e dice se
+    autentica. **Rifiuta senza `--confirm`**, perché validare è egress (chiama l'API del
+    provider). Il valore grezzo **non viene mai persistito`: va in un file temporaneo `0600`
+    fuori dal workspace, rimosso in un `finally`; l'output riporta detector, tipo e un
+    `fingerprint` sha256 troncato (corrisponde a `secret_fingerprint` del loot vault, non
+    recuperabile). Senza i flag il comportamento è invariato: estrazione offline mascherata.
 - **Precise tampering:** `node tools/repeater.js --url <u> [--vary p=v1,v2] [--as <identity>] [flags]`
   (hard scope guard; global pacing from scope.json; auto backoff on 429). `--as` loads a bearer/headers
   from `auth.json` for authed / IDOR tests. `--vary` sets a query param; for a **path-based** id
@@ -49,6 +59,19 @@
   safe) — runs CL.TE / TE.CL / TE.TE probes on YOUR OWN connection and reports `likely`+
   confidence; read `tools/payloads/smuggling.md` before chaining to a real impact (confirm-tier).
   Class `smuggling` (CWE-444).
+- **Property-based stateful API fuzzing:** `node tools/workflow.js run workflows/attack-api-stateful.yaml -t https://<host> [--var spec_path=/openapi.json] [--var checks=all]`
+  — schemathesis (pipx, MIT) genera i casi dalla specifica e verifica che il server rispetti
+  ANCORA lo schema dopo input invalidi: copre struttura, non forma. È l'unico strumento
+  dell'arsenale che attacca BOLA/mass-assignment lungo il lifecycle e la state-dependent authz
+  senza che l'input derivi da un'ipotesi dell'agente. `checks` default `not_a_server_error`:
+  `all` esercita anche metodi distruttivi e va usato solo su endpoint di test, mai su dati reali.
+  `examples` (default 50) è il tetto Hypothesis = numero di richieste reali: abbassarlo su WAF.
+- **h2c smuggling (detection-only):** `node tools/workflow.js run workflows/attack-h2c.yaml -t https://<proxy/path>`
+  — `h2csmuggler` in modalità `-t/--test`: sonda e riporta, NON tunnella. Il binario senza `-t`
+  stabilisce il tunnel verso endpoint interni ed è **confirm-tier** (regola tier-2), quindi mai
+  in un workflow automatico. Attenzione al falso positivo: su HTTPS il rilevamento è quasi
+  sempre vero, su HTTP in chiaro può non essere altro che un proxy h2c che risponde all'upgrade
+  senza inoltrarlo — per questo il finding nasce `triggered` e la prova resta differenziale.
 - **Payload references (classes without a dedicated tool):** `tools/payloads/` — `ssti.md`,
   `deserialization.md`, `lfi.md`, `nosqli.md`, `prototype-pollution.md`, `llm-agentic.md`, `mcp.md`,
   `smuggling.md`. Read the matching file before testing that class; substitute a unique `MARKER` and
@@ -100,7 +123,13 @@
   — results appear as `poc_archive` entries pointing INTO the sealed zip. NEVER extract or run them from
   the harness; an operator opens one file inside an isolated lab only. Pull/refresh snapshots with
   `node tools/vendor-mirror.js pull <owner>/<repo>` and re-verify pins with `... verify`.
-- **WordPress check (detection-only):** `node tools/wp-check.js <base-url>` — fingerprints WP core version
+- **WordPress scan (detection-only):** `node tools/workflow.js run workflows/attack-wp.yaml -t <url> --var api_token=<t>`
+  — due passate: `wp-check.js` fingerprinta la versione core dagli artefatti pubblici (zero
+  token, zero egress) e dice se una CVE core è applicabile; poi `wpscan` (via `run.js`,
+  `risk_tier: active`) trasforma versione+plugin+temi in un elenco CVE dal database WPScan.
+  Senza `api_token` wpscan gira in modalità free con copertura CVE ridotta. L'ordine non è
+  decorativo: se il fingerprint fallisce il secondo step non parte.
+  `node tools/wp-check.js <base-url>` da solo fingerprints WP core version
   from public artifacts (meta/feed generator, readme.html, /wp-json/) and gates CVE-2026-63030 /
   CVE-2026-60137 applicability (WP 6.9–7.0.1). It never sends exploit payloads: applicable CVEs go to
   `record-finding.js` as `verify_level:suspected` until proven on a lab/authorized instance.
@@ -118,11 +147,32 @@
   on `findings.jsonl` (an explicit `technique: T####` wins, otherwise the finding's `class` is mapped
   through the same registry). `--write` emits `reports/attack-matrix.md` — a report-gate (P3) input;
   run it before the report gate, like `coverage.js <host> --write`.
+- **Privilegi minimi dei binari di attacco (niente prompt di password):** `node tools/capcheck.js`
+  dice lo stato REALE — `net.ipv4.ip_unprivileged_port_start` e le capability per binario — con
+  `--json`, `--quiet`, `--mode network|wireless|host` e `--require <mode>` (preflight, esce 1 se la
+  modalità non è operativa; `--require` con una modalità inesistente esce 2). Scrive
+  `reports/tmp/cap-state.json`. È il modo onesto di sapere se un tool gira davvero senza sudo: le
+  capability spengono a ogni `apt upgrade`, e proseguire convinto del contrario costa un fermo a
+  metà engagement. **Non è un fail-closed sul target**: dice cosa manca *sulla macchina*, quindi
+  lanciarlo non è un'azione d'attacco. Applica con `sudo ./grant-tool-caps.sh [--check|--print]`.
+- **Manifest e piano dei privilegi (sorgente unica):** `tools/cap-manifest.json` dichiara, per
+  binario, le capability minime e **perché** servono; `tools/cap-plan.js` lo valida e lo rende un
+  piano piatto (TSV per lo shell, `--json` per il resto) che consumano sia l'installer sia
+  `capcheck.js`. Ogni capability concessa a mano e non dichiarata qui è drift, e come tale
+  visibile. Un manifest rotto esce 3 senza applicare nulla.
 - **Knowledge retrieval:** `node tools/kb-search.js index` builds an FTS5 index over `knowledge.md` +
   `docs/**/*.md` (`--docs` adds `reports/*.md`); `node tools/kb-search.js "query terms" [--limit N]`
   returns heading-scoped snippets — use it instead of re-reading the whole methodology.
 - **HTML report:** `node tools/report-html.js [--findings <f>] [--state <db>] [--sploit <j>] [--out <f>]`
   -> standalone HTML (severity + CVSS + CWE + EPSS + chains + recon). Markdown remains the source of truth.
+- **SARIF export (interoperabilità):** `node tools/report-sarif.js [--findings <f>] [--out <f>] [--host <h>]`
+  -> SARIF 2.1.0 da `findings.jsonl`, per GitHub code scanning / DefectDojo / qualsiasi SIEM
+  (`--out -` va su stdout). Ogni result porta in `properties.stavros` cio che SARIF non ha un
+  campo per: `verify_level`, il suo `severity_ceiling`, `status`, `oracle_ref`/`oracle_type`,
+  il blocco `verify` rieseguibile e `evidence_ref`. **Rifiuta** un record la cui severity eccede
+  il `verify_level` (stessa regola di `record-finding.js`) e in quel caso **esce 2**: un run che
+  ha perso record non può presentarsi come scan pulito. Un finding senza `verify_level` esce
+  come `unclassified`, mai promosso. Zero dipendenze, offline.
 - **Attack galaxy (shape view):** `node tools/attack-galaxy.js [--findings <f>] [--out <f>] [--host <h>]`
   -> `reports/attack-galaxy.html`, a self-contained force graph of the engagement: host nodes sized by
   finding count, finding nodes coloured by severity, magenta edges = the attack chains `chain.js` found.

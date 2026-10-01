@@ -3,7 +3,9 @@
 #   ./install-tools.sh            -> apt (tool Parrot) + go install (ProjectDiscovery) + nuclei templates
 #   ./install-tools.sh --sliver   -> in piu stampa il comando di install di Sliver (NON lo esegue)
 #
-# Copre web + rete/AD + creds + recon/OSINT + wireless (Fase 5, modalita separata). Ogni step
+# Copre web + rete/AD + creds + recon/OSINT + wireless (Fase 5, modalita separata), e chiude
+# con la Fase 6 che concede i privilegi minimi ai binari di attacco (grant-tool-caps.sh).
+# Ogni step
 # salta cio che non serve o non e disponibile; i tool mancanti vengono comunque aggirati con
 # curl/repeater.js.
 
@@ -41,7 +43,7 @@ else
 fi
 
 # -------------------- 1. pacchetti apt (tool nativi Kali) --------------------
-info "Fase 1/5: pacchetti apt (tool Parrot)"
+info "Fase 1/6: pacchetti apt (tool Parrot)"
 APT_PKGS=(
   # core rete / recon
   nmap masscan naabu netcat-openbsd bind9-dnsutils whois curl proxychains4
@@ -92,7 +94,7 @@ else
 fi
 
 # -------------------- 2. go install (ultime release ProjectDiscovery/altro) ---
-info "Fase 2/5: go install (ultime release dei tool non in apt)"
+info "Fase 2/6: go install (ultime release dei tool non in apt)"
 GO_TOOLS=(
   "github.com/projectdiscovery/httpx/cmd/httpx@latest"
   "github.com/projectdiscovery/subfinder/v2/cmd/subfinder@latest"
@@ -127,7 +129,7 @@ else
 fi
 
 # -------------------- 3. pip (breach hunting / OSINT aggiuntivi) --------------
-info "Fase 3/5: pip (h8mail — breach hunting, BSD-3)"
+info "Fase 3/6: pip (h8mail — breach hunting, BSD-3)"
 if have h8mail; then
   ok "h8mail gia presente"
 elif have pipx; then
@@ -142,7 +144,8 @@ else
 fi
 
 # tool Python che su Kali erano in apt ma su Parrot NON sono pacchettizzati: pipx best-effort.
-for t in ghauri xsstrike lfimap; do
+# schemathesis (MIT) = property-based stateful API fuzzing: workflow attack-api-stateful.
+for t in ghauri xsstrike lfimap schemathesis; do
   if have "$t"; then ok "$t gia presente"; continue; fi
   if have pipx; then info "pipx install $t"; pipx install "$t" && ok "$t installato" || warn "pipx install $t fallito (serve internet)";
   elif have pip3; then pip3 install --user "$t" && ok "$t installato" || warn "pip3 install $t fallito";
@@ -150,6 +153,30 @@ for t in ghauri xsstrike lfimap; do
 done
 have linkfinder || warn "linkfinder: non in apt/PyPI su Parrot -> git clone https://github.com/GerbenJavado/LinkFinder"
 warn "tplmap/nosqlmap non pacchettizzati su Parrot: git clone upstream se servono (coperti anche da sqlmap/commix/repeater.js)"
+
+# h2csmuggler (BishopFox, Apache-2.0) — h2c smuggling detection: workflow attack-h2c.
+# La CLI upstream e' uno script Python (richiede il solo `h2`), NON un binario go: `go install`
+# sul repo compila solo demo.go. Si installa con un hash pin, come il resto del piano esterno.
+H2C_URL="https://raw.githubusercontent.com/BishopFox/h2csmuggler/master/h2csmuggler.py"
+H2C_SHA256="9a9999fffd585878d9247817a2285cd7937d28b00458f4a7bd6bec2819ec7dee"
+if have h2csmuggler; then
+  ok "h2csmuggler gia presente"
+elif have curl; then
+  info "download h2csmuggler.py (pin sha256)"
+  tmp_h2c="$(mktemp)"
+  if curl -sSL -o "$tmp_h2c" "$H2C_URL" \
+     && echo "$H2C_SHA256  $tmp_h2c" | sha256sum -c - >/dev/null 2>&1; then
+    install -m 0755 "$tmp_h2c" "$HOME/.local/bin/h2csmuggler" \
+      && ok "h2csmuggler installato in ~/.local/bin (sha256 verificato)" \
+      || warn "install h2csmuggler fallito"
+  else
+    warn "h2csmuggler: download o sha256 MISMATCHATO — non installato (revoca se il mirror è cambiato)"
+  fi
+  rm -f "$tmp_h2c"
+  python3 -c 'import h2' 2>/dev/null || warn "h2csmuggler richiede il modulo python 'h2' (pip3 install h2)"
+else
+  warn "curl assente: salto h2csmuggler"
+fi
 
 # certipy (ADCS ESC1..ESC16) — apt package is certipy-ad; pipx fallback if the apt name differs.
 if have certipy; then
@@ -162,7 +189,7 @@ else
 fi
 
 # -------------------- 4. nuclei templates ------------------------------------
-info "Fase 4/5: nuclei templates"
+info "Fase 4/6: nuclei templates"
 if have nuclei; then
   info "nuclei -update-templates"
   nuclei -update-templates || warn "nuclei -update-templates fallito (serve internet / permessi di scrittura)"
@@ -176,7 +203,7 @@ fi
 # obscura-worker in $OBSCURA_DIR (root vendor esterna, vedi vendor_root(); risolto da
 # tools/obscura.js; override con STAVROS_OBSCURA_BIN). Se imposti OBSCURA_SHA256=<sha256>
 # l'archivio viene verificato.
-info "Fase 4b/5: Obscura (headless browser antidetect, backend CDP opzionale)"
+info "Fase 4b/6: Obscura (headless browser antidetect, backend CDP opzionale)"
 OBSCURA_VERSION="${OBSCURA_VERSION:-v0.2.0}"
 OBSCURA_DIR="$VENDOR_ROOT/tools/obscura"
 case "$(uname -m)" in
@@ -221,7 +248,7 @@ fi
 # -------------------- 4c. Mobile / Android lab (ReDroid + APK static/dynamic) ----
 # Target: ReDroid locale (adb su 127.0.0.1:5555) + APK lab/bounty in-scope.
 # Best-effort come il resto dello script; i tool mancanti restano segnalati nel riepilogo.
-info "Fase 4c/5: Mobile / Android (apktool, jadx, frida, objection, mitmproxy)"
+info "Fase 4c/6: Mobile / Android (apktool, jadx, frida, objection, mitmproxy)"
 MOBILE_APT=(apktool mitmproxy aapt jadx)
 MISSING_MOBILE=()
 for p in "${MOBILE_APT[@]}"; do
@@ -315,7 +342,7 @@ fi
 info "ReDroid: se non l'hai fatto, avvia una volta: sudo ~/redroid/setup-redroid.sh && newgrp docker && ~/redroid/redroid start"
 
 # -------------------- 5. Sliver (solo istruzioni, mai eseguito) --------------
-info "Fase 5/5: Sliver (C2 per host exploitation) — istruzioni"
+info "Fase 5/6: Sliver (C2 per host exploitation) — istruzioni"
 if have sliver-client && have sliver-server; then
   ok "Sliver gia installato"
 else
@@ -324,6 +351,29 @@ else
   say "  # poi: sudo systemctl enable --now sliver  (server) e  sliver-client  (operatore)"
   if [[ " ${*} " == *" --sliver "* ]]; then
     say "  # (binari precompilati: https://github.com/BishopFox/sliver/releases)"
+  fi
+fi
+
+# -------------------- 6. Privilegi minimi dei binari di attacco --------------
+# Senza questa fase i tool che aprono raw socket (masscan, nmap -sS, hping3, airodump-ng,
+# hcxdumptool...) si fermano su "permission denied" e i tool che fanno bind sotto 1024
+# (responder 445, ntlmrelayx 445, chisel, hostapd, dnsmasq 53) su EACCES: l'agente deve
+# allora chiedere una password all'operatore a meta' engagement. Qui si concede il minimo
+# necessario, una volta sola.
+#
+# Il dettaglio e' in grant-tool-caps.sh + tools/cap-manifest.json: `setcap` per capability
+# (non NOPASSWD sudo — vedi `_why_not_nopasswd` nel manifest) e sysctl per la soglia delle
+# porte. Niente di eseguito senza che l'installatore sia gia' root o abbia sudo: se nessuno
+# dei due e' disponibile, la fase salta con un avviso e resta eseguibile a mano.
+info "Fase 6/6: privilegi minimi per i binari di attacco (setcap + sysctl)"
+if [ "$(id -u)" -eq 0 ]; then CAPS_SUDO=""
+elif have sudo; then CAPS_SUDO="sudo"
+else CAPS_SUDO=""; warn "Niente sudo e non sei root: la fase privilegi salta. Applicala con 'sudo ./grant-tool-caps.sh' quando vuoi."; fi
+if [ -n "$CAPS_SUDO" ] || [ "$(id -u)" -eq 0 ]; then
+  if [ -x ./grant-tool-caps.sh ]; then
+    $CAPS_SUDO ./grant-tool-caps.sh || warn "grant-tool-caps.sh non ha completato tutto: 'node tools/capcheck.js' dice cosa manca"
+  else
+    warn "grant-tool-caps.sh non trovato nella root del repo: salto la fase privilegi"
   fi
 fi
 

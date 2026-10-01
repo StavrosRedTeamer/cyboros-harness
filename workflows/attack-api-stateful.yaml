@@ -1,0 +1,42 @@
+# Workflow offensivo — attack-api-stateful (dialetto workflow)
+# Property-based STATEFUL API fuzzing dalla specifica OpenAPI/GraphQL. Schemathesis genera
+# casi da `schema` e li esegue contro `base_url`: è l'unico strumento nell'arsenale che attacca
+# la STRUTTURA della risposta (property testing: il server rispetta ancora lo schema dopo che
+# l'input è invalido?) e non la sua forma. Copre le classi su cui la harness è più debole —
+# BOLA/Mass-assignment lungo il lifecycle di una risorsa, validazione rotta sui boundary dello
+# schema, state-dependent authz — perché l'input è generato dal CONTRATTO e non dalla mia ipotesi.
+#
+# `spec_path` : percorso della specifica appenduto a {target} (default /openapi.json).
+#               La specifica può anche essere un path GraphQL o un file locale.
+# `checks`   : all | not_a_server_error | status_code_conformance | response_schema_conformance
+# `examples` : tetto a Hypothesis per schema (default 50). ALTO = più copertura, più richieste.
+#              Su WAF o API lenta, abbassare: ogni "example" è una richiesta reale.
+#
+# NOTA: {target} si sostituisce SOLO se appare direttamente nel `cmd` — non dentro il valore di
+# una var (i placeholder non sono ricorsivi: `schema: "{target}/openapi.json"` produrrebbe un
+# comando con il letterale "{target}" e fallirebbe con un errore di argomenti). Per questo lo
+# spec path è una var a se stante concatenata nel cmd.
+#
+# Rischio: active (invio payload generati, muta stato se l'API non è ben validata).
+# NESSUN auto-tier: le API con effetti collaterali (POST/PUT/DELETE che scrivono dati reali)
+# vanno coperte da `--var checks=not_a_server_error` e solo su endpoint di test. Se la specifica
+# espone metodi distruttivi, NON usare `all` su un ambiente con dati reali.
+# Uso: node tools/workflow.js run workflows/attack-api-stateful.yaml -t https://<host> \
+#        --var spec_path=/openapi.json --var checks=all
+name: attack-api-stateful
+description: Property-based stateful API fuzzing dalla spec (schemathesis) — copertura strutturale, non per forma
+vars:
+  tag: target
+  outdir: reports
+  spec_path: "/openapi.json"
+  checks: not_a_server_error
+  examples: "50"
+requires:
+  - schemathesis
+steps:
+  - id: api-stateful
+    cmd: node tools/run.js schemathesis run {target}{spec_path} --base-url {target} --checks {checks} --hypothesis-max-examples {examples} --report-junit={outdir}/attack-{tag}-schemathesis.xml
+    artifacts:
+      - path: "{outdir}/attack-{tag}-schemathesis.txt"
+        surface: api
+        from: stdout

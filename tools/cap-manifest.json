@@ -1,0 +1,44 @@
+{
+  "_comment": "Manifest dei privilegi minimi per eseguire i binari di attacco come utente NON-root, senza prompt di password. Unica fonte: la legge `grant-tool-caps.sh` (applica) e `node tools/capcheck.js` (verifica) leggono entrambi questo file — se una capability viene concessa a mano, il drift è visibile perché il manifest non la dichiara. Perche' capabilities e non NOPASSWD sudo: `setcap` concede ESATTAMENTE le capability elencate, per quel binario, e non esiste un percorso che produca una shell root. NOPASSWD `/bin/bash` o `find` equivarrebbe a root shell senza password; NOPASSWD `masscan` no. Le capacita' sono pero' un privilegio reale: cap_net_admin permette di manipolare le interfacce, e su alcuni sistemi e' un vettore di escalazione. Chi installa questo manifest accetta quel confine: resta comunque piu' stretto del sudo che l'operatore ha gia' nel gruppo `sudo`. LO STATO NON E' PERMANENTE: un `apt upgrade` riscrive il binario e azzera l'xattr `security.capability`. Ecco perche' esiste capcheck.js e perche' l'installer va rieseguito dopo un upgrade del pacchetto.",
+  "_why_sysctl": "I tool che devono fare bind su porte <1024 (responder 445/139/53, impacket-ntlmrelayx 445, chisel server, hostapd, dnsmasq 53) sono in gran parte script Python: `setcap` su uno script non fa nulla (l'xattr andrebbe sull'interprete, e su python3 sarebbe root per ogni cosa). Invece di toccare l'interprete, si abbassa la soglia delle porte non privilegiate a 0: il kernel lascia bindare sotto 1024 a qualunque utente. Nessun binario viene elevato, nessun interprete viene toccato, ed e' una riga reversibile.",
+  "version": 1,
+  "sysctl": {
+    "net.ipv4.ip_unprivileged_port_start": {
+      "want": 0,
+      "persist_file": "/etc/sysctl.d/99-stavros-unprivileged-ports.conf",
+      "why": "bind su 445/139/53/80 senza root per responder, impacket-ntlmrelayx, chisel, hostapd, dnsmasq"
+    }
+  },
+  "bins": {
+    "masscan":       { "caps": ["cap_net_raw", "cap_net_admin"], "mode": "network", "why": "raw socket + enumerazione/interfaccia per lo scan SYN multiporta" },
+    "nmap":          { "caps": ["cap_net_raw", "cap_net_admin"], "mode": "network", "why": "-sS/-O e la host discovery con raw packet; nmap si dichiara 'requires root' e basta per negare tutto",
+      "caveat": "MISURATO: le capability sono applicate e presenti, ma nmap le IGNORA perche' prima controlla geteuid()!=0 e rifiuta con 'You requested a scan type which requires root privileges' — un controllo suo, non del kernel. Consequenza: -sT/-sV funzionano da utente (verificato), -sS/-sU/-sA no. Non e' risolvibile con setcap. La via breve (NOPASSWD sudo su nmap) e' STATA SCARTATA di proposito: `nmap --script=<file>` esegue Lua come root, quindi una regola NOPASSWD su nmap equivale a una shell root per chi puo' scrivere un file .lua. Il buco di scan SYN e' coperto da masscan e naabu, che invece funzionano." },
+    "hping3":        { "caps": ["cap_net_raw", "cap_net_admin"], "mode": "network", "why": "packet crafting grezzi per le classi di trasporto/flood (recheck OOB, desync)" },
+    "naabu":         { "caps": ["cap_net_raw", "cap_net_admin"], "mode": "network", "why": "scan SYN con raw socket; binario utente, sta su btrfs in ~/go/bin" },
+    "rustscan":      { "caps": ["cap_net_raw", "cap_net_admin"], "mode": "network", "why": "stesso motivo di naabu; usato solo come fallback se naabu non e' installato" },
+    "arping":        { "caps": ["cap_net_raw", "cap_net_admin"], "mode": "network", "why": "probe ARP per L2 discovery e poison-check" },
+    "arpspoof":      { "caps": ["cap_net_raw", "cap_net_admin"], "mode": "network", "why": "poisoning ARP: richiede raw socket su AF_PACKET" },
+    "ettercap":      { "caps": ["cap_net_raw", "cap_net_admin"], "mode": "network", "why": "MITM su L2: raw socket + promiscuita'" },
+    "airodump-ng":   { "caps": ["cap_net_raw", "cap_net_admin"], "mode": "wireless", "why": "apre PF_PACKET per catturare dalla scheda in monitor mode" },
+    "aireplay-ng":   { "caps": ["cap_net_raw", "cap_net_admin"], "mode": "wireless", "why": "iniezione di frame 802.11" },
+    "aircrack-ng":   { "caps": ["cap_net_raw", "cap_net_admin"], "mode": "wireless", "why": "verifica/offline cracking su cattura, e raw socket quando lavora online" },
+    "hcxdumptool":   { "caps": ["cap_net_raw", "cap_net_admin"], "mode": "wireless", "why": "PMKID handshake over-the-air: raw socket sulla scheda" },
+    "hcxpcapngtool": { "caps": ["cap_net_raw", "cap_net_admin"], "mode": "wireless", "why": "conversione pcapng per hcxtract, stessa ragione di hcxdumptool" },
+    "reaver":        { "caps": ["cap_net_raw", "cap_net_admin"], "mode": "wireless", "why": "attacco WPS online: raw socket" },
+    "hostapd":       { "caps": ["cap_net_raw", "cap_net_admin"], "mode": "wireless", "why": "AP software: gestisce l'interfaccia in AP mode (net_admin) e i beacon 802.11 (net_raw)" },
+    "dnsmasq":       { "caps": ["cap_net_raw", "cap_net_admin"], "mode": "wireless", "why": "DHCP/ARP per l'AP: raw socket e routing sull'interfaccia" },
+    "iw":            { "caps": ["cap_net_admin"], "mode": "wireless", "why": "cambia il tipo di interfaccia in monitor/AP mode; e' il comando su cui airmon-ng (script, non setcap-pabile) appoggia il monitor mode" },
+    "iwconfig":      { "caps": ["cap_net_admin"], "mode": "wireless", "why": "stessa ragione di iw; airmon-ng lo invoca come fallback per il mode switch" },
+    "ifconfig":      { "caps": ["cap_net_admin"], "mode": "wireless", "why": "airmon-ng porta l'interfaccia down/up via ifconfig: senza net_admin il monitor mode non parte" }
+  },
+  "covered_elsewhere": {
+    "tcpdump": "utente gia' nel gruppo `dialout`: nessuna capability necessaria",
+    "tshark":  "utente gia' nel gruppo `dialout`: nessuna capability necessaria",
+    "responder": "basta net.ipv4.ip_unprivileged_port_start=0 (script Python)",
+    "impacket-ntlmrelayx": "basta net.ipv4.ip_unprivileged_port_start=0 (script Python)",
+    "chisel":  "basta net.ipv4.ip_unprivileged_port_start=0 per i bind sotto 1024",
+    "airmon-ng": "script POSIX: setcap non applicabile. I comandi su cui si appoggia (iw, iwconfig, ifconfig) hanno le capability, quindi funziona da utente"
+  },
+  "_why_not_nopasswd": "La strada ovvia — `NOPASSWD` nel sudoers per i binari che lo chiedono — e' stata scartata, non per pigrizia. Concede la capacita' di ESEGUIRE COME ROOT quei programmi, e alcuni di questi programmi eseguono codice arbitrario: `nmap --script=evil.lua` gira dentro l'interprete Lua come root, quindi la regola diventa una shell root per chiunque possa scrivere un file. Lo stesso vale per `find -exec`, `less`, `vi`. `setcap` non ha questo problema per costruzione: concede un insieme di capability, non un uid, e non esiste un flag di nmap, hping3 o masscan che trasformi il capability in una shell. Il prezzo che si paga e' esplicito: cap_net_admin permette di manipolare interfacce ed e' un vettore di escalazione su alcuni kernel. Resta comunque piu' stretto del sudo con password che l'operatore ha gia' nel gruppo `sudo` — la differenza e' che non richiede di digitare nulla.",
+  "_residual": "Non risolto, e dichiarato perche' un limite che non e' scritto diventa un fermo a meta' engagement: (1) i tipi di scan raw di nmap restano bloccati dal suo controllo geteuid() interno, non dal kernel — vedi bins.nmap.caveat; (2) il monitor mode richiede che la scheda lo annunci fra gli interface modes supportati: MISURATO su wlo1 = IBSS/managed/AP, `monitor` ASSENTE, quindi airodump-ng si avvia e passa il controllo di privilegio ma fallisce sul ioctl SIOCSIWMODE — e' un limite hardware della scheda, non di privilegio; (3) le capability si perdono a ogni apt upgrade del pacchetto, e solo capcheck.js lo puo' dire in tempo."
+}

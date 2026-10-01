@@ -82,5 +82,22 @@
   "impacket-GetUserSPNs": { "args_schema": "<domain>/<user>:<pass> [-dc-ip <ip>]", "risk_tier": "active", "timeout_ms": 600000, "rate_class": "normal", "alternative": null, "read_only": false },
   "impacket-lookupsid": { "args_schema": "<domain>/<user>:<pass>@<host>", "risk_tier": "active", "timeout_ms": 600000, "rate_class": "slow", "alternative": null, "read_only": false },
   "impacket-rpcdump": { "args_schema": "<domain>/<user>:<pass>@<host>", "risk_tier": "active", "timeout_ms": 600000, "rate_class": "slow", "alternative": null, "read_only": false },
-  "impacket-smbclient": { "args_schema": "<domain>/<user>:<pass>@<host>", "risk_tier": "read", "timeout_ms": 600000, "rate_class": "slow", "alternative": "smbclient", "read_only": true }
+  "impacket-smbclient": { "args_schema": "<domain>/<user>:<pass>@<host>", "risk_tier": "read", "timeout_ms": 600000, "rate_class": "slow", "alternative": "smbclient", "read_only": true },
+
+  "uncover": { "args_schema": "-e <shodan|censys|zoomeye|hunter|fofa|daydaymap> -q <query>", "risk_tier": "read", "timeout_ms": 600000, "rate_class": "normal", "alternative": "subfinder", "read_only": true },
+  "shuffledns": { "args_schema": "-d <domain-list> [-w <wordlist>] -silent -r <resolvers>", "risk_tier": "active", "timeout_ms": 3600000, "rate_class": "aggressive", "alternative": "dnsx", "read_only": false },
+  "mapcidr": { "args_schema": "-cidr <cidr> [-silent]", "risk_tier": "read", "timeout_ms": 600000, "rate_class": "normal", "alternative": null, "read_only": true },
+  "interactsh-client": { "args_schema": "-json -o <file>", "risk_tier": "read", "timeout_ms": 3600000, "rate_class": "normal", "alternative": null, "read_only": true },
+
+  "wpscan": { "args_schema": "--url <url> [--enumerate vp,vu] [--api-token <t>]", "risk_tier": "active", "timeout_ms": 3600000, "rate_class": "normal", "alternative": "nuclei", "read_only": false },
+  "xsser": { "args_schema": "-u <url> -p <payloads>", "risk_tier": "active", "timeout_ms": 1800000, "rate_class": "normal", "alternative": "dalfox", "read_only": false },
+  "medusa": { "args_schema": "-h <host> -u <user-list> -p <pass-list> -M <module>", "risk_tier": "intrusive", "timeout_ms": 7200000, "rate_class": "aggressive", "alternative": "hydra", "read_only": false },
+  "dirb": { "args_schema": "<url> <wordlist>", "risk_tier": "active", "timeout_ms": 3600000, "rate_class": "aggressive", "alternative": "ffuf", "read_only": false },
+  "theharvester": { "args_schema": "-d <domain> -b all", "risk_tier": "read", "timeout_ms": 1800000, "rate_class": "normal", "alternative": "uncover", "read_only": true },
+  "fierce": { "args_schema": "dns <domain> [-dns <servers>]", "risk_tier": "active", "timeout_ms": 1800000, "rate_class": "aggressive", "alternative": "dnsx", "read_only": false },
+  "dnsenum": { "args_schema": "--enum all <domain>", "risk_tier": "active", "timeout_ms": 1800000, "rate_class": "aggressive", "alternative": "dnsx", "read_only": false },
+  "eyewitness": { "args_schema": "-f <file> --no-prompt", "risk_tier": "active", "timeout_ms": 3600000, "rate_class": "normal", "alternative": "obscura", "read_only": false },
+
+  "schemathesis": { "args_schema": "run <schema-url> [--base-url <b>] [--checks all] [--hypothesis-max-examples <n>]", "risk_tier": "active", "timeout_ms": 3600000, "rate_class": "normal", "alternative": "arjun", "read_only": false },
+  "h2csmuggler": { "args_schema": "-x <url> -t | --scan-list <file> --threads <n>", "risk_tier": "intrusive", "timeout_ms": 600000, "rate_class": "slow", "alternative": "desync.js", "read_only": false }
 }
