@@ -5,7 +5,7 @@
 **A penetration-testing harness where a finding is only a finding if code can prove it —
 and where the agent cannot violate scope, because the enforcement is beneath it.**
 
-[Apache-2.0](LICENSE) · zero dependencies · offline-capable · 109 tests, hermetic and parallel
+[Apache-2.0](LICENSE) · zero dependencies · offline-capable · 110 tests, hermetic and parallel
 
 ![Command Center overview](docs/assets/command-center-overview.png)
 
@@ -93,7 +93,7 @@ clean scan.
   On a client network, `npm install` does nothing.
 - **Runs air-gapped.** `local/` drives the same deterministic engine against a local
   model. No API key, no data leaving the engagement laptop.
-- **109 tests, hermetic and parallel by default, no network.** Offline and loopback tests,
+- **110 tests, hermetic and parallel by default, no network.** Offline and loopback tests,
   classified by the runner; `npm test` is the gate, `npm run test:all` includes the live e2e
   set. Tests keep the engine's shared state — the global rate limiter, the run audit, the
   findings head-anchor, the egress-proxy state — in a fixture (`hermetic()` in
@@ -111,7 +111,7 @@ Requires **Node ≥ 22** (the Command Center backend uses `node:sqlite`).
 ```bash
 git clone https://github.com/CSI-entitymorton/stavrosredteamer.git
 cd stavrosredteamer
-npm test                 # 109 tests, no install, no network, 2 workers (--jobs 1 to serialize)
+npm test                 # 110 tests, no install, no network, 2 workers (--jobs 1 to serialize)
 ```
 
 Then write your authorization. `scope.json` **is** the written authorization, and the
@@ -158,7 +158,7 @@ only the processes the harness owns.
 
 | | |
 |---|---|
-| `tools/` | the engine: 155 modules, scope guards, repeater, oracle, pipeline, C2, wifi, GUI, tests |
+| `tools/` | the engine: 156 modules, scope guards, repeater, oracle, pipeline, C2, wifi, GUI, tests |
 | `local/fleet/` | 28 agent definitions (orchestrator + specialists) |
 | `local/` | standalone runner against a local model — no cloud, no Freebuff |
 | `workflows/` | 17 reusable `enum-*` / `attack-*` pipelines |

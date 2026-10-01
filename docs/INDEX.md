@@ -32,7 +32,7 @@
 - [**Egress gateway & anonymized egress (red-team OPSEC)**](docs/egress-opsec.md) — To force third-party HTTP(S) binaries through the scope allowlist, start the proxy first: · 2,4 KB
 - [**docs/f3-client-runbook.md — Poco F3 come client dell'harness stavros**](docs/f3-client-runbook.md) — ┌─────────────────────── Poco F3 (client) ───────────────────────┐ · 9,6 KB
 - [**docs/f3-rom-alioth.md — Poco F3 (alioth): ROM dedicata per il client harness**](docs/f3-rom-alioth.md) — (`docs/egress-opsec.md`). Le uniche app extra: Termux (F-Droid) e nulla altro. · 7,6 KB
-- [**Forum — il lato admin: ruolo, homepage, sanzioni**](docs/forum-admin.md) — Il forum firmato (`tools/forum-server.js` + `tools/forum.js`) ha un ruolo admin lato server: lo · 5,2 KB
+- [**Forum — il lato admin: ruolo, homepage, sanzioni**](docs/forum-admin.md) — Il forum firmato (`tools/forum-server.js` + `tools/forum.js`) ha un ruolo admin lato server: lo · 7,4 KB
 - [**Host exploitation (post-web: C2 / post-ex / lateral) + threat intel**](docs/host-exploitation.md) — Confirm-tier is refused unless `--confirm "<reason>"` is passed, which needs your explicit in-session · 9,1 KB
 - [**Testing by class — dettaglio metodologico**](docs/methodology-classes.md) — Class names for `record-finding.js` are the canonical keys of `tools/test-registry.json` — · 5,1 KB
 - [**Mobile (Android) — methodology & tool detail**](docs/mobile.md) — (`127.0.0.1`, `localhost`) o un serial USB esplicitamente in allowlist (device fisico autorizzato). · 4,9 KB
@@ -48,7 +48,7 @@
 
 - [**Stavros Radar Implementation Plan**](docs/superpowers/plans/2026-09-08-stavros-radar.md) — Goal: Create an autonomous intelligence and capability-scouting tool for StavrosRedTeamer that analyzes the local codebase, discovers relevant open-so · 26,0 KB · 0/26 check
 - [**Offensive Batch 2 — Implementation Plan (6 workstream)**](docs/superpowers/plans/2026-09-26-offensive-batch2-plan.md) — Goal: Sei capacità offensive indipendenti per l'harness: matrice permessi multi-identità (Gate P1), ingest OpenAPI/Swagger, wordlist adattive dal targ · 25,5 KB · 0/34 check
-- [**Simulazione del forum con admin abliterato — piano**](docs/superpowers/plans/2026-10-01-forum-admin.md) — Data: 2026-10-01 · Stato: F0–F2 in corso — checkpoint utente dopo «forum creato e testato» · 4,0 KB
+- [**Simulazione del forum con admin abliterato — piano**](docs/superpowers/plans/2026-10-01-forum-admin.md) — Data: 2026-10-01 · Stato: F0–F3 fatti (server, wrapper, runtime dell'agente); F4–F5 aperti · 4,3 KB
 - [**Stavros Radar — Design Specification**](docs/superpowers/specs/2026-09-08-stavros-radar-design.md) — Status: Approved · 7,6 KB
 - [**Ondata 7 — Integrità e promozione della prova (design spec)**](docs/superpowers/specs/2026-09-28-findings-integrity-design.md) — Data: 2026-09-28 · Repo: stavrosredteamer · Stato: design, in attesa di revisione · 12,7 KB
 - [**Forum agentico con admin — design spec (F0)**](docs/superpowers/specs/2026-10-01-forum-admin-design.md) — Data: 2026-10-01 · Repo: stavrosredteamer · Stato: congelato per F1–F2 · 4,8 KB

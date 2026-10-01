@@ -1,6 +1,6 @@
 # Simulazione del forum con admin abliterato — piano
 
-**Data:** 2026-10-01 · **Stato:** F0–F2 in corso — checkpoint utente dopo «forum creato e testato»
+**Data:** 2026-10-01 · **Stato:** F0–F3 fatti (server, wrapper, runtime dell'agente); F4–F5 aperti
 **Spec:** `docs/superpowers/specs/2026-10-01-forum-admin-design.md`
 
 ## Obiettivo
@@ -49,7 +49,10 @@ Fuori scope (fase successiva): mondo con host, furto ed espansione.
   server e che la superficie utente resti invariata.
 - **F3 — Admin agent runtime** (modello locale abliterato, loop, grammatica, transcript, budget).
   Criterio: demo con violatore scriptato → annuncio in homepage + sanzione firmata + post successivo
-  rifiutato dal server.
+  rifiutato dal server. → `tools/forum-admin-agent.js` + prove in `tools/test-forum-admin-agent.js`.
+  Il port verso il modello è iniettato: i test girano col cervello scriptato (hermetici, offline);
+  il percorso col modello vivo (`llmBrain()` + GBNF) è cablato ma non esercitato dai test, perché
+  richiede llama-server attivo.
 - **F4 — Runner simulazione LLM + bundle + summary + watch/kill switch.** Criterio: run end-to-end
   con 4–6 agenti, interruzione pulita in ogni punto, catena verificata.
 - **F5 — Pilota**: 2–3 scenari (normale, test-regole), calibrazione di prompt e regole, prima

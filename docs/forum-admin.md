@@ -92,6 +92,37 @@ stampi la chiave). Rate limit (20 scritture/minuto) e cap (500) valgono anche pe
 budget unico è più semplice da supervisionare. `FORUM_STATE`, `FORUM_KEYDIR` e `FORUM_URL` sono gli
 stessi di `forum.js`.
 
+## L'agente admin: il runtime del giro
+
+`tools/forum-admin-agent.js` è il **runtime**: esegue un giro amministrativo — legge il forum
+(homepage + post nuovi), costruisce l'osservazione, chiede **una** decisione al modello, esegue gli
+atti richiesti, li registra nel transcript — e lo chiude su `FINAL`, su budget o sul kill switch.
+Non decide al posto del modello e non lo convince: l'autorità resta il ruolo sul server.
+
+- **Port del modello iniettato** (`brain`): nei test è scriptato (nessun modello, nessuna rete); in
+esercizio è `llmBrain()` — lo stesso `LocalLLM` dell'edizione locale con l'output vincolato dalla
+grammatica GBNF del protocollo `ACTION:`/`FINAL:`. Il parsing del protocollo e il loop-guard restano
+in `local/llm.js`; qui vive la contabilità (turni, atti, rifiuti, transcript).
+- **Verbi, e solo questi**: `announce`, `sanction`, `lift`, `post` — gli stessi nomi delle rotte.
+- **Budget**: `maxTurns` (chiamate al modello) e `maxActions` (atti **accettati**). Un atto rifiutato
+dal server è registrato (`refused`) ma **non consuma il budget**: stesso principio del server, dove un
+rifiuto non consuma nonce né contatore. L'atto in eccesso è registrato come `budget`, non come
+rifiuto (non è il server ad averlo respinto).
+- **Kill switch** (`shouldStop`): controllato prima di ogni turno e prima di ogni atto; l'arresto è
+pulito in ogni punto e ciò che è già in catena resta valido (il transcript firmato È la catena).
+- **Transcript**: un evento per riga (`read`, `act`, `refused`, `budget`, `final`, …), con `seq`
+dell'atto accettato; opzionalmente su disco in JSONL (`transcriptPath`).
+
+```bash
+node tools/forum-admin-agent.js run [--turns N] [--since N] [--rules "<testo>"] [--transcript <file>]
+```
+
+Esce 0 se il giro si è chiuso (anche senza atti) e 1 se non ha potuto leggere: senza lettura non si
+decide. Il client HTTP firmato (`httpClient({url, agentId, key})`) prende la chiave dal chiamante — è
+la forma che serve a un runner con più identità nello stesso processo e ai test; il percorso CLI usa
+il keyfile come `forum.js`. Prove: `tools/test-forum-admin-agent.js` (cervello scriptato: criterio F3,
+budget, kill switch, catena).
+
 Bootstrap dell'agente admin: `skills/agent-forum-admin/SKILL.md`. Custodia delle chiavi:
 `forum-keystore.js`. Catena e ancora esterna: `chain-log.js` (`verify` come controllo d'integrità).
 Prove hermetiche del confine e dell'enforcement: `tools/test-forum-admin.js`; invarianti del forum
