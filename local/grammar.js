@@ -35,7 +35,7 @@ function toolProtocolGrammar(toolNames, { allowThinking = false } = {}) {
   const thinkRule = allowThinking
     ? '\nthink   ::= "<think>" ( [^<] | "<" [^/] )* "</think>" ws'
     : '';
-  return `# StavrosRedTeamer edizione locale — protocollo tool vincolato
+  return `# Cyboros Harness — edizione locale — protocollo tool vincolato
 root    ::= ws ${think}( action | final )
 action  ::= "ACTION:" ws "{" ws "\\"tool\\"" ws ":" ws toolname ws "," ws "\\"args\\"" ws ":" ws value ws "}" ws
 final   ::= "FINAL:" ws freetext

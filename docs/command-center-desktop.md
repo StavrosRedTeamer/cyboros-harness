@@ -114,7 +114,9 @@ costruiscono 8 WP sopra un diff aperto.
   (default `auto`), enforcement del token su POST/DELETE e su `/api/term/stream`,
   `GET /api/instance`, rilascio del lock su exit/SIGINT/SIGTERM, `SCOPE_FILE` che rispetta `SCOPE_JSON`.
 - `tools/gui/app.js`: token da `?token=` → `sessionStorage` (URL ripulito), header
-  `X-Stavros-Token` in `api()`, `?token=` sull'EventSource del terminale, banner read-only al 403.
+  `X-Cyboros-Token` in `api()`, `?token=` sull'EventSource del terminale, banner read-only al 403.
+  Il server accetta ancora `X-Stavros-Token` per una release: un client gia` aperto su una
+  versione precedente non deve prendere un 403 muto a meta` scrittura.
 - `start-command-center.sh`: genera il token, apre l'URL tokenizzato, `--attach` friendly.
 - `.gitignore`: dati cliente + `reports/app/`.
 - Test: `tools/test-cc-instance.js` (offline) e `tools/test-cc-server.js`

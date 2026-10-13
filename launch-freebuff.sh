@@ -89,7 +89,7 @@ fi
 # Il main agent di Freebuff e' sempre un wrapper bundled derivato dal MODELLO scelto
 # (freebuffModel in settings.json): l'identita' "Cyboros" non viene da .agents/, ma dal
 # blocco IDENTITÀ in AGENTS.md e dal router in ~/.AGENTS.md. vedi local/README-local.md
-say "Agente: default del prodotto — per Cyboros scrivi '@stavros' come PRIMO messaggio"
+say "Agente: default del prodotto — per Cyboros scrivi '@cyboros' come PRIMO messaggio"
 say "Modello: $(node -e 'try{process.stdout.write(require("fs").readFileSync(process.env.HOME+"/.config/manicode/settings.json","utf8").match(/"freebuffModel":\s*"([^"]+)"/)?.[1]??"default")}catch{}' 2>/dev/null)"
 say "Verifica wiring: node tools/check-identity.js"
 say "Avvio: freebuff --cwd $EDITION"

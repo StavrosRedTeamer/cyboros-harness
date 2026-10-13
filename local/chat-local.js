@@ -1,6 +1,6 @@
 #!/usr/bin/env node
-// local/chat-local.js — REPL INTERATTIVO dell'edizione locale StavrosRedTeamer.
-// "Stavros al tuo comando" dal terminale: chatti, il modello ragiona e chiama i TOOL REALI
+// local/chat-local.js — REPL INTERATTIVO dell'edizione locale di Cyboros Harness.
+// "Cyboros al tuo comando" dal terminale: chatti, il modello ragiona e chiama i TOOL REALI
 // (gli stessi guardati di run-local.js: scope-guard/rate hard-enforced nei wrapper), tu vedi
 // output e findings e continui la conversazione. Nessuna dipendenza npm.
 //
@@ -293,7 +293,7 @@ async function turn(userMsg) {
   ].filter(Boolean).join(dim(' · '));
   console.log(dim(`  ${grn('✔')}  `) + dim(summary));
   state.history = res.messages; // porta avanti la conversazione (system+tool turns inclusi)
-  console.log('\n' + bold(grn('Stavros')) + ': ' + res.text + '\n');
+  console.log('\n' + bold(grn('Cyboros')) + ': ' + res.text + '\n');
 }
 
 // ---- comandi slash ----------------------------------------------------------------

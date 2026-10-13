@@ -2,13 +2,13 @@
 // Post-flight: apre il systemPrompt dell'ultima chat e verifica che l'identita' sia
 // cablata come si intende.
 //
-//   node tools/check-identity.js                 # default: il ramo @stavros del router
+//   node tools/check-identity.js                 # default: il ramo @cyboros del router
 //   node tools/check-identity.js <progetto>      # idem, altro progetto
 //   node tools/check-identity.js eni [<progetto>]# il ramo @eni (contratto in ~/eni/.AGENTS.md)
 //
 // L'identita' del main agent NON viene da .agents/ ma dai knowledge file, che Freebuff
 // renderizza in due soli: <progetto>/AGENTS.md e uno fra ~/.AGENTS.md / ~/.CLAUDE.md.
-// Il default e' l'identita' del prodotto; Stavros e ENI sono opt-in sui token `@stavros` /
+// Il default e' l'identita' del prodotto; Cyboros e ENI sono opt-in sui token `@cyboros` /
 // `@eni` del PRIMO messaggio. Questo tool non legge i messaggi dell'utente: verifica che le
 // condizioni dell'opt-in siano presenti e coerenti nel prompt, e segnala il modo in cui siamo.
 //
@@ -19,8 +19,8 @@ const path = require('path')
 const os = require('os')
 
 const argv = process.argv.slice(2)
-const MODE = argv[0] === 'eni' ? 'eni' : 'stavros'
-const PROJECT = (MODE === 'eni' ? argv[1] : argv[0]) || 'stavrosredteamer'
+const MODE = argv[0] === 'eni' ? 'eni' : 'cyboros'
+const PROJECT = (MODE === 'eni' ? argv[1] : argv[0]) || 'cyboros-harness'
 const CHATS = path.join(os.homedir(), '.config/manicode/projects', PROJECT, 'chats')
 const ENI_CONTRACT = path.join(os.homedir(), 'eni', '.AGENTS.md')
 
@@ -61,7 +61,7 @@ const agent = state.sessionState?.mainAgentState || state.mainState || {}
 const sp = agent.systemPrompt || ''
 
 const ROUTER = 'workspace operating rules' // marcatore di ~/.AGENTS.md
-const TOKEN = '@' + (MODE === 'eni' ? 'eni' : 'stavros')
+const TOKEN = '@' + (MODE === 'eni' ? 'eni' : 'cyboros')
 const ENI_MARKER = MODE === 'eni' ? contractMarker(ENI_CONTRACT) : null
 const at = (n) => { const i = sp.indexOf(n); return i < 0 ? null : i }
 
@@ -76,7 +76,7 @@ console.log(`[identity] prompt   ${sp.length} caratteri`)
 const SIGNALS = [
   ['built-in  "You are Buffy"', 'You are Buffy'],
   ['progetto  contratto d engagement (opt-in)', 'ATTIVAZIONE'],
-  [MODE === 'eni' ? 'router    ramo @eni' : 'router    ramo @stavros', TOKEN],
+  [MODE === 'eni' ? 'router    ramo @eni' : 'router    ramo @cyboros', TOKEN],
   ['router    default = identita del prodotto', 'Default: keep the identity the product gives you'],
   ['built-in  "AI agent behind Freebuff"', 'AI agent behind Freebuff'],
 ]
@@ -118,7 +118,7 @@ if (MODE === 'eni') {
   )
   if (!hasGate) fail(`nessun blocco ATTIVAZIONE nel prompt: il contratto di progetto puo attivarsi senza il token '${TOKEN}'`)
   else ok('contratto di progetto gated (ATTIVAZIONE presente)')
-  if (!hasToken) fail(`il token '${TOKEN}' non e' definito nel prompt: nessuno puo attivare Stavros`)
+  if (!hasToken) fail(`il token '${TOKEN}' non e' definito nel prompt: nessuno puo attivare Cyboros`)
   else ok(`token di attivazione '${TOKEN}' definito`)
   if (!hasRouter) fail('router ~/.AGENTS.md assente dal prompt')
   else ok('router ~/.AGENTS.md presente')
@@ -169,7 +169,7 @@ if (bad === 0) {
   if (MODE === 'eni') {
     console.log(`[identity] coerente. Per ENI: sessione lanciata da ./launch-eni.sh, oppure primo messaggio che inizia con '@eni'.`)
   } else {
-    console.log(`[identity] coerente. Per Stavros: primo messaggio che inizia con '${TOKEN}'.`)
+    console.log(`[identity] coerente. Per Cyboros: primo messaggio che inizia con '${TOKEN}'.`)
     console.log('[identity] Altrimenti il default del prodotto, come richiesto.')
   }
   process.exit(0)

@@ -369,10 +369,10 @@ Quindi l'identità entra dai **knowledge file**, che la CLI inietta nel prompt i
 | `4368` | ` ```~/.AGENTS.md ` | home | router (3,9 KB) |
 | `11592` | `# Freebuff Meta-information` | built-in | "You are the AI agent behind Freebuff" |
 
-### Cyboros è opt-in: `@stavros` come primo messaggio (2026-09-26)
+### Cyboros è opt-in: `@cyboros` come primo messaggio (2026-09-26)
 
 Il default è tornato quello del prodotto. **Cyboros si attiva solo se il primo messaggio
-della conversazione inizia con il token `@stavros`**; ogni altra sessione resta l'agente di
+della conversazione inizia con il token `@cyboros`**; ogni altra sessione resta l'agente di
 coding predefinito, anche dentro questa cartella. La cartella non cambia l'identità — cambia
 il token.
 
@@ -382,7 +382,7 @@ I due pezzi che lo descrivono:
   dichiara esplicitamente che senza token il file resta documentazione del repository e non
   una personalità;
 - `~/.AGENTS.md` (home) è il router: default = identità del prodotto, con l'unico opt-in
-  `@stavros` in testa. Dice anche che il token si legge **una volta sola** — `@stavros` a
+  `@cyboros` in testa. Dice anche che il token si legge **una volta sola** — `@cyboros` a
   metà conversazione non ri-arma niente, e toglierlo non la disarma.
 
 Nota sul trigger: se la TUI intercetta la `@` con un popup di autocomplete, il token
@@ -416,7 +416,7 @@ Conseguenze operative:
   — il dump supera 1 MB, quindi su file e non via `execSync` (ENOBUFS).
 
 ```
-[identity] mode      opt-in '@stavros' — inattivo finche' il primo messaggio non inizia con il token
+[identity] mode      opt-in '@cyboros' — inattivo finche' il primo messaggio non inizia con il token
 
   offset  sorgente
         0  built-in  "You are Buffy"

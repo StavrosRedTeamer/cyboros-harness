@@ -1,7 +1,7 @@
 # Prompt di sessione — benchmark gen-bench
 
 > Incolla questo testo come **secondo** messaggio in una sessione Freebuff CLI lanciata da
-> una shell dove hai fatto `source ./bench.env.sh`. Il primo messaggio deve essere `@stavros`
+> una shell dove hai fatto `source ./bench.env.sh`. Il primo messaggio deve essere `@cyboros`
 > da solo: l'identità si legge solo al primo messaggio.
 >
 > **Sostituisci i due segnaposto** `<PORTA>` e `<SEED>` con i valori stampati dall'env.

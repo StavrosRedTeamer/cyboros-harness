@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// POC delivery for the Stavros harness: generate a standalone, parameterized Python
+// POC delivery for the Cyboros harness: generate a standalone, parameterized Python
 // reproduction script for a verified finding.
 //   node tools/gen-poc.js <finding-id|--latest> [--out <file>]
 //   node tools/gen-poc.js <finding-id|--latest> --stdout

@@ -1,5 +1,5 @@
 {
-  "_comment": "StavrosRedTeamer — edizione LOCALE. Config del runner autonomo che guida il motore deterministico (tools/) e usa un modello locale abliterato via API OpenAI di llama.cpp. Nessuna dipendenza da Freebuff/cloud.",
+  "_comment": "Cyboros Harness — edizione LOCALE. Config del runner autonomo che guida il motore deterministico (tools/) e usa un modello locale abliterato via API OpenAI di llama.cpp. Nessuna dipendenza da Freebuff/cloud.",
   "endpoint": {
     "base_url": "http://127.0.0.1:8080/v1",
     "api_key": "sk-local-noauth",

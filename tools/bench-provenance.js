@@ -87,7 +87,7 @@ function main() {
     } catch (e) { return null; }
   })();
 
-  const armed = !!firstPrompt && /^\s*@(stavros|eni)\b/.test(firstPrompt);
+  const armed = !!firstPrompt && /^\s*@(cyboros|eni)\b/.test(firstPrompt);
   const live = liveModelKey();
   const out = {
     session: path.basename(dir),
@@ -104,7 +104,7 @@ function main() {
   if (!out.benchModel && out.liveModelKey) warnings.push('lo slug del modello non e` ancora nel log: la 0.2.11 tiene solo la chiave di catalogo "' + out.liveModelKey + '" (id server, non risolvibile su disco). Il nome leggibile lo mostra la TUI: guardalo li` prima di fidarti di --model.');
   if (models.length > 1) warnings.push('piu` di un modello nella stessa chat: il benchmark ne ha uno solo');
   if (agentType === 'base3-free-catalog') warnings.push('agentType = base3-free-catalog: il modello e` stato scelto dal picker, non pinnato da settings.json');
-  if (!armed) warnings.push('il primo messaggio non arma nessuna identita` (@stavros/@eni): la sessione non e` Stavros');
+  if (!armed) warnings.push('il primo messaggio non arma nessuna identita` (@cyboros/@eni): la sessione non e` Cyboros');
   if (warnings.length) out.warning = warnings.join(' | ');
   console.log(JSON.stringify(out, null, 2));
   process.exit(out.benchModel && armed ? 0 : 1);

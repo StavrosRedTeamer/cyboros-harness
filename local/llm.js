@@ -1,4 +1,4 @@
-// local/llm.js — client OpenAI-compatibile per llama.cpp (edizione locale StavrosRedTeamer).
+// local/llm.js — client OpenAI-compatibile per llama.cpp (edizione locale di Cyboros Harness).
 // Zero dipendenze (Node >= 22, fetch globale). Espone un loop di tool-calling adatto a un
 // modello DEBOLE abliterato: contesto tagliato, output clippato, retry, e un fallback a
 // protocollo testuale quando il modello non emette tool_calls nativi affidabili.

@@ -60,7 +60,7 @@ plan() {
 #
 # I membri del gruppo stanno nel QUARTO campo di getent group (`sudo:x:27:utente1,utente2`),
 # separati da virgole: si prende `cut -d: -f4` e poi si splitta sulle virgole. Splittando
-# l'intera riga con `tr ',' ' '` si ottiene un unico candidato "sudo:x:27:stavros", che
+# l'intera riga con `tr ',' ' '` si ottiene un unico candidato "sudo:x:27:utente1 utente2", che
 # `getent passwd` non risolve, e il ciclo scarta tutto ricadendo su $HOME=/root — che e'
 # esattamente il guasto che questo script aveva, e che da utente era invisibile perche' il
 # fallback dava per caso la risposta giusta.

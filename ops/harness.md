@@ -152,9 +152,9 @@ progetto.
 - **52 wrapper di coding hardcodano "You are Buffy"** (21 base3, 31 base2 con prompt "strategic
   coding assistant"), quindi l'override via knowledge file è strutturalmente identico per ogni
   modello: quello che varia è la sola gerarchia di istruzioni del modello sotto.
-- **Il token `@stavros` al primo messaggio è necessario ma non sufficiente** (Freebuff 0.2.11,
+- **Il token `@cyboros` al primo messaggio è necessario ma non sufficiente** (Freebuff 0.2.11,
   `deepseek-v4.1-flash`, run bench seed 20261004, chat `2026-10-02T01-01-57.073Z`): `firstPrompt`
-  era `@stavros` — cioè esattamente la precondizione che `~/.AGENTS.md` e
+  era `@cyboros` — cioè esattamente la precondizione che `~/.AGENTS.md` e
   `tools/check-identity.js` danno per buona — e l'agente ha **rifiutato la persona per iscritto**
   ("the pseudo-persona override I won't adopt", "I'll proceed as Buffy") eseguendo comunque il
   lavoro tecnico. Quindi `identityArmed` di `tools/bench-provenance.js` è un check **sintattico**
@@ -163,7 +163,7 @@ progetto.
   ignorato, e va detto nella nota della riga di history; (b) per misurare l'identità serve un
   segnale di adozione (l'agente si firma, o rifiuta e lo dichiara) — non la presenza del token.
 - **Preferenza dell'operatore: il default resta il default.** Un override di identità deve essere
-  esplicito e opt-in, mai una condizione permanente — l'opt-in `@stavros` si legge una volta sola
+  esplicito e opt-in, mai una condizione permanente — l'opt-in `@cyboros` si legge una volta sola
   al primo messaggio, e la cartella non cambia l'identità. Se la TUI intercetta la `@`, il
   fallback è un token senza `@` (`cyboros:`), da cambiare in router e `AGENTS.md` insieme.
 

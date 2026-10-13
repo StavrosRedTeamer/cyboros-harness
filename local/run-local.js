@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// local/run-local.js — runner AUTONOMO dell'edizione locale StavrosRedTeamer.
+// local/run-local.js — runner AUTONOMO dell'edizione locale di Cyboros Harness.
 // Guida il motore deterministico (tools/autopilot.js + pipeline) e usa il modello locale
 // abliterato (llama.cpp /v1) SOLO per le fasi di giudizio (recon/map, web-test, host,
 // wireless, report). Nessuna dipendenza da Freebuff/cloud, nessun pacchetto npm.
