@@ -11,7 +11,7 @@
 # fallback: Chromium --app, then the default browser. Node stays the only hard dep.
 #
 # Usage:
-#   tools/app/scc.py [--read-only] [--headless] [--web] [--kiosk] [--keep-server]
+#   tools/app/cyboros-cc.py [--read-only] [--headless] [--web] [--kiosk] [--keep-server]
 #
 # --read-only    backend refuses every write (403 read-only)
 # --web          do not open a native window; hand the URL to the browser
@@ -32,7 +32,7 @@ from types import SimpleNamespace
 WS = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 TOOLS = os.path.join(WS, "tools")
 LOG_DIR = os.path.join(WS, "reports", "app")
-LOG_FILE = os.path.join(LOG_DIR, "scc.log")
+LOG_FILE = os.path.join(LOG_DIR, "cyboros-cc.log")
 APP_NAME = "cyboros-cc"
 SERVER_NAME = "cyboros-cc-single"
 _QT_APP = None  # keeps a QApplication created outside main() alive
@@ -46,7 +46,7 @@ def log(msg):
             fh.write(line)
     except OSError:
         pass
-    sys.stderr.write("[scc] %s\n" % msg)
+    sys.stderr.write("[cyboros-cc] %s\n" % msg)
 
 
 def _tooling_path():
@@ -300,7 +300,7 @@ def report_startup_failure(message):
     Without this the launcher icon just disappears again and the operator has no clue.
     """
     log("FATAL: %s" % message)
-    sys.stderr.write("[scc] %s\n" % message)
+    sys.stderr.write("[cyboros-cc] %s\n" % message)
     if not (os.environ.get("DISPLAY") or os.environ.get("WAYLAND_DISPLAY")):
         return
     try:

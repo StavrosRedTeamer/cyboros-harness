@@ -19,4 +19,4 @@ if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then
   exit 0
 fi
 
-exec python3 "$WS/tools/app/scc.py" "$@"
+exec python3 "$WS/tools/app/cyboros-cc.py" "$@"

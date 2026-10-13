@@ -131,7 +131,7 @@ e legge i dati senza token, con banner che spiega perché le write sono disabili
 ### WP2 — Shell desktop `cyboros-cc`
 
 **Deliverable**
-- `tools/app/scc.py` (PyQt6): QMainWindow con menubar (File/Engagement/View/Actions/Tools/Help),
+- `tools/app/cyboros-cc.py` (PyQt6): QMainWindow con menubar (File/Engagement/View/Actions/Tools/Help),
   toolbar (selettore campagna + chip stato + `⌘K` + Panic), statusbar, tray con colore di stato,
   notifiche desktop (con **discreet mode** e mute), geometria/dock salvati in QSettings,
   single instance (`QLocalServer`) con **handshake di raise**: il secondo lancio chiede alla
@@ -139,11 +139,11 @@ e legge i dati senza token, con banner che spiega perché le write sono disabili
   bloccata) viene scavalcato così la finestra si apre comunque — mai un'uscita silenziosa senza
   finestra, e se il backend non parte l'errore è mostrato in un dialog (non solo nel log),
   supervisore del backend (spawn → health → restart con
-  circuit breaker), log in `reports/app/scc.log` con rotazione, `--read-only`, `--headless`,
+  circuit breaker), log in `reports/app/cyboros-cc.log` con rotazione, `--read-only`, `--headless`,
   `--web`, `--kiosk`, fallback Chromium app-mode / browser.
 - `tools/app/icons/cyboros-cc.svg` (icona neon-duotone), `cyboros-cc` (launcher),
   `install-cyboros-cc-launcher.sh` (idempotente, `StartupWMClass`, Actions), `cyboros-cc.desktop`.
-- `tools/app/test_scc.py`: smoke test stdlib `unittest` in `QT_QPA_PLATFORM=offscreen`
+- `tools/app/test_cyboros_cc.py`: smoke test stdlib `unittest` in `QT_QPA_PLATFORM=offscreen`
   (finestra costruita, tray creato, supervisore chiama `--instance`).
 
 **AC:** doppio click sull'icona → finestra nativa con icona propria e SPA dentro; chiudendo la
@@ -353,7 +353,7 @@ mission, routes, panic). Ogni modulo riusa i tool esistenti; nessun guard è sta
 
 | WP | Stato | Note |
 |----|-------|------|
-| 2 Shell desktop | ✅ (🚧 notifiche) | `tools/app/scc.py` (tray con colore, supervisore spawn→health→restart con circuit breaker, single instance `QLocalServer`, QSettings geometria, `--read-only/--headless/--web/--kiosk/--keep-server`, fallback Chromium→browser), `tools/app/icons/cyboros-cc.svg`, `cyboros-cc`, `install-cyboros-cc-launcher.sh`, `cyboros-cc.desktop`,  `tools/app/pdf-export.py`, `tools/cc-panic.js`, `tools/app/test_scc.py` (8 test offscreen,
+| 2 Shell desktop | ✅ (🚧 notifiche) | `tools/app/cyboros-cc.py` (tray con colore, supervisore spawn→health→restart con circuit breaker, single instance `QLocalServer`, QSettings geometria, `--read-only/--headless/--web/--kiosk/--keep-server`, fallback Chromium→browser), `tools/app/icons/cyboros-cc.svg`, `cyboros-cc`, `install-cyboros-cc-launcher.sh`, `cyboros-cc.desktop`,  `tools/app/pdf-export.py`, `tools/cc-panic.js`, `tools/app/test_cyboros_cc.py` (8 test offscreen,
   incluso il raise fra due processi). 🚧 **mancano**: notifiche desktop con discreet mode/mute (tray + colore di stato ci sono). |
 | 3 Campagna | ✅ | `tools/cc-campaign.js`, `templates/campaign/{web-app,internal-network,wireless,mobile,red-team-full}.json`, route `/api/cc/campaign*`, pannello Campaign + wizard. Rollup ore da gate-log + run-audit. |
 | 4 Approvazioni | ✅ | `tools/cc-approvals.js` + `tools/request-approval.js`, store append-only, token `{id,host,action_class,command_hash,scope_verdict,ttl,granted_by,note}`, coda in opstate via CAS. Integrazione **additiva e default-off** in `run.js`/`c2-guard.js` (`--approval`, policy `host_ops.require_approval`). Pannello + badge. |
@@ -379,5 +379,5 @@ ctx del router), `tools/cc-mission.js` (pass-through `counters`/`caps` per burn/
 `tools/gui/app.js` (renderTab + palette), `tools/gui/app.css` (rail/panel), `docs/f3-client-runbook.md`.
 
 **Prossimo passo concreto** per chi riprende: implementare le notifiche desktop + discreet mode in
-`scc.py` (WP2), il retest diff in Reports (WP6), l'install con conferma tipizzata (WP7) e l'audit
+`cyboros-cc.py` (WP2), il retest diff in Reports (WP6), l'install con conferma tipizzata (WP7) e l'audit
 tastiera (WP8).

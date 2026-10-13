@@ -3,6 +3,14 @@
 **Data:** 10 settembre 2026 · **Repo:** stavrosredteamer (Freebuff) · **Branch:** `command-center-redesign`
 **Stato:** SOLO PIANO — nessuna modifica applicata al codebase.
 
+> **Esito, misurato il 2026-10-13.** Entrambe le fasi sono state eseguite. **Fase A:** `knowledge.md`
+> 41,8 KB → **15,2 KB**, `skills/pentest-playbook/SKILL.md` 56,4 KB → **20,9 KB** — i tetti di A.1
+> (≤12 KB) e A.2 (≤20 KB) **non sono ancora centrati**, ed è l'unico residuo di questo piano.
+> **Fase B:** chiusa — `tools/vendor-dir.js` con root esterna, `vendor/` da 291 MB a **11 MB** (i
+> binari grossi li scarica `install-tools.sh` fuori dalla workspace). **Decision point:** entrambi
+> chiusi, vedi la sezione in fondo. Il testo che segue resta come fu scritto il 10 settembre: è la
+> storia della decisione, non lo stato di oggi.
+
 ## Diagnostica di partenza (misurata)
 
 | Area | Valore | Nota |
@@ -150,4 +158,10 @@ rm vendor/tools/frida/frida-server
 
 ## Decision points (da chiudere prima di eseguire)
 1. **Skill autostavros duplicata** (`skills/` vs `.agents/skills/`): quale percorso è quello caricato da Freebuff? L'altra copia si rimuove o si lascia?
+   → **chiuso il 2026-10-13:** la doppia copia non esiste più. `skills/` contiene `agent-forum`,
+   `agent-forum-admin` e `pentest-playbook`; l'autopilot vive in una sola copia,
+   `.agents/skills/cyboros-autopilot/`. Nessuna decisione residua.
 2. **Bug `unpin.js`** (`tools/mobile.js:128` punta a un file inesistente): creare lo script unpin reale in-repo oppure imporre `--script` esplicito?
+   → **chiuso il 2026-10-13:** risolto creando lo script in-repo. `tools/frida/unpin.js` esiste ed è
+   quello che `tools/mobile.js` carica (`path.join(__dirname, 'frida', 'unpin.js')`), con
+   `CYBOROS_FRIDA_SCRIPT` come override esplicito.

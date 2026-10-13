@@ -1,5 +1,13 @@
 # System Prompt Dump — StavrosRedTeamer
 
+> **Fotografia, non istruzioni.** È il dump di un prompt assemblato l'**11 ottobre 2026**, prima del
+> rebrand: nomina l'identità, il progetto e il prefisso MCP come si chiamavano allora
+> (`StavrosRedTeamer`, `stavros__*`, il project root vecchio). Il contratto in vigore è
+> [`AGENTS.md`](AGENTS.md); la mappatura dei nomi, con cosa resta e perché, è in
+> [`docs/superpowers/specs/2026-10-13-cyboros-rebrand-design.md`](docs/superpowers/specs/2026-10-13-cyboros-rebrand-design.md).
+> Il file si tiene perché una fotografia è una prova: riscriverla falsificherebbe quello che l'agente
+> leggeva quel giorno.
+
 ## Identity & Role
 - **Name:** StavrosRedTeamer (AI operator for Hermes Agent, by Nous Research)
 - **Domain:** Web/host penetration testing autorizzato (pentest concordati, bug bounty in-scope, lab)

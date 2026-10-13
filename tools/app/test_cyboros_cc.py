@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # WP2 smoke test for the desktop shell. Offscreen, stdlib unittest, no real backend.
-# Run: QT_QPA_PLATFORM=offscreen python3 tools/app/test_scc.py
+# Run: QT_QPA_PLATFORM=offscreen python3 tools/app/test_cyboros_cc.py
 import importlib.util
 import os
 import subprocess
@@ -15,15 +15,15 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 WS = os.path.dirname(os.path.dirname(HERE))
 
 
-def load_scc():
-    spec = importlib.util.spec_from_file_location("scc", os.path.join(HERE, "scc.py"))
+def load_cc():
+    spec = importlib.util.spec_from_file_location("cyboros_cc", os.path.join(HERE, "cyboros-cc.py"))
     mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)
     return mod
 
 
-scc = load_scc()
-DEFAULT_SERVER_NAME = scc.SERVER_NAME  # tests re-scope the socket name; keep the default here
+cc = load_cc()
+DEFAULT_SERVER_NAME = cc.SERVER_NAME  # tests re-scope the socket name; keep the default here
 
 
 class FakePopen:
@@ -58,13 +58,13 @@ class FakeRun:
 
 class ShellTests(unittest.TestCase):
     def setUp(self):
-        self.tmp = tempfile.mkdtemp(prefix="scc-test-")
+        self.tmp = tempfile.mkdtemp(prefix="cc-test-")
         os.environ["CC_STATE_DIR"] = self.tmp
         # Never touch the socket of a real running window: scope the name to this test run.
-        scc.SERVER_NAME = "scc-test-single-%d" % os.getpid()
+        cc.SERVER_NAME = "cc-test-single-%d" % os.getpid()
 
     def test_paths_live_under_reports_app(self):
-        self.assertTrue(scc.LOG_FILE.endswith(os.path.join("reports", "app", "scc.log")))
+        self.assertTrue(cc.LOG_FILE.endswith(os.path.join("reports", "app", "cyboros-cc.log")))
         self.assertEqual(DEFAULT_SERVER_NAME, "cyboros-cc-single")
 
     def test_supervisor_spawns_with_instance_and_parses_handshake(self):
@@ -74,14 +74,14 @@ class ShellTests(unittest.TestCase):
             captured["args"] = args
             return FakePopen(args, **kwargs)
 
-        old_run, old_popen = scc.subprocess.run, scc.subprocess.Popen
+        old_run, old_popen = cc.subprocess.run, cc.subprocess.Popen
         try:
-            scc.subprocess.run = lambda *a, **k: FakeRun(returncode=1, stdout="")
-            scc.subprocess.Popen = fake_popen
-            sup = scc.BackendSupervisor(read_only=True)
+            cc.subprocess.run = lambda *a, **k: FakeRun(returncode=1, stdout="")
+            cc.subprocess.Popen = fake_popen
+            sup = cc.BackendSupervisor(read_only=True)
             url = sup.start()
         finally:
-            scc.subprocess.run, scc.subprocess.Popen = old_run, old_popen
+            cc.subprocess.run, cc.subprocess.Popen = old_run, old_popen
 
         self.assertIn("--instance", captured["args"], "supervisor must spawn with --instance")
         self.assertIn("--print-port", captured["args"])
@@ -90,19 +90,19 @@ class ShellTests(unittest.TestCase):
         self.assertTrue(sup.owned)
 
     def test_supervisor_attaches_to_a_live_instance(self):
-        old_run, old_popen = scc.subprocess.run, scc.subprocess.Popen
+        old_run, old_popen = cc.subprocess.run, cc.subprocess.Popen
         try:
-            scc.subprocess.run = lambda *a, **k: FakeRun(returncode=0, stdout="http://127.0.0.1:8787/?token=x\n")
-            scc.subprocess.Popen = lambda *a, **k: (_ for _ in ()).throw(AssertionError("must not spawn"))
-            sup = scc.BackendSupervisor()
+            cc.subprocess.run = lambda *a, **k: FakeRun(returncode=0, stdout="http://127.0.0.1:8787/?token=x\n")
+            cc.subprocess.Popen = lambda *a, **k: (_ for _ in ()).throw(AssertionError("must not spawn"))
+            sup = cc.BackendSupervisor()
             url = sup.start()
         finally:
-            scc.subprocess.run, scc.subprocess.Popen = old_run, old_popen
+            cc.subprocess.run, cc.subprocess.Popen = old_run, old_popen
         self.assertEqual(url, "http://127.0.0.1:8787/?token=x")
         self.assertFalse(sup.owned, "an attached supervisor does not own the backend")
 
     def test_circuit_breaker_suspends_restarts(self):
-        sup = scc.BackendSupervisor()
+        sup = cc.BackendSupervisor()
         sup.owned = True
 
         class Dead:
@@ -132,11 +132,11 @@ class ShellTests(unittest.TestCase):
 
     def test_single_instance_with_qt(self):
         _, QLocalServer, _ = self._qt()
-        server = scc.acquire_single_instance()
+        server = cc.acquire_single_instance()
         self.assertIsNotNone(server)
         if server != "existing":
             server.close()
-            QLocalServer.removeServer(scc.SERVER_NAME)
+            QLocalServer.removeServer(cc.SERVER_NAME)
 
     def test_raise_round_trip_raises_the_window(self):
         app, QLocalServer, QLocalSocket = self._qt()
@@ -156,13 +156,13 @@ class ShellTests(unittest.TestCase):
             def activateWindow(self):
                 self.activated += 1
 
-        server = scc.acquire_single_instance()
+        server = cc.acquire_single_instance()
         self.assertNotEqual(server, "existing")
         win = CountingWindow()
-        scc.serve_raise_requests(server, win)
+        cc.serve_raise_requests(server, win)
         try:
             client = QLocalSocket()
-            client.connectToServer(scc.SERVER_NAME)
+            client.connectToServer(cc.SERVER_NAME)
             self.assertTrue(client.waitForConnected(500), "client must connect to the owner")
             client.write(b"raise\n")
             client.flush()
@@ -178,7 +178,7 @@ class ShellTests(unittest.TestCase):
                              "the raise must bring the window back")
         finally:
             server.close()
-            QLocalServer.removeServer(scc.SERVER_NAME)
+            QLocalServer.removeServer(cc.SERVER_NAME)
 
     def test_second_launch_raises_the_window_across_processes(self):
         """End-to-end: the launch that arrives while a window is up must raise it, not exit.
@@ -187,11 +187,11 @@ class ShellTests(unittest.TestCase):
         loop would starve each other, so the handshake is only real between two processes.
         """
         app, QLocalServer, _ = self._qt()
-        name = "scc-test-e2e-%d" % os.getpid()
-        scc.SERVER_NAME = name  # the client side must look at the socket the child owns
+        name = "cc-test-e2e-%d" % os.getpid()
+        cc.SERVER_NAME = name  # the client side must look at the socket the child owns
         script = "\n".join([
             "import importlib.util, sys",
-            "spec = importlib.util.spec_from_file_location('scc', %r)" % os.path.join(HERE, "scc.py"),
+            "spec = importlib.util.spec_from_file_location('cyboros_cc', %r)" % os.path.join(HERE, "cyboros-cc.py"),
             "m = importlib.util.module_from_spec(spec); spec.loader.exec_module(m)",
             "m.SERVER_NAME = %r" % name,
             "from PyQt6.QtWidgets import QApplication, QMainWindow",
@@ -214,7 +214,7 @@ class ShellTests(unittest.TestCase):
         try:
             self.assertEqual(child.stdout.readline().strip(), "ready",
                              "the first launch must own the socket")
-            result = scc.acquire_single_instance(ack_timeout_ms=3000)
+            result = cc.acquire_single_instance(ack_timeout_ms=3000)
             self.assertEqual(result, "existing",
                              "the second launch must be told the window is up")
             shown = []
@@ -235,15 +235,15 @@ class ShellTests(unittest.TestCase):
         """A listener that ignores the raise (old build / hung window) must not swallow the launch."""
         app, QLocalServer, _ = self._qt()
         silent = QLocalServer()
-        self.assertTrue(silent.listen(scc.SERVER_NAME))
+        self.assertTrue(silent.listen(cc.SERVER_NAME))
         try:
-            server = scc.acquire_single_instance(ack_timeout_ms=100)
+            server = cc.acquire_single_instance(ack_timeout_ms=100)
             self.assertNotEqual(server, "existing", "silence must not be read as 'already running'")
             self.assertIsNotNone(server, "the launch must still end up owning the socket")
             server.close()
         finally:
             silent.close()
-            QLocalServer.removeServer(scc.SERVER_NAME)
+            QLocalServer.removeServer(cc.SERVER_NAME)
 
 
 if __name__ == "__main__":

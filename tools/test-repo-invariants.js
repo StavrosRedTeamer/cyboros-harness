@@ -526,7 +526,7 @@ const REBRAND_ALLOWLIST = [
   ['docs/INDEX.md', 'generato: indicizza anche i documenti datati, e ha già il suo gate'],
   ['docs/project-map.html', 'generato: ha già il suo --check'],
   ['legal/', 'testi con data'],
-  ['piano-ottimizzazione-stavros.md', 'piano datato, tenuto in superficie viva per la sua Fase B'],
+  ['piano-ottimizzazione-stavros.md', 'piano datato (10 settembre): le due fasi sono eseguite, resta il residuo dichiarato in testa'],
   ['tools/env.js', 'legge il prefisso STAVROS_* come fallback di deprecazione'],
   ['tools/test-env.js', 'verifica la finestra di deprecazione: deve scrivere il prefisso vecchio'],
   ['tools/cyboros.js', 'accetta un nome legacy `STAVROS_…` in resolveOperatorTool'],
