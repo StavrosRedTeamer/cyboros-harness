@@ -1,0 +1,66 @@
+name: Bug report
+description: Something in the harness behaves differently from what this repository claims
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        **Not for vulnerabilities.** If you found a way to defeat a guardrail, a scope check or
+        the verification ceiling, that is a security report: use
+        [Security → Report a vulnerability](https://github.com/CSI-entitymorton/stavrosredteamer/security/advisories/new)
+        or read [SECURITY.md](https://github.com/CSI-entitymorton/stavrosredteamer/blob/master/SECURITY.md).
+        Do not open a public issue for it.
+
+  - type: textarea
+    id: what
+    attributes:
+      label: What happens
+      description: The observed behavior, with the exact command and the output it produced.
+      placeholder: |
+        $ node tools/...
+        <output>
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected instead, and where that is written
+      description: >
+        A claim in the docs that reality contradicts is a bug in itself, so quote it: a README
+        line, a test name, a section of ops/harness.md.
+    validations:
+      required: true
+
+  - type: input
+    id: environment
+    attributes:
+      label: Node version and commit
+      description: The output of `node --version` and `git rev-parse --short HEAD`.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - guardrails (scope-guard, enforce, c2/wifi/mobile guards)
+        - run.js / repeater / workflow
+        - findings (record-finding, verify, chain, effective-findings)
+        - Command Center (GUI / API / ledger)
+        - wireless / mobile
+        - suite and gates (test-*, docs-index, invariants, lint)
+        - documentation
+    validations:
+      required: true
+
+  - type: textarea
+    id: gates
+    attributes:
+      label: Did the gates say anything?
+      description: >
+        Optional but useful: the output of `node tools/test-repo-invariants.js`,
+        `node tools/docs-index.js --check` and `node tools/test-lint.js`.
+    validations:
+      required: false

@@ -1,0 +1,11 @@
+# Nessun canale per le vulnerabilità qui dentro: `SECURITY.md` chiede di segnalarle in privato
+# e un issue tracker non lo è, anche quando il repository è privato. I due link qui sotto sono
+# l'unica strada che il progetto indica.
+blank_issues_enabled: true
+contact_links:
+  - name: Vulnerability in the harness (guardrails, scope, findings)
+    url: https://github.com/CSI-entitymorton/stavrosredteamer/security/advisories/new
+    about: Report it privately, never in a public issue — see SECURITY.md for what is in scope.
+  - name: Security policy, safe harbor and the one honest caveat
+    url: https://github.com/CSI-entitymorton/stavrosredteamer/blob/master/SECURITY.md
+    about: What counts as a vulnerability, what does not, and the authorization requirement.

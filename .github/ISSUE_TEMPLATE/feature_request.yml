@@ -1,0 +1,56 @@
+name: Feature request
+description: A capability the harness should have
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: The problem
+      description: What you cannot do today, and in which engagement it bit you. A capability without a use case is hard to judge.
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: What you propose
+      description: >
+        If it adds a module, say where the documentation goes: an undocumented module fails
+        `tools/test-repo-invariants.js`, and a module that is not committed fails
+        `tools/test-lint.js` for whoever requires it.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: deps
+    attributes:
+      label: Does it need a dependency?
+      description: >
+        Zero dependencies is a design constraint, not a preference — it is why the harness runs
+        air-gapped and why `npm install` does nothing on a client network.
+      options:
+        - No — Node standard library only
+        - Yes — and here is what happens without it (fallback in the proposal)
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: gates
+    attributes:
+      label: Gates this is likely to touch
+      options:
+        - label: README counters (tests / modules / pipelines / agent definitions)
+        - label: docs/INDEX.md — regeneration needed
+        - label: AGENTS.md — the 6000-character prompt budget
+        - label: .gitignore or .gitattributes — engagement data rules
+        - label: CI — a new job, or a pinned action
+    validations:
+      required: false
+
+  - type: textarea
+    id: decided_against
+    attributes:
+      label: Options you already ruled out
+      description: Optional, and often the most useful part — it saves the maintainer from re-deciding what you already tested.
+    validations:
+      required: false

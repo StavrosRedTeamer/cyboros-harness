@@ -1,0 +1,26 @@
+# EditorConfig — https://editorconfig.org
+#
+# Perché esiste: la suite è tutta in un dialetto (2 spazi, LF, newline finale) ma l'unica cosa
+# che lo diceva era il codice già scritto. `.gitattributes` copre i line ending nel repository;
+# qui c'è quello che l'editor deve fare mentre si scrive.
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+indent_style = space
+indent_size = 2
+
+# In Markdown due spazi a fine riga sono un a capo forzato: non sono rumore da togliere.
+[*.md]
+trim_trailing_whitespace = false
+
+[*.py]
+indent_size = 4
+
+# Nessun Makefile nel repo oggi: la regola c'è perché il tab in un Makefile è sintassi, non
+# stile, e chi ne aggiunge uno non deve scoprirlo dal fallimento.
+[Makefile]
+indent_style = tab

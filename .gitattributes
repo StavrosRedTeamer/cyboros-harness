@@ -1,0 +1,14 @@
+# I line ending si normalizzano NEL repository, non solo nel checkout: un blob con CRLF resta
+# CRLF per chiunque cloni, e ogni diff di quel file diventa rumore. Cinque file tracciati erano
+# arrivati CRLF (tools/cors.js, csp.js, jwt.js, privacy.js, test-privacy.js) e sono stati
+# rinormalizzati quando questa regola è entrata: da qui in avanti il problema non si ripresenta.
+* text=auto eol=lf
+
+# Binari: nessuna conversione, mai. Oggi l'unico è la panoramica del Command Center.
+*.png binary
+
+# Script eseguibili via shebang: LF obbligatorio, un shebang con CRLF non parte.
+*.sh text eol=lf
+
+# Generato da tools/docs-index.js: non deve dominare le statistiche di linguaggio del repo.
+docs/INDEX.md linguist-generated=true
