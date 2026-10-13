@@ -4,7 +4,7 @@
 > dimensione, avanzamento delle checkbox dei piani). Non si modifica a mano: rigeneralo.
 > `tools/test-repo-invariants.js` fallisce se è rimasto indietro rispetto ai file.
 
-**Superficie viva:** 29 documenti · **piani:** 6 · **archivio:** 3 file superati.
+**Superficie viva:** 31 documenti · **piani:** 7 · **archivio:** 3 file superati.
 
 ## Root del repo
 
@@ -29,6 +29,8 @@
 - [**Alternative-tools audit — what the harness should adopt, borrow, or leave alone**](docs/TOOL-ALTERNATIVES-AUDIT.md) — Three concrete gaps, in priority order: · 26,1 KB
 - [**What the published benchmarks measure, and what they leave out**](docs/TOOL-LANDSCAPE.md) — As of mid-2026 there is real, serious work here, and none of it is · 6,3 KB
 - [**Stavros Command Center — Desktop Edition (piano e work package)**](docs/command-center-desktop.md) — Obiettivo. Portare il Command Center da dashboard web a programma desktop (`stavros-cc`) · 25,4 KB
+- [**Community scout #2 — web, HN e community, 2026-10-04 → 2026-10-09**](docs/community-scout-2026-10-09.md) — OpenAPI/GraphQL SDL/WSDL/.proto. Pipeline a due stadi — cattura una volta, genera (anche · 30,1 KB
+- [**Community scout — Reddit pentest/redteam, ottobre 2026**](docs/community-scout-2026-10.md) — *supervised*, guardia obbligatoria al confine di esecuzione, finding legati a ricevute · 23,1 KB
 - [**Egress gateway & anonymized egress (red-team OPSEC)**](docs/egress-opsec.md) — To force third-party HTTP(S) binaries through the scope allowlist, start the proxy first: · 2,4 KB
 - [**docs/f3-client-runbook.md — Poco F3 come client dell'harness stavros**](docs/f3-client-runbook.md) — ┌─────────────────────── Poco F3 (client) ───────────────────────┐ · 10,4 KB
 - [**docs/f3-rom-alioth.md — Poco F3 (alioth): ROM dedicata per il client harness**](docs/f3-rom-alioth.md) — (`docs/egress-opsec.md`). Le uniche app extra: Termux (F-Droid) e nulla altro. · 7,6 KB
@@ -48,6 +50,7 @@
 
 - [**Stavros Radar Implementation Plan**](docs/superpowers/plans/2026-09-08-stavros-radar.md) — Goal: Create an autonomous intelligence and capability-scouting tool for StavrosRedTeamer that analyzes the local codebase, discovers relevant open-so · 26,0 KB · 0/26 check
 - [**Offensive Batch 2 — Implementation Plan (6 workstream)**](docs/superpowers/plans/2026-09-26-offensive-batch2-plan.md) — Goal: Sei capacità offensive indipendenti per l'harness: matrice permessi multi-identità (Gate P1), ingest OpenAPI/Swagger, wordlist adattive dal targ · 25,5 KB · 0/34 check
+- [**F3 — Arsenale completo + root: Implementation Plan**](docs/superpowers/plans/2026-09-30-f3-arsenal-and-root.md) — Goal: portare il Poco F3 (client *e* target mobile della harness) alla parità con l'arsenale · 23,8 KB · 0/40 check
 - [**Simulazione del forum con admin abliterato — piano**](docs/superpowers/plans/2026-10-01-forum-admin.md) — Data: 2026-10-01 · Stato: F0–F3 fatti (server, wrapper, runtime dell'agente); F4–F5 aperti · 4,3 KB
 - [**Stavros Radar — Design Specification**](docs/superpowers/specs/2026-09-08-stavros-radar-design.md) — Status: Approved · 7,6 KB
 - [**Ondata 7 — Integrità e promozione della prova (design spec)**](docs/superpowers/specs/2026-09-28-findings-integrity-design.md) — Data: 2026-09-28 · Repo: stavrosredteamer · Stato: design, in attesa di revisione · 12,7 KB

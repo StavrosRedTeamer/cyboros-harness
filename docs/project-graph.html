@@ -1,0 +1,610 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Grafo del progetto — StavrosRedTeamer</title>
+<style>
+  :root {
+    --bg: #08060d; --bg2: #050409; --surface: #0f0b18; --surface-2: #160f26;
+    --line: #261a3d; --line-2: #3a2a5c;
+    --ink: #eae7f7; --muted: #9b90b8; --faint: #665b84;
+    --cyan: #24e3ff; --magenta: #ff2d95; --purple: #b98cff; --orange: #ff8324;
+    --green: #24e38b; --yellow: #ffd60a; --red: #ff2b5e; --blue: #7d8cff; --low: #2ad4ff;
+    --mono: "JetBrains Mono", "Cascadia Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    --sans: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; }
+  body {
+    background: var(--bg); color: var(--ink); font-family: var(--sans);
+    display: flex; flex-direction: column; min-height: 100vh;
+  }
+  header {
+    display: flex; align-items: center; gap: 18px; flex-wrap: wrap;
+    padding: 14px 20px 10px; border-bottom: 1px solid var(--line);
+    background: linear-gradient(180deg, #0d0917, #08060d);
+  }
+  header h1 { margin: 0; font-size: 17px; letter-spacing: .3px; }
+  header h1 .dim { color: var(--muted); font-weight: 400; }
+  header .when { color: var(--faint); font: 11px var(--mono); margin-left: 2px; }
+  header .spacer { flex: 1; }
+  button.btn {
+    background: var(--surface); color: var(--muted); border: 1px solid var(--line-2);
+    border-radius: 3px; padding: 6px 10px; font: 11px var(--mono); cursor: pointer;
+  }
+  button.btn:hover { color: var(--ink); border-color: var(--cyan); }
+  nav { display: flex; gap: 6px; flex-wrap: wrap; }
+  nav button {
+    background: transparent; color: var(--muted); border: 1px solid var(--line);
+    border-radius: 3px; padding: 7px 12px; font: 12px var(--mono); cursor: pointer;
+  }
+  nav button:hover { color: var(--ink); border-color: var(--line-2); }
+  nav button.on { color: var(--ink); border-color: var(--cyan); box-shadow: 0 0 8px rgba(36,227,255,.25); }
+  main { display: flex; flex: 1; min-height: 0; }
+  .stage {
+    flex: 1; overflow: auto; padding: 14px 16px 24px; background: #08060d;
+  }
+  .stage svg { display: block; width: 100%; height: auto; max-width: 1600px; }
+  .stage.native svg { width: auto; height: auto; max-width: none; }
+  aside {
+    width: 330px; flex: 0 0 330px; border-left: 1px solid var(--line);
+    background: var(--surface); overflow: auto; padding: 16px 16px 24px;
+  }
+  aside h2 { margin: 0 0 4px; font-size: 15px; }
+  aside .asub { color: var(--muted); font: 11.5px var(--mono); margin: 0 0 12px; }
+  aside .detail { font-size: 12.5px; line-height: 1.55; color: #cfc8e4; }
+  aside .files { margin-top: 14px; color: var(--faint); font: 11px var(--mono); line-height: 1.7; }
+  aside .files code { color: var(--muted); }
+  aside .hint { color: var(--faint); font-size: 12.5px; line-height: 1.6; }
+  footer {
+    border-top: 1px solid var(--line); padding: 10px 20px;
+    color: var(--faint); font: 11px var(--mono); display: flex; gap: 18px; flex-wrap: wrap;
+  }
+  footer .legend { display: flex; gap: 12px; flex-wrap: wrap; }
+  footer .legend i { display: inline-block; width: 9px; height: 9px; border-radius: 2px; margin-right: 5px; vertical-align: -1px; }
+  /* svg */
+  .node { cursor: pointer; }
+  .node rect { transition: stroke .15s, filter .15s; }
+  .node.hot rect { filter: drop-shadow(0 0 6px currentColor); }
+  .node.sel rect { stroke-width: 2.2; }
+  .node text { pointer-events: none; user-select: none; }
+  .edge path { transition: stroke .15s, opacity .15s; }
+  .edge.hot path { stroke: var(--cyan) !important; opacity: 1 !important; }
+  svg.focused .edge:not(.hot) path { opacity: .18; }
+  svg.focused .node:not(.hot):not(.sel) { opacity: .55; }
+  .note text { user-select: none; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Grafo del progetto <span class="dim">— StavrosRedTeamer</span> <span class="when">2026-10-04</span></h1>
+  <nav id="tabs"></nav>
+  <span class="spacer"></span>
+  <button class="btn" id="fit" title="Adatta alla larghezza / scala 1:1">1:1</button>
+  <button class="btn" id="dl" title="Scarica la tab attiva come SVG">↓ SVG</button>
+</header>
+<main>
+  <div class="stage" id="stage"></div>
+  <aside id="details">
+    <p class="hint">Clicca un nodo del grafo per leggere descrizione e fonti. Passa il mouse per evidenziare le connessioni.</p>
+  </aside>
+</main>
+<footer>
+  <span class="legend" id="legend"></span>
+  <span class="src">Fonti: docs/ARCHITECTURE.md · tools/gate.js · README.md · evo-x2-lab/README.md · local/README-local.md</span>
+</footer>
+
+<script>
+'use strict';
+/* Grafo del progetto StavrosRedTeamer — self-contained, zero dipendenze.
+   Quattro viste: Componenti · Fasi engagement · Prova & stato · Lab & runner.
+   I contenuti sono ricavati dai file reali del repo (ARCHITECTURE.md, gate.js,
+   evo-x2-lab/README.md, local/README-local.md); le parti "pianificato" vengono
+   dalla discussione sul deployment self-hosted e non sono ancora nel repo. */
+
+const NS = 'http://www.w3.org/2000/svg';
+const C = {
+  ink: '#eae7f7', muted: '#9b90b8', faint: '#665b84', line: '#261a3d',
+  cyan: '#24e3ff', mag: '#ff2d95', purple: '#b98cff', orange: '#ff8324',
+  green: '#24e38b', yellow: '#ffd60a', red: '#ff2b5e', low: '#2ad4ff', blue: '#7d8cff',
+};
+
+// ── helpers ────────────────────────────────────────────────────────────────
+function N(id, x, y, w, h, title, sub, accent, detail, files, opts) {
+  return Object.assign({ id, x, y, w, h, title, sub, accent, detail, files: files || [] }, opts || {});
+}
+function E(a, b, kind) { return { a, b, kind: kind || 'flow' }; }
+function svgEl(tag, attrs) {
+  const e = document.createElementNS(NS, tag);
+  for (const k in attrs) e.setAttribute(k, attrs[k]);
+  return e;
+}
+function wrap(text, max) {
+  // divide anche le parole lunghe sui trattini (es. effective-findings)
+  const words = [];
+  for (const w of String(text).split(/\s+/).filter(Boolean)) {
+    if (w.length > max && w.includes('-')) {
+      const segs = w.split('-').map((s, i, arr) => (i < arr.length - 1 ? s + '-' : s));
+      words.push(...segs);
+    } else words.push(w);
+  }
+  const lines = []; let cur = '';
+  for (const w of words) {
+    if (cur && (cur + ' ' + w).length > max) { lines.push(cur); cur = w; }
+    else cur = cur ? cur + ' ' + w : w;
+  }
+  if (cur) lines.push(cur);
+  return lines;
+}
+function center(n) { return { x: n.x + n.w / 2, y: n.y + n.h / 2 }; }
+function borderPoint(n, tx, ty) {
+  const c = center(n);
+  const dx = tx - c.x, dy = ty - c.y;
+  if (!dx && !dy) return c;
+  const sx = dx ? (n.w / 2) / Math.abs(dx) : Infinity;
+  const sy = dy ? (n.h / 2) / Math.abs(dy) : Infinity;
+  const s = Math.min(sx, sy);
+  return { x: c.x + dx * s, y: c.y + dy * s };
+}
+function edgePath(a, b, bow) {
+  const ac = center(a), bc = center(b);
+  if (bow === 'bottom' || bow === 'bottom2') {
+    // arco sotto la riga: dagli spigoli inferiori, con un salto sotto entrambi i nodi
+    const p1 = { x: ac.x, y: a.y + a.h };
+    const p2 = { x: bc.x, y: b.y + b.h };
+    const dip = Math.max(p1.y, p2.y) + (bow === 'bottom2' ? 58 : 30);
+    return `M ${p1.x} ${p1.y} C ${p1.x} ${dip}, ${p2.x} ${dip}, ${p2.x} ${p2.y}`;
+  }
+  const p1 = borderPoint(a, bc.x, bc.y);
+  const p2 = borderPoint(b, ac.x, ac.y);
+  const vertical = Math.abs(bc.x - ac.x) < Math.abs(bc.y - ac.y);
+  if (vertical) {
+    const my = (p1.y + p2.y) / 2;
+    return `M ${p1.x} ${p1.y} C ${p1.x} ${my}, ${p2.x} ${my}, ${p2.x} ${p2.y}`;
+  }
+  const mx = (p1.x + p2.x) / 2;
+  return `M ${p1.x} ${p1.y} C ${mx} ${p1.y}, ${mx} ${p2.y}, ${p2.x} ${p2.y}`;
+}
+
+// ── renderer ───────────────────────────────────────────────────────────────
+const stage = document.getElementById('stage');
+const aside = document.getElementById('details');
+let activeTab = null;
+const tabsNav = document.getElementById('tabs');
+
+function buildSvg(spec) {
+  const svg = svgEl('svg', { viewBox: `0 0 ${spec.w} ${spec.h}`, width: spec.w, height: spec.h, xmlns: NS });
+  const defs = svgEl('defs', {});
+  const marker = svgEl('marker', { id: 'arr', viewBox: '0 0 10 10', refX: '9', refY: '5', markerWidth: '6.5', markerHeight: '6.5', orient: 'auto-start-reverse' });
+  marker.appendChild(svgEl('path', { d: 'M0,0 L10,5 L0,10 z', fill: '#665b84' }));
+  defs.appendChild(marker);
+  svg.appendChild(defs);
+
+  const byId = new Map();
+  for (const n of spec.nodes) byId.set(n.id, n);
+
+  // titoli di gruppo
+  for (const t of spec.titles || []) {
+    const tx = svgEl('text', { x: t.x, y: t.y, fill: t.color || C.muted, 'font-size': t.size || 15, 'font-family': 'var(--mono)', 'font-weight': t.weight || 600 });
+    tx.textContent = t.text;
+    svg.appendChild(tx);
+  }
+
+  // edge sotto i nodi
+  const edgeEls = [];
+  const perNode = new Map();
+  for (const e of spec.edges || []) {
+    const a = byId.get(e.a), b = byId.get(e.b);
+    if (!a || !b) { console.warn('edge con nodo mancante', e); continue; }
+    const g = svgEl('g', { class: 'edge ' + e.kind });
+    const p = svgEl('path', {
+      d: edgePath(a, b, e.bow), fill: 'none',
+      stroke: e.kind === 'faint' ? '#3d2c61' : '#4a3868',
+      'stroke-width': e.kind === 'faint' ? 1.1 : 1.4,
+      'stroke-dasharray': e.kind === 'faint' ? '4 5' : 'none',
+      'marker-end': 'url(#arr)',
+    });
+    g.appendChild(p);
+    svg.appendChild(g);
+    edgeEls.push({ a: e.a, b: e.b, p });
+    for (const id of [e.a, e.b]) {
+      if (!perNode.has(id)) perNode.set(id, []);
+      perNode.get(id).push(p);
+    }
+  }
+
+  // nodi
+  for (const n of spec.nodes) {
+    if (n.invisible) continue;
+    const g = svgEl('g', { class: 'node', 'data-id': n.id, transform: `translate(${n.x},${n.y})`, tabindex: '0' });
+    g.style.color = n.accent;
+    const rect = svgEl('rect', {
+      x: 0, y: 0, width: n.w, height: n.h, rx: 8,
+      fill: n.fill || '#120c1e', stroke: n.accent, 'stroke-width': 1.2,
+      'stroke-opacity': n.opacity !== undefined ? n.opacity : 0.72,
+      'stroke-dasharray': n.dashed ? '5 4' : 'none',
+    });
+    g.appendChild(rect);
+
+    const maxTitle = Math.max(10, Math.floor((n.w - 28) / 7.3));
+    const maxSub = Math.max(10, Math.floor((n.w - 28) / 6.4));
+    const titleLines = wrap(n.title, maxTitle);
+    const subLines = n.sub ? wrap(n.sub, maxSub) : [];
+    const total = titleLines.length * 16 + (subLines.length ? 6 + subLines.length * 13 : 0);
+    let y = n.h / 2 - total / 2 + 12;
+
+    for (const line of titleLines) {
+      const t = svgEl('text', { x: 14, y, fill: C.ink, 'font-size': 13, 'font-family': 'var(--mono)', 'font-weight': 700 });
+      t.textContent = line;
+      g.appendChild(t); y += 16;
+    }
+    if (subLines.length) {
+      y += 3;
+      for (const line of subLines) {
+        const t = svgEl('text', { x: 14, y, fill: C.muted, 'font-size': 11, 'font-family': 'var(--mono)' });
+        t.textContent = line;
+        g.appendChild(t); y += 13;
+      }
+    }
+    g.addEventListener('mouseenter', () => highlight(n.id, true));
+    g.addEventListener('mouseleave', () => highlight(n.id, false));
+    g.addEventListener('click', () => select(n.id, spec));
+    g.addEventListener('keydown', (ev) => { if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); select(n.id, spec); } });
+    svg.appendChild(g);
+  }
+
+  // note / box
+  for (const nt of spec.notes || []) {
+    const g = svgEl('g', { class: 'note' });
+    if (nt.box !== false) {
+      g.appendChild(svgEl('rect', {
+        x: nt.x, y: nt.y - 4, width: nt.w, height: nt.h || (nt.lines.length * 14 + 26), rx: 6,
+        fill: nt.bg || '#0d0917', stroke: nt.color || '#2a1f45', 'stroke-width': 1,
+      }));
+    }
+    let y = nt.y + 14;
+    if (nt.heading) {
+      const h = svgEl('text', { x: nt.x + 12, y, fill: nt.color || C.muted, 'font-size': 11.5, 'font-family': 'var(--mono)', 'font-weight': 700 });
+      h.textContent = nt.heading;
+      g.appendChild(h); y += 18;
+    }
+    const max = Math.max(20, Math.floor(((nt.w || 400) - 24) / 7.0));
+    for (const line of nt.lines) {
+      for (const l of wrap(line, max)) {
+        const t = svgEl('text', { x: nt.x + 12, y, fill: nt.fill || C.muted, 'font-size': 11.5, 'font-family': 'var(--mono)' });
+        if (nt.bullets) t.textContent = '· ' + l; else t.textContent = l;
+        g.appendChild(t); y += 14;
+      }
+    }
+    svg.appendChild(g);
+  }
+
+  function highlight(id, on) {
+    const node = svg.querySelector(`.node[data-id="${id}"]`);
+    if (node) node.classList.toggle('hot', on);
+    for (const p of perNode.get(id) || []) p.classList.toggle('hot', on);
+    svg.classList.toggle('focused', !!on);
+  }
+
+  function select(id, s) {
+    const n = byId.get(id);
+    if (!n) return;
+    for (const el of svg.querySelectorAll('.node.sel')) el.classList.remove('sel');
+    const node = svg.querySelector(`.node[data-id="${id}"]`);
+    if (node) node.classList.add('sel');
+    const files = (n.files || []).map((f) => `<code>${f}</code>`).join('<br>');
+    aside.innerHTML =
+      `<h2>${n.title}</h2>` +
+      (n.sub ? `<p class="asub">${n.sub}</p>` : '') +
+      `<div class="detail">${n.detail || ''}</div>` +
+      (files ? `<div class="files"><strong>Fonti</strong><br>${files}</div>` : '');
+  }
+
+  return svg;
+}
+
+function render(key) {
+  activeTab = key;
+  for (const b of tabsNav.querySelectorAll('button')) b.classList.toggle('on', b.dataset.key === key);
+  const tab = TABS.find((t) => t.id === key) || TABS[0];
+  const spec = tab.build();
+  stage.replaceChildren(buildSvg(spec));
+  aside.innerHTML = '<p class="hint">Clicca un nodo del grafo per leggere descrizione e fonti. Passa il mouse per evidenziare le connessioni.</p>';
+  history.replaceState(null, '', '#' + key);
+}
+
+// ── tab 1 · componenti ─────────────────────────────────────────────────────
+function buildComponents() {
+  const nodes = [], edges = [], titles = [], notes = [];
+
+  titles.push({ x: 40, y: 66, text: 'Deployment self-hosted — pianificato (non ancora nel repo)', color: C.cyan, size: 14 });
+  titles.push({ x: 1080, y: 238, text: 'Superfici operative', color: C.cyan, size: 15 });
+  titles.push({ x: 44, y: 242, text: 'L4 · Agent fleet — advisory', color: C.mag, size: 12, weight: 700 });
+  titles.push({ x: 44, y: 358, text: 'L3 · Conoscenza — recuperata, mai enforcement', color: C.purple, size: 12, weight: 700 });
+  titles.push({ x: 44, y: 460, text: 'L2 · Guard layer — fail-closed, fuori dalla portata del modello', color: C.orange, size: 12, weight: 700 });
+  titles.push({ x: 44, y: 562, text: 'L1 · Proof layer — cosa un finding può affermare', color: C.green, size: 12, weight: 700 });
+  titles.push({ x: 44, y: 664, text: 'L0 · Stato — output deterministico', color: C.yellow, size: 12, weight: 700 });
+
+  // deployment
+  nodes.push(N('d-router', 40, 90, 250, 96, 'Router privacy', 'OPNsense + AdGuard Home · blocklist DNS · policy per VLAN', C.cyan,
+    'Pianificato. Il router fa compartimentazione e tunnel, non anonimato: DNS filtering con blocklist, resolver locale forzato (redirect porta 53, blocco DoT/DoH se i client provano a scavalcare), WireGuard, IPv6 gestito, policy per VLAN (HOME / LAB / EXEC / ANON / MGMT). Il fingerprint browser non si cambia dal router: è lato client.',
+    ['docs/egress-opsec.md', 'docs/THREAT-MODEL.md'], { dashed: true }));
+  nodes.push(N('d-switch', 325, 90, 250, 96, 'Switch managed 2.5GbE', 'VLAN deny-by-default tra zone', C.cyan,
+    'Pianificato. Segmentazione a VLAN: la zona EXEC non ha route verso la LAN domestica né verso il LAB. 2.5GbE è sufficiente al routing API (JSON); il link diretto 10GbE servirebbe solo per trasferimenti grossi.',
+    ['evo-x2-lab/docs/setup-evo-x2.md'], { dashed: true }));
+  nodes.push(N('d-m5a', 610, 90, 250, 96, 'Bosgame M5 #1 — Brain', 'Qwen3.8-Flash-Next-Heretic (~85 GB)', C.cyan,
+    'Pianificato: nodo «brain» del lab — llama.cpp/llama-server, ruoli PLANNER · JUDGE · ARBITRO · AUTO-PROMPTER. Delta M5: una sola porta 2.5GbE, BIOS UMA/GTT da verificare (report di unità limitate a 64 GB usabili), checklist di accettazione prima della seconda unità.',
+    ['evo-x2-lab/deploy/models.yaml', 'evo-x2-lab/docs/setup-evo-x2.md'], { dashed: true }));
+  nodes.push(N('d-m5b', 895, 90, 250, 96, 'Bosgame M5 #2 — Worker pool', 'coder · toolcaller · parser · cyber · RAG', C.cyan,
+    'Pianificato: worker pool con modelli specializzati (coder, tool caller, parser, critico cyber, triage, RAG BGE-M3 + reranker). Modelli separati per nodo e routing a livello API: nessuno split di tensori cross-nodo.',
+    ['evo-x2-lab/deploy/models.yaml', 'evo-x2-lab/README.md'], { dashed: true }));
+  nodes.push(N('d-pc', 1180, 90, 250, 96, 'PC di casa — solo progetto', 'workstation · gateway · audit · zona EXEC', C.cyan,
+    'Pianificato: dedicato solo al progetto — workstation operatore, gateway (nginx njs :8080 spostato fuori dal brain), audit sink e zona EXEC isolata (Docker + tool) con egress forzato via egress-proxy.js e kill-switch.',
+    ['docs/egress-opsec.md', 'docs/THREAT-MODEL.md'], { dashed: true }));
+
+  // harness layers
+  nodes.push(N('h-l4', 40, 250, 980, 84, 'Agent fleet — 28 agenti', 'orchestrator + specialisti · local/fleet/ · .agents/', C.mag,
+    '28 definizioni agente (orchestrator + specialisti). Propongono tecniche e scrivono finding: livello advisory — non decidono autorizzazioni e non decidono la severità.',
+    ['local/README-local.md']));
+  nodes.push(N('band-l3', 40, 372, 980, 64, '', '', C.purple, '', [], { invisible: true }));
+  nodes.push(N('band-l2', 40, 474, 980, 64, '', '', C.orange, '', [], { invisible: true }));
+  nodes.push(N('band-l1', 40, 576, 980, 64, '', '', C.green, '', [], { invisible: true }));
+  nodes.push(N('band-l0', 40, 678, 980, 64, '', '', C.yellow, '', [], { invisible: true }));
+
+  nodes.push(N('h-k', 40, 372, 230, 64, 'knowledge.md', 'il contratto: ROE 1–5 · verification levels', C.purple,
+    'Il contratto dell\'engagement: regole ROE 1–5, verification levels, toolbox compatto. Letto all\'avvio degli agenti; mai punto di enforcement.', ['knowledge.md']));
+  nodes.push(N('h-ops', 290, 372, 230, 64, 'ops/harness.md + docs/', 'regole condivise · metodologia per classe', C.purple,
+    'Regole condivise della harness (disciplina, tool-wiring, MCP) e metodologia per classe nei docs/. Recuperate a richiesta con kb-search.js, non streammate a interi file.', ['ops/harness.md', 'docs/methodology-classes.md']));
+  nodes.push(N('h-skills', 540, 372, 230, 64, 'skills/ + workflows (18)', 'playbook · pipeline enum-*/attack-*', C.purple,
+    'Playbook e reference letti su richiesta; 18 pipeline riusabili enum-*/attack-* in workflows/.', ['skills/', 'workflows/']));
+  nodes.push(N('h-mem', 790, 372, 230, 64, 'memory/ (RAG)', 'lezioni sanificate · distiller', C.purple,
+    'Lezioni cross-engagement sanificate (il distiller rifiuta host, email, token); RAG ibrido lessicale+denso con fallback offline.', ['memory/', 'local/README-local.md']));
+
+  nodes.push(N('g-scope', 40, 474, 150, 64, 'scope-guard', 'fail-closed · scope.json', C.orange,
+    'Fail-closed: host assente da scope.json = tutto bloccato. Nessun flag lo disattiva.', ['tools/scope-guard.js']));
+  nodes.push(N('g-ssrf', 206, 474, 150, 64, 'ssrf-guard', 'DNS rebinding', C.orange,
+    'DNS rebinding: il nome risolto viene ricontrollato — un hostname in-scope che punta a range privati/loopback viene rifiutato.', ['docs/ARCHITECTURE.md']));
+  nodes.push(N('g-c2', 372, 474, 150, 64, 'c2 / wifi / mobile', 'guardie per superficie', C.orange,
+    'Guardie per superficie: C2, wireless e mobile, con scope separati.', ['tools/c2-guard.js', 'docs/wireless.md']));
+  nodes.push(N('g-enforce', 538, 474, 150, 64, 'enforce', 'pacing + tier + consent', C.orange,
+    'Pacing globale (max_requests_per_second) e conferma a tier: i consent token sono a uso singolo, legati a host e azione.', ['docs/ARCHITECTURE.md']));
+  nodes.push(N('g-run', 704, 474, 150, 64, 'run / runBin', 'unico path ai binari', C.orange,
+    'run.js / runBin: l\'unico percorso supportato verso i binari esterni — scope-check, audit e pacing in serie. Chiamare nmap diretto è unsupported.', ['docs/ARCHITECTURE.md']));
+  nodes.push(N('g-mcp', 870, 474, 150, 64, 'mcp proxy / bridge', 'MCP dentro le guardie', C.orange,
+    'MCP: il server si monta attraverso mcp-guard-proxy.js (inbound) o si espongono i tool guardati con mcp-bridge.js (outbound). Montato raw, il server è fuori dalle guardie.', ['README.md', 'docs/THREAT-MODEL.md']));
+
+  nodes.push(N('p-rec', 40, 576, 150, 64, 'record-finding', 'severity ceiling', C.green,
+    'Ladder: suspected → Low · triggered → Medium · exploited → High · proven_impact → Critical. Severità sopra il livello = record rifiutato, non avvisato.', ['README.md', 'tools/record-finding.js']));
+  nodes.push(N('p-oracle', 206, 576, 150, 64, 'oracle', 'riesecuzione live N/N', C.green,
+    'Un claim di realtà (verified / exploited / proven_impact) deve portare un oracle: il harness lo riesegue live, N/N, prima che lo status regga.', ['docs/ARCHITECTURE.md']));
+  nodes.push(N('p-quote', 372, 576, 150, 64, 'evidence-quote', 'citazione verbatim', C.green,
+    'I claim di realtà citano una fetta esatta di un artefatto; la prosa del modello finisce nei diagnostics.', ['tools/evidence-quote.js']));
+  nodes.push(N('p-verify', 538, 576, 150, 64, 'verify-finding', 'verifica indipendente', C.green,
+    'Un verificatore indipendente ricontrolla contro il target, non contro il riassunto del reporter.', ['docs/ARCHITECTURE.md']));
+  nodes.push(N('p-gate', 704, 576, 150, 64, 'gate + coverage', 'nessun report incompleto', C.green,
+    'gate.js: coverage completa + nessun claim senza prova valida + almeno un verificato — o il report non viene prodotto.', ['tools/gate.js']));
+  nodes.push(N('p-chain', 870, 576, 150, 64, 'chain / verif. log', 'append-only · fold', C.green,
+    'findings.jsonl append-only e hash-chained; verifications.jsonl con la stessa disciplina; effective-findings è la vista (fold fail-closed). rechain.js è l\'unico modo per riconciliare una catena rotta.', ['docs/ARCHITECTURE.md', 'tools/effective-findings.js']));
+
+  nodes.push(N('s-db', 40, 678, 230, 64, 'state.db', 'pipeline deterministica', C.yellow,
+    'Stato deterministico delle pipeline recon/scan/enumerate; gli agenti non le lanciano a mano.', ['docs/ARCHITECTURE.md']));
+  nodes.push(N('s-find', 290, 678, 230, 64, 'findings.jsonl', 'hash-chain + ancora esterna', C.yellow,
+    'Immutabile e incatenato con ancora esterna: una verifica successiva non riscrive il record.', ['docs/ARCHITECTURE.md']));
+  nodes.push(N('s-ver', 540, 678, 230, 64, 'verifications.jsonl', 'fatti di verifica', C.yellow,
+    'I fatti di verifica vivono qui; anche una ri-esecuzione fallita è un fatto registrato.', ['tools/verification-log.js']));
+  nodes.push(N('s-rep', 790, 678, 230, 64, 'reports/ + gate-log', 'SARIF · HTML · evidenze', C.yellow,
+    'Artefatti: SARIF 2.1.0, report HTML, gate-log, evidenze; i PoC in exp/<id>.py (exit 0 = riprodotto).', ['tools/report-sarif.js']));
+
+  nodes.push(N('ext', 40, 790, 980, 60, 'Binari esterni / target', 'raggiungibili solo via run/runBin (L2) — scope-check + audit + pacing', C.faint,
+    'nmap, nuclei, ffuf, metasploit… eseguiti solo via run/runBin: l\'unico percorso che applica guardie, audit e pacing.', ['docs/ARCHITECTURE.md']));
+
+  // superfici
+  nodes.push(N('sf-cli', 1080, 308, 380, 72, 'CLI — tools/stavros.js', 'recon | scan | enumerate | status', C.cyan,
+    'Superficie CLI deterministica del motore: recon | scan | enumerate | status.', ['tools/stavros.js']));
+  nodes.push(N('sf-cc', 1080, 394, 380, 72, 'Command Center (stavros-cc)', 'campagna → missione → approvazione → evidenza', C.cyan,
+    'Desktop app (PyQt6, ripiego Chromium): campagna → missione → approvazione → esecuzione → verifica → report → evidence bundle. L\'approval inbox è dove vivono i consent token; cc-panic ferma solo i processi della harness.', ['docs/command-center-desktop.md']));
+  nodes.push(N('sf-local', 1080, 480, 380, 72, 'Local runner (local/)', 'air-gapped · 5 fasi · GBNF', C.cyan,
+    'Runner air-gapped contro un modello locale via llama.cpp: 5 fasi, grammatica GBNF per fase, scope_check duro prima di ogni fase.', ['local/README-local.md']));
+  nodes.push(N('sf-wf', 1080, 566, 380, 72, 'Workflows (18)', 'enum-* / attack-*', C.cyan,
+    '18 pipeline riusabili enum-*/attack-*.', ['workflows/']));
+  nodes.push(N('sf-egress', 1080, 652, 380, 72, 'Egress proxy', 'SOCKS5 · Tor · rotazione UA · check', C.cyan,
+    'Per far passare i binari di terze parti dall\'allowlist: SOCKS5 (anche catene, Tor), DNS via socks5, rotazione UA, check dell\'exit IP.', ['docs/egress-opsec.md']));
+  nodes.push(N('sf-report', 1080, 738, 380, 72, 'Reporting', 'SARIF 2.1.0 · report HTML · gen-poc', C.cyan,
+    'report-sarif.js (SARIF 2.1.0, ceiling in properties.stavros), report HTML, gen-poc.js (riproduttore Python parametrizzato).', ['tools/report-sarif.js', 'tools/gen-poc.js']));
+
+  notes.push({ x: 1080, y: 258, w: 380, box: false, lines: ['Nessuna superficie scavalca le guardie (Command Center incluso): sono wrapper dei tool esistenti.'], fill: C.faint });
+
+  // edges
+  edges.push(E('d-router', 'd-switch'), E('d-switch', 'd-m5a'));
+  edges.push(Object.assign(E('d-switch', 'd-m5b'), { bow: 'bottom' }));
+  edges.push(Object.assign(E('d-switch', 'd-pc'), { bow: 'bottom2' }));
+  edges.push(E('d-pc', 'd-m5b', 'faint'));
+  edges.push(E('h-l4', 'band-l3'), E('band-l3', 'band-l2'), E('band-l2', 'band-l1'), E('band-l1', 'band-l0'));
+  edges.push(E('sf-cc', 'h-l4', 'faint'), E('sf-local', 'g-run', 'faint'));
+
+  return { w: 1500, h: 900, nodes, edges, titles, notes };
+}
+
+// ── tab 2 · fasi engagement ────────────────────────────────────────────────
+function buildPhases() {
+  const nodes = [], edges = [], titles = [], notes = [];
+  titles.push({ x: 75, y: 84, text: 'Pipeline engagement — gate strutturali (tools/gate.js)', color: C.cyan, size: 15 });
+  titles.push({ x: 75, y: 482, text: 'Output del report — solo a gate passati', color: C.muted, size: 13 });
+
+  const gates = [
+    ['f-recon', '1 · recon', 'Reconnaissance baseline', C.low,
+      'Criteri strutturali: scope.json esiste e non è vuoto (allowed_hosts o allowed_ips). Manuale: ogni entry porta un\'autorizzazione scritta (ingaggio firmato, bounty in scope, lab proprio).',
+      ['scope.json presente', 'allowed_hosts / allowed_ips non vuoto', 'manuale: autorizzazione scritta per ogni entry']],
+    ['f-map', '2 · map', 'Service enumeration baseline', C.low,
+      'Almeno una scan eseguita (reports/tmp/run-audit.jsonl) e almeno un finding registrato. Manuale: tutti gli host in-scope enumerati (porte + servizi).',
+      ['run-audit.jsonl (almeno una scan)', '≥ 1 finding registrato', 'manuale: tutti gli host enumerati']],
+    ['f-test', '3 · test', 'Vulnerability testing baseline', C.yellow,
+      'Almeno un finding e il gate mappa passato (marker stavros/map). Manuale: ogni classe di vulnerabilità testata o saltata con motivazione.',
+      ['≥ 1 finding', 'marker stavros/map (gate mappa passato)', 'manuale: ogni classe testata o skip motivato']],
+    ['f-authed', '4 · authed', 'Authenticated post-auth baseline', C.orange,
+      'auth.json presente. Manuale: superficie autenticata testata (o skip esplicito se non ci sono credenziali).',
+      ['auth.json presente', 'manuale: superficie autenticata testata (o skip)']],
+    ['f-chains', '5 · chains', 'Exploit chain coverage', C.orange,
+      'Almeno un finding. Manuale: catene costruite da finding low/medium che escalano a impatto alto.',
+      ['≥ 1 finding', 'manuale: catene low/med → high impact']],
+    ['f-report', '6 · report', 'Report readiness (P3)', C.red,
+      'La coda di controlli: ≥1 verificato, nessun claim senza prova valida su disco, coverage matrix, catena findings intatta, oracle validato su disco, evidence-quote verbatim, un reproducer per ogni verificato (pocReplay), head ancorate (findings e verifications), matrice ATT&CK. Manuale: coverage completa + cross-check di un subagent indipendente.',
+      ['≥ 1 verificato', 'nessun claim senza prova su disco', 'coverage matrix', 'catena findings intatta', 'oracle validato su disco', 'evidence-quote verbatim', 'pocReplay: exp/<id>.py', 'chainHead / verifications ancorate', 'attackCoverage', 'manuale: coverage completa + cross-check']],
+  ];
+  gates.forEach(([id, title, sub, accent, detail, criteria], i) => {
+    nodes.push(N(id, 75 + i * 228, 140, 210, 96, title, sub, accent, detail, ['tools/gate.js']));
+    notes.push({ x: 75 + i * 228, y: 256, w: 210, box: false, lines: criteria, bullets: true, fill: C.muted });
+  });
+  edges.push(E('f-recon', 'f-map'), E('f-map', 'f-test'), E('f-test', 'f-authed'), E('f-authed', 'f-chains'), E('f-chains', 'f-report'));
+
+  const outs = [
+    ['o-sarif', 'SARIF 2.1.0', 'GitHub code scanning / DefectDojo', 'tools/report-sarif.js — export SARIF che i consumer standard mangiano unmodified; il ceiling viaggia in properties.stavros. Un record con severità oltre il livello di verifica fa uscire l\'export con exit non-zero: un run che ha perso finding non passa come scan pulita.'],
+    ['o-html', 'report HTML', 'leggibile per il cliente', 'Report leggibile, con quote di evidenza e livello di verifica per ogni finding.'],
+    ['o-evid', 'evidence bundle', 'artefatti + prove', 'Bundle degli artefatti citati dalle quote, rieseguibile a mano.'],
+    ['o-poc', 'PoC — exp/<id>.py', 'exit 0 = riprodotto', 'gen-poc.js scrive un riproduttore Python parametrizzato: chiunque può rieseguirlo senza fidarsi della harness.'],
+  ];
+  outs.forEach(([id, title, sub, detail], i) => {
+    nodes.push(N(id, 120 + i * 320, 502, 300, 64, title, sub, C.green, detail, ['tools/report-sarif.js', 'tools/gen-poc.js']));
+  });
+
+  notes.push({ x: 75, y: 608, w: 1350, box: false, lines: ['Il gate legge criteri strutturali (file, marker, chain, oracle) più una piccola parte manuale dichiarata: il report non esiste finché i criteri non passano — niente artefatto che possa sembrare un lavoro finito.'], fill: C.faint });
+  return { w: 1500, h: 700, nodes, edges, titles, notes };
+}
+
+// ── tab 3 · prova & stato ──────────────────────────────────────────────────
+function buildProof() {
+  const nodes = [], edges = [], titles = [], notes = [];
+  titles.push({ x: 60, y: 74, text: 'Ladder di verifica — severity ceiling', color: C.green, size: 15 });
+  titles.push({ x: 480, y: 74, text: 'Ciclo della prova — dal record al report', color: C.green, size: 15 });
+
+  const ladder = [
+    ['v-susp', 'suspected', 'plausibile, non riprodotto → ceiling Low', C.low,
+      'Plausibile, non riprodotto. La severità massima consentita è Low.'],
+    ['v-trig', 'triggered', 'condizione triggerata, non sfruttata → Medium', C.yellow,
+      'La condizione è stata triggerata ma non sfruttata. Severità massima: Medium.'],
+    ['v-expl', 'exploited', 'catena completa dimostrata → High', C.orange,
+      'Una catena di exploit completa è stata dimostrata. Severità massima: High.'],
+    ['v-prov', 'proven_impact', 'impatto reale provato → Critical', C.red,
+      'Impatto reale provato: dati letti, account takeover, RCE. Severità massima: Critical — e solo con oracle valido.'],
+  ];
+  ladder.forEach(([id, title, sub, accent, detail], i) => {
+    nodes.push(N(id, 60, 110 + i * 114, 360, 84, title, sub, accent, detail, ['README.md', 'tools/record-finding.js']));
+  });
+  edges.push(E('v-susp', 'v-trig'), E('v-trig', 'v-expl'), E('v-expl', 'v-prov'));
+
+  const cycle = [
+    ['l-rec', 'record-finding', 'severità ≤ prova', 'Enforced ladder: severità oltre il livello → record rifiutato (non avvisato).'],
+    ['l-chain', 'chain-log', 'hash-chain + ancora', 'findings.jsonl append-only, hash-chained, con ancora di testa esterna.'],
+    ['l-vlog', 'verification-log', 'prova rieseguita su disco', 'Il fatto della verifica con la stessa disciplina: la ri-validazione avviene su disco in quel momento, mai sulla parola del chiamante.'],
+    ['l-fold', 'effective-findings', 'fold fail-closed downward', 'La vista: fold di findings + side log. Nessun record, nessuna promozione; se l\'artefatto sparisce, la promozione cade.'],
+    ['l-gate', 'gate', 'legge la vista', 'Il gate legge la vista per verify / noPending / oracle / evidenceQuote / pocReplay; gli altri consumer vedono lo stato registrato (direzione conservativa).'],
+    ['l-report', 'report + SARIF', 'properties.stavros', 'SARIF con verify_level, ceiling e riferimento all\'oracle in properties.stavros: un consumer generico non può inferirli, quindi viaggiano col risultato.'],
+  ];
+  cycle.forEach(([id, title, sub, detail], i) => {
+    nodes.push(N(id, 480 + i * 170, 110, 158, 96, title, sub, C.green, detail, ['docs/ARCHITECTURE.md']));
+  });
+  edges.push(E('l-rec', 'l-chain'), E('l-chain', 'l-vlog'), E('l-vlog', 'l-fold'), E('l-fold', 'l-gate'), E('l-gate', 'l-report'));
+
+  notes.push({ x: 60, y: 574, w: 360, box: false, lines: ['record-finding.js non avvisa: rifiuta un record con severità sopra il livello. Un claim di realtà senza oracle valido non entra nella ladder.'], fill: C.faint });
+  notes.push({ x: 480, y: 268, w: 1008, h: 112, box: true, heading: 'Regola', color: C.green, lines: [
+    'Un claim di realtà (verified · exploited · proven_impact) senza oracle valido viene rifiutato. L\'oracle è rieseguito dal harness, N/N, al momento: mai sulla parola del modello.',
+    'Una verifica successiva non riscrive findings.jsonl — il log verifiche è separato e la vista (fold) promuove solo se la prova regge ancora su disco.',
+  ] });
+  notes.push({ x: 480, y: 420, w: 1008, box: false, lines: [
+    'Consumatori del report: report HTML · evidence bundle · SARIF 2.1.0 (GitHub code scanning / DefectDojo).',
+    'rechain.js: unico modo supportato per riconciliare una catena rotta — backup, ricostruzione sul contenuto esistente, evento old-head/new-head/motivo nell\'anchor log.',
+  ], fill: C.muted });
+  return { w: 1500, h: 640, nodes, edges, titles, notes };
+}
+
+// ── tab 4 · lab & runner ───────────────────────────────────────────────────
+function buildLab() {
+  const nodes = [], edges = [], titles = [], notes = [];
+  titles.push({ x: 60, y: 74, text: 'Fasi del lab — evo-x2-lab (pianificato su 2× Bosgame M5)', color: C.blue, size: 15 });
+  titles.push({ x: 580, y: 74, text: 'Local runner — le 5 fasi (air-gapped)', color: C.cyan, size: 15 });
+
+  const lab = [
+    ['F0 — Setup hardware / OS', 'BIOS UMA/GTT · kernel ≥ 6.16.9 · ROCm 7.2 · llama.cpp gfx1151', 'BIOS (UMA/GTT), Ubuntu, kernel ≥ 6.16.9, ROCm 7.2 nativo, build llama.cpp per gfx1151 (GGML_HIP, AMDGPU_TARGETS=gfx1151), systemd, firewall. Flag Strix Halo: --no-mmap -ngl 99 -fa 1. Validare ogni build: possono corrompere l\'output in silenzio.'],
+    ['F1 — PC1: brain', 'Qwen3.8-Flash-Next-Heretic · llama-server · validazione build', 'Scaricare il modello (quant dinamico, hash pinnati), avviare llama-server, validare la build, benchmarkare prompt processing, generazione e concorrenza.'],
+    ['F2 — PC2: worker pool + gateway', 'models.yaml · nginx njs :8080 · routing per model', 'Worker pool da deploy/models.yaml + gateway OpenAI-compatible (nginx njs :8080, routing per campo model). Su M5: una NIC per nodo, modelli separati per nodo.'],
+    ['F3 — Agent layer', 'CAI + MCP in Docker/Kali sandbox · audit trail', 'CAI + server MCP (nmap, nuclei, burp, metasploit) in Docker/Kali sandbox; audit trail attivo di ogni comando.'],
+    ['F4 — Bake-off e A/B', 'generalisti vs cyber · solo vs critic+judge', 'Le decisioni di produzione si prendono solo qui, sui dati propri: metriche e criteri di accettazione in docs/evaluation-plan.md.'],
+    ['F5 — Fine-tune LoRA', 'Qwen-3.5-27B e 9B · il modello cyber definitivo', 'Fine-tune sulle tracce raccolte: il modello cyber proprietario. Per clienti istituzionali, provenienza dei dati documentata.'],
+  ];
+  lab.forEach(([title, sub, detail], i) => {
+    nodes.push(N('F' + i, 60, 110 + i * 104, 460, 84, title, sub, C.blue, detail, ['evo-x2-lab/README.md']));
+  });
+  edges.push(E('F0', 'F1'), E('F1', 'F2'), E('F2', 'F3'), E('F3', 'F4'), E('F4', 'F5'));
+
+  const runner = [
+    ['r-recon', 'recon-map', 'recon · osint · network · ad · mapper — scope_check, pipeline, run_tool, kb_search', 'Copre gli agenti cloud recon, osint, network, ad, mapper. Tool esposti: scope_check, pipeline, run_tool, read/write_file, kb_search.'],
+    ['r-web', 'web-test', 'sqli, xss, authz, authn, csrf, ssrf, injection, cloud, llm, idor — + record_finding, memory_recall', 'Copre sqli, xss, authz, authn, csrf, ssrf, injection, cloud, llm, idor. In più: record_finding, memory_recall.'],
+    ['r-host', 'host', 'breach, postex, lateral, persist, privesc, cleanup, exploit', 'Copre breach, postex, lateral, persist, privesc, cleanup, exploit. Azioni intrusive in FINAL per conferma operatore.'],
+    ['r-wifi', 'wireless', 'wireless, hardware, mobile — scope wireless separato', 'Copre wireless, hardware, mobile con scope wireless separato.'],
+    ['r-rep', 'report', 'vet, reporter — read/write_file, record_finding', 'Copre vet e reporter con read/write_file, record_finding.'],
+  ];
+  runner.forEach(([id, title, sub, detail], i) => {
+    nodes.push(N(id, 580, 110 + i * 78, 880, 64, title, sub, C.cyan, detail, ['local/README-local.md']));
+  });
+
+  notes.push({ x: 580, y: 520, w: 880, h: 148, box: true, heading: 'Come gira', color: C.cyan, lines: [
+    'run-local.js: modello locale via llama.cpp — nessuna API key, nessun dato che esce dalla macchina.',
+    'GBNF per fase: il tool è vincolato all\'enum dei tool ammessi, gli args a JSON valido.',
+    'scope_check duro prima di ogni fase; azioni intrusive messe in FINAL per conferma esplicita.',
+    'RAG ibrido opzionale con embedding locali; senza server di embedding torna al lessicale, senza crash.',
+  ] });
+  return { w: 1500, h: 760, nodes, edges, titles, notes };
+}
+
+// ── tab registry + init ────────────────────────────────────────────────────
+const TABS = [
+  { id: 'componenti', label: 'Componenti', build: buildComponents },
+  { id: 'fasi', label: 'Fasi engagement', build: buildPhases },
+  { id: 'prova', label: 'Prova & stato', build: buildProof },
+  { id: 'lab', label: 'Lab & runner', build: buildLab },
+];
+
+const LEGEND = [
+  ['pianificato', C.cyan], ['fleet', C.mag], ['conoscenza', C.purple], ['guardie', C.orange],
+  ['prova', C.green], ['stato', C.yellow], ['lab', C.blue],
+];
+const legendEl = document.getElementById('legend');
+for (const [label, color] of LEGEND) {
+  const s = document.createElement('span');
+  s.innerHTML = `<i style="background:${color}"></i>${label}`;
+  legendEl.appendChild(s);
+}
+
+for (const t of TABS) {
+  const b = document.createElement('button');
+  b.textContent = t.label;
+  b.dataset.key = t.id;
+  b.addEventListener('click', () => render(t.id));
+  tabsNav.appendChild(b);
+}
+
+const initial = (location.hash || '').replace('#', '');
+render(TABS.some((t) => t.id === initial) ? initial : TABS[0].id);
+
+let nativeScale = false;
+const fitBtn = document.getElementById('fit');
+fitBtn.addEventListener('click', () => {
+  nativeScale = !nativeScale;
+  stage.classList.toggle('native', nativeScale);
+  fitBtn.textContent = nativeScale ? 'adatta' : '1:1';
+});
+
+document.getElementById('dl').addEventListener('click', () => {
+  const svg = stage.querySelector('svg');
+  if (!svg) return;
+  const blob = new Blob([new XMLSerializer().serializeToString(svg)], { type: 'image/svg+xml' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `project-graph-${activeTab}.svg`;
+  a.click();
+  URL.revokeObjectURL(a.href);
+});
+</script>
+</body>
+</html>
