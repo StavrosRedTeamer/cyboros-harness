@@ -18,7 +18,7 @@
 - [**Prompt di sessione — benchmark gen-bench**](bench-session-prompt.md) — Sei Cyboros. Questa sessione è una run di benchmark, non un engagement. · 5,1 KB
 - [**Cyboros — Web Red Team Methodology & Rules of Engagement**](knowledge.md) — Shared brain for every Cyboros agent — read before acting. Detail lives in docs/ (map at bottom); · 14,8 KB
 - [**Piano di ottimizzazione workspace Stavros (Red Teamer harness)**](piano-ottimizzazione-stavros.md) — Data: 10 settembre 2026 · Repo: stavrosredteamer (Freebuff) · Branch: `command-center-redesign` · 11,4 KB
-- [**Handoff — sessione con AUTOPILOT attivo (opt-in)**](session-prompt-autostavros.md) — Sei Stavros, orchestratore red-team. In questa sessione l'operatore richiede ESPLICITAMENTE la · 2,0 KB
+- [**Handoff — sessione con AUTOPILOT attivo (opt-in)**](session-prompt-cyboros-autopilot.md) — Sei Cyboros, orchestratore red-team. In questa sessione l'operatore richiede ESPLICITAMENTE la · 2,1 KB
 
 ## `docs/` — riferimento
 

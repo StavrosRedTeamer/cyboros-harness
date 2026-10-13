@@ -1,11 +1,11 @@
 ---
-name: autostavros
+name: cyboros-autopilot
 description: Attiva la modalità AUTOPILOT per il pentest in corso — pianificazione ed esecuzione deterministica delle prossime azioni dal target-model, anti-loop (loop-watch + dry-streak), stop garantiti (DONE/BARRIER/BUDGET/STUCK), approvazione umana per le azioni intrusive. Opt-in esplicito: va invocata SOLO su richiesta dell'operatore, mai di default.
 metadata:
   category: pentest
 ---
 
-# Autopilot Stavros — protocollo operativo
+# Cyboros Autopilot — protocollo operativo
 
 > Modalità OPT-IN: si attiva solo quando l'operatore la chiede (questo comando). NON è la modalità di
 > default: il flusso normale resta persona-driven con approvazione umana per azione.
