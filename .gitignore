@@ -2,7 +2,11 @@
 auth.json
 c2.json
 scope.json
+# Scope del benchmark (loopback-only, seed del bench): e' un'autorizzazione come scope.json,
+# anche se innocua. Nessun file di autorizzazione nel repo.
+scope.bench.json
 wifi-scope.json
+scope.wof.json
 mobile-scope.json
 mcp.json
 
@@ -47,6 +51,9 @@ Scrivania
 temp/
 # Backup di scope con target reali (scope.*.bak.json): solo *.example.json è versionato.
 scope.*.bak.json
+# ...e la variante con la data nel suffisso (scope.json.bak-YYYYMMDD[-label]): il pattern qui
+# sopra ha l'ordine invertito e non la copriva, quindi restavano untracked ma addabili.
+scope.json.bak-*
 tools/.pace.json
 tools/.test-routes.txt
 node_modules/
