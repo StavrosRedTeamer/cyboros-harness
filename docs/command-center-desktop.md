@@ -1,7 +1,7 @@
 # Stavros Command Center — Desktop Edition (piano e work package)
 
 **Obiettivo.** Portare il Command Center da dashboard web a **programma desktop** (`stavros-cc`)
-che governa StavrosRedTeamer a 360°: campagna → missione → consenso → esecuzione → verifica →
+che governa Cyboros Harness a 360°: campagna → missione → consenso → esecuzione → verifica →
 report → prova. Riferimenti di settore: Cobalt Strike / Havoc / Sliver (console operatore,
 sessioni, kill switch), Mythic / CALDERA (operazioni → task → artefatti → ATT&CK), reNgine /
 Trickest (pipeline e scan engine), BloodHound (grafo), PlexTrac / Dradis / PwnDoc (ciclo del

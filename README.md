@@ -1,6 +1,6 @@
 <div align="center">
 
-# StavrosRedTeamer
+# Cyboros Harness
 
 **A penetration-testing harness where a finding is only a finding if code can prove it —
 and where the agent cannot violate scope, because the enforcement is beneath it.**
@@ -109,8 +109,8 @@ clean scan.
 Requires **Node ≥ 22** (the Command Center backend uses `node:sqlite`).
 
 ```bash
-git clone https://github.com/CSI-entitymorton/stavrosredteamer.git
-cd stavrosredteamer
+git clone https://github.com/CSI-entitymorton/cyboros-harness.git
+cd cyboros-harness
 npm test                 # 112 tests, no install, no network, 2 workers (--jobs 1 to serialize)
 ```
 
@@ -229,9 +229,9 @@ If you use the harness, the guard architecture, or `gen-bench.js` in published w
 cite the commit you used rather than `master`:
 
 ```
-StavrosRedTeamer — severity-enforced findings and a contamination-proof
+Cyboros Harness — severity-enforced findings and a contamination-proof
 precision benchmark for AI security agents.
-https://github.com/CSI-entitymorton/stavrosredteamer @ <commit-sha>
+https://github.com/CSI-entitymorton/cyboros-harness @ <commit-sha>
 ```
 
 Scores produced by this harness are only meaningful alongside the seed, the agent

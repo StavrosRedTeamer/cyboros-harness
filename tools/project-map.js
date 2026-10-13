@@ -611,7 +611,7 @@ function conceptView(d) {
 
   const root = `<g class="root">` +
     `<rect x="14" y="20" width="210" height="132"/>` +
-    `<text class="rtitle" x="28" y="50">StavrosRedTeamer</text>` +
+    `<text class="rtitle" x="28" y="50">Cyboros Harness</text>` +
     `<text class="rsub" x="28" y="74">Un harness di pentest</text>` +
     `<text class="rsub" x="28" y="90">autorizzato in cui la policy</text>` +
     `<text class="rsub" x="28" y="106">sta nel runtime, non nel prompt</text>` +
@@ -624,7 +624,7 @@ function conceptView(d) {
   casella è quella che serve al suo contenuto, niente di più. <strong>Clicca un componente</strong> per aprirlo
   nell'indice con la sua scheda, o un nome di file per leggerlo.</p>
   <div class="cmapwrap">
-    <svg id="cmap" viewBox="0 0 1120 ${H}" role="img" aria-label="Mappa concettuale: StavrosRedTeamer diviso in ${d.areas.length} aree">
+    <svg id="cmap" viewBox="0 0 1120 ${H}" role="img" aria-label="Mappa concettuale: Cyboros Harness diviso in ${d.areas.length} aree">
       ${root}
       ${out.join('\n      ')}
     </svg>
@@ -691,8 +691,8 @@ function render(d) {
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Mappa del progetto — StavrosRedTeamer</title>
-<meta name="description" content="Dove sta cosa in StavrosRedTeamer: ${d.counts.modules} moduli in ${d.areas.length} aree, i cancelli, i test. Pagina generata dal repository.">
+<title>Mappa del progetto — Cyboros Harness</title>
+<meta name="description" content="Dove sta cosa in Cyboros Harness: ${d.counts.modules} moduli in ${d.areas.length} aree, i cancelli, i test. Pagina generata dal repository.">
 <style>
 :root{
   --ink:#0a0a11; --ink-2:#0e0e17; --panel:#12121c; --rule:#242433; --rule-soft:#1a1a26;
@@ -844,7 +844,7 @@ footer p{margin:6px 0}
 <body>
 <header>
   <div class="wrap">
-    <h1>Mappa del progetto<span class="sub">StavrosRedTeamer — generata dal repository, non scritta a mano</span></h1>
+    <h1>Mappa del progetto<span class="sub">Cyboros Harness — generata dal repository, non scritta a mano</span></h1>
     <dl class="counts">${counts}</dl>
   </div>
 </header>

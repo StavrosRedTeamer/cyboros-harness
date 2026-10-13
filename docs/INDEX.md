@@ -13,8 +13,8 @@
 - [**Changelog**](CHANGELOG.md) — All notable changes to this project are documented here. Dates are commit dates. · 42,8 KB
 - [**Contributor Covenant Code of Conduct**](CODE_OF_CONDUCT.md) — We as members, contributors, and leaders pledge to make participation in our community a · 5,8 KB
 - [**Contributing**](CONTRIBUTING.md) — This repository is a penetration-testing harness built around one claim: a finding is only a · 4,5 KB
-- [**StavrosRedTeamer**](README.md) — A penetration-testing harness where a finding is only a finding if code can prove it — · 11,8 KB
-- [**Security Policy**](SECURITY.md) — StavrosRedTeamer is offensive-security tooling. It executes reconnaissance and · 4,1 KB
+- [**Cyboros Harness**](README.md) — A penetration-testing harness where a finding is only a finding if code can prove it — · 11,8 KB
+- [**Security Policy**](SECURITY.md) — Cyboros Harness is offensive-security tooling. It executes reconnaissance and · 4,1 KB
 - [**Prompt di sessione — benchmark gen-bench**](bench-session-prompt.md) — Sei Stavros. Questa sessione è una run di benchmark, non un engagement. · 5,1 KB
 - [**Stavros — Web Red Team Methodology & Rules of Engagement**](knowledge.md) — Shared brain for every Stavros agent — read before acting. Detail lives in docs/ (map at bottom); · 14,8 KB
 - [**Piano di ottimizzazione workspace Stavros (Red Teamer harness)**](piano-ottimizzazione-stavros.md) — Data: 10 settembre 2026 · Repo: stavrosredteamer (Freebuff) · Branch: `command-center-redesign` · 11,4 KB
@@ -28,7 +28,7 @@
 - [**Measuring whether an AI pentest agent's findings are real**](docs/METHODOLOGY.md) — An agent that reports everything it can think of scores 100% recall and is · 7,3 KB
 - [**Recording the demo**](docs/RECORDING.md) — $ DEMO_FAST=1 DEMO_PACE=3 ./tools/demo.sh · 5,0 KB
 - [**`refs/` — provenance, licensing, and why it is not in this repository**](docs/REFS-PROVENANCE.md) — The corpus is not wholly first-party. Its own `refs/README.md` states that · 5,0 KB
-- [**Threat model: attacking StavrosRedTeamer itself**](docs/THREAT-MODEL.md) — Not the target. The target is supposed to be attacked — that is the job. What is · 12,6 KB
+- [**Threat model: attacking Cyboros Harness itself**](docs/THREAT-MODEL.md) — Not the target. The target is supposed to be attacked — that is the job. What is · 12,6 KB
 - [**Alternative-tools audit — what the harness should adopt, borrow, or leave alone**](docs/TOOL-ALTERNATIVES-AUDIT.md) — Three concrete gaps, in priority order: · 26,1 KB
 - [**What the published benchmarks measure, and what they leave out**](docs/TOOL-LANDSCAPE.md) — As of mid-2026 there is real, serious work here, and none of it is · 6,3 KB
 - [**Stavros Command Center — Desktop Edition (piano e work package)**](docs/command-center-desktop.md) — Obiettivo. Portare il Command Center da dashboard web a programma desktop (`stavros-cc`) · 25,4 KB

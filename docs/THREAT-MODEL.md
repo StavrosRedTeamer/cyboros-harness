@@ -1,4 +1,4 @@
-# Threat model: attacking StavrosRedTeamer itself
+# Threat model: attacking Cyboros Harness itself
 
 > This project is offensive tooling whose central claim is that it cannot be
 > talked into misbehaving. That claim is only worth anything if it can be

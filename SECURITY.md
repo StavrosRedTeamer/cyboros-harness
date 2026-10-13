@@ -1,6 +1,6 @@
 # Security Policy
 
-StavrosRedTeamer is offensive-security tooling. It executes reconnaissance and
+Cyboros Harness is offensive-security tooling. It executes reconnaissance and
 exploitation techniques against targets you point it at. That shapes both what
 this file is about and who should read it.
 
@@ -44,7 +44,7 @@ We aim to acknowledge within 7 days.
 
 ## Safe harbor
 
-StavrosRedTeamer is intended for authorized security testing: penetration tests
+Cyboros Harness is intended for authorized security testing: penetration tests
 under a signed scope, bug-bounty programs where the target is in scope, and
 laboratory environments you own.
 
