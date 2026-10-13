@@ -59,7 +59,11 @@ const FORBIDDEN = [
   { re: /^local-only\//, why: 'script one-off di engagement' },
   { re: /^campaigns?\//, why: 'stato campagne (nomi clienti, contatti RoE)' },
   { re: /^(auth|scope|c2|wifi-scope|mobile-scope|mcp|campaign)\.json$/, why: 'segreto o autorizzazione' },
-  { re: /\.bak\.json$/, why: 'backup di autorizzazione con target reali' },
+  // Ancorato al NOME dell'autorizzazione, non alla forma `.bak`: `tools/gui/app.css.bak` e
+  // `app.js.bak` sono storico tenuto apposta (`.gitignore` lo dichiara) e una forma larga li
+  // segnala come se fossero backup di scope. Copre entrambi gli ordini in cui il naming reale
+  // si presenta: `scope.acme.bak.json` e `scope.json.bak-20261006[-cliente]`.
+  { re: /(^|\/)(auth|scope|c2|wifi-scope|mobile-scope|mcp)[^\/]*\.bak(\.json)?(-[0-9A-Za-z-]+)?$/, why: 'backup di autorizzazione con target reali' },
   { re: /^freebuff-blocchi-/, why: 'dump di sessione' },
   { re: /^session-prompt-egress-/, why: 'runbook interno di una postazione' },
 ];

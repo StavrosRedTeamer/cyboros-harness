@@ -104,7 +104,7 @@ jobs:
         run: |
           set -e
           bad=0
-          for pat in '^temp/' '^scope\.json$' '^auth\.json$' '^c2\.json$' '\.bak\.json$' '^reports/' '^artifacts/'; do
+          for pat in '^temp/' '^scope\.json$' '^auth\.json$' '^c2\.json$' '(^|/)(auth|scope|c2|wifi-scope|mobile-scope|mcp)[^/]*\.bak(\.json)?(-[0-9A-Za-z-]+)?$' '^reports/' '^artifacts/'; do
             hits=$(git ls-files | grep -E "$pat" || true)
             if [ -n "$hits" ]; then
               echo "::error::tracked files matching '$pat' must not be committed:"
@@ -121,7 +121,7 @@ jobs:
         run: |
           bad=0
           for f in scope.json auth.json c2.json wifi-scope.json mobile-scope.json mcp.json \
-                   scope.acme.bak.json temp/x reports/x artifacts/x campaign.json \
+                   scope.acme.bak.json scope.json.bak-20261006 temp/x reports/x artifacts/x campaign.json \
                    reports/approvals.jsonl scripts/probe_x.py scripts/record-x-findings.js \
                    tools/.pace.json local-only/one-off.py .scope.json.kate-swp; do
             if ! git check-ignore -q "$f"; then
