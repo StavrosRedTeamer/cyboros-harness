@@ -7,8 +7,7 @@ this file is about and who should read it.
 ## Reporting a vulnerability in the harness
 
 Report privately, not in a public issue. Use GitHub's
-**Security → Report a vulnerability** (private advisory) on this repository, or
-email the maintainer directly.
+**Security → Report a vulnerability** (private advisory) on this repository.
 
 Please do **not** open a public issue for a vulnerability in the guardrails.
 
