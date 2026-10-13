@@ -184,7 +184,7 @@ const AREAS = [
       'gui-server', 'gui/app', 'gui/views-control', 'gui/views-engagement', 'gui/views-warroom',
       'portal', 'backfill-findings-tab',
     ],
-    files: ['docs/command-center-desktop.md', 'stavros-cc'],
+    files: ['docs/command-center-desktop.md', 'cyboros-cc'],
   },
   {
     id: 'forum', name: 'Forum agentico', accent: '#c77dff',

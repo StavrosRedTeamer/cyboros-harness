@@ -11,7 +11,7 @@ const path = require('path');
 const { spawn } = require('child_process');
 
 const WS = path.join(__dirname, '..');
-const T = fs.mkdtempSync(path.join(os.tmpdir(), 'stavros-cc-routes-'));
+const T = fs.mkdtempSync(path.join(os.tmpdir(), 'cyboros-cc-routes-'));
 const TOKEN = 'a'.repeat(48);
 
 const env = Object.assign({}, process.env, {

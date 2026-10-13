@@ -724,7 +724,7 @@ function renderPipeline(data) {
 
   // ── last run card ──
   const resumeBtn = data.resumePossible
-    ? actBtn('▶ Resume incomplete run', 'resume the incomplete run', () => startJob('resume', '/api/pipeline/resume', 'stavros.js resume'))
+    ? actBtn('▶ Resume incomplete run', 'resume the incomplete run', () => startJob('resume', '/api/pipeline/resume', 'cyboros.js resume'))
     : el('button', { class: 'btn', disabled: true, title: 'no genuinely incomplete phase to resume (a done scan-only run is not incomplete)' }, '▶ Resume (nothing to resume)');
   if (data.resumePossible) resumeBtn.classList.add('btn-primary');
   const lastCtl = (lastRun && lastRun.status !== 'done') ? [
@@ -1063,7 +1063,7 @@ function cmdkRun(i) {
 }
 function cmdkResumePipeline() {
   api('/api/pipeline').then((d) => {
-    if (d.resumePossible) startJob('resume', '/api/pipeline/resume', 'stavros.js resume');
+    if (d.resumePossible) startJob('resume', '/api/pipeline/resume', 'cyboros.js resume');
     else toast('nothing to resume — no genuinely incomplete run', '');
   }).catch((e) => toast(String(e.message || e), 'err'));
 }

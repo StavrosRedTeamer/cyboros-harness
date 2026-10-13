@@ -1,21 +1,21 @@
 #!/usr/bin/env xdg-open
 [Desktop Entry]
 Type=Application
-Name=Stavros Command Center
+Name=Cyboros Command Center
 GenericName=Red team console
-Comment=Desktop console for StavrosRedTeamer
-Exec=stavros-cc %U
-Icon=stavros-cc
+Comment=Desktop console for Cyboros Harness
+Exec=cyboros-cc %U
+Icon=cyboros-cc
 Terminal=false
 Categories=Development;Security;
 StartupNotify=true
-StartupWMClass=stavros-cc
+StartupWMClass=cyboros-cc
 Actions=ReadOnly;Web;
 
 [Desktop Action ReadOnly]
 Name=Open read-only
-Exec=stavros-cc --read-only
+Exec=cyboros-cc --read-only
 
 [Desktop Action Web]
 Name=Open in browser
-Exec=stavros-cc --web
+Exec=cyboros-cc --web

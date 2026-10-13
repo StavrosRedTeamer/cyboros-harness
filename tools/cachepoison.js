@@ -61,7 +61,7 @@ function reflects(body, marker) { return typeof body === 'string' && body.indexO
 function deceptionPaths(url) {
   const u = new URL(url);
   const base = u.pathname.replace(/\/+$/, '');
-  const suffixes = ['/stavros.css', ';.css', '/stavros.js', '.json', '%0Astavros.css', '/%2e%2e/stavros.css'];
+  const suffixes = ['/cyboros.css', ';.css', '/cyboros.js', '.json', '%0Acyboros.css', '/%2e%2e/cyboros.css'];
   return suffixes.map((s) => u.origin + base + s + u.search);
 }
 

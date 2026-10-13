@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 // Client-side / DOM-XSS surface checker via Chrome DevTools Protocol (zero-dep, Node >= 22).
 // Requires a browser with remote debugging enabled, e.g.:
-//   Kali/Linux:  chromium --remote-debugging-port=9222 --user-data-dir=/tmp/chrome-stavros
-//   Windows:     chrome.exe --remote-debugging-port=9222 --user-data-dir=%TEMP%\chrome-stavros
+//   Kali/Linux:  chromium --remote-debugging-port=9222 --user-data-dir=/tmp/chrome-cyboros
+//   Windows:     chrome.exe --remote-debugging-port=9222 --user-data-dir=%TEMP%\chrome-cyboros
 //   OR Obscura:  node tools/obscura.js serve --port 9222 --stealth   (Rust engine, CDP-compatible)
 // Usage:
 //   node tools/dom-check.js <url> [--cdp-port 9222] [--eval 'js'] [--timeout 8000]
@@ -26,7 +26,7 @@ const obscura = require('./obscura');
 
 // Platform-aware Chrome/Chromium launch hint for the CDP requirement (Kali ships chromium).
 function browserLaunchHint(port) {
-  const udd = process.platform === 'win32' ? '%TEMP%\\chrome-stavros' : '/tmp/chrome-stavros';
+  const udd = process.platform === 'win32' ? '%TEMP%\\chrome-cyboros' : '/tmp/chrome-cyboros';
   if (process.platform === 'win32') return `chrome.exe --remote-debugging-port=${port} --user-data-dir=${udd}`;
   if (process.platform === 'darwin')
     return `"/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" --remote-debugging-port=${port} --user-data-dir=${udd}`;

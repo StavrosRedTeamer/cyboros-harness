@@ -81,7 +81,7 @@ intrusive`.
 **Recommendation:** either register them with honest tiers, or drop them from
 `APT_PKGS`. `wpscan` is the one with real value (§6.4).
 
-### 1.3 RustScan: repo moved, and `stavros.js` still calls the old name
+### 1.3 RustScan: repo moved, and `cyboros.js` still calls the old name
 
 `tools/cyboros.js:383` invokes `rustscan`. The canonical repo is now **`bee-san/RustScan`**
 (the `RustScan/rustscan` path 302-redirects). Last release **2.4.1**, February — the project
@@ -373,7 +373,7 @@ architecture.
 |---|---|
 | `recon-ng` from `APT_PKGS` | Abandoned all-in-one framework, dependency rot. **Non rimosso**: registrato con tier, che raggiunge l'obiettivo di sicurezza senza toccare la macchina dell'operatore. |
 | `dirb`, `medusa` from `APT_PKGS` unless registered | Credential-attack tools. **Registrati** come `intrusive`: tier dichiarato invece che rimozione. |
-| ~~`rustscan` branch in `stavros.js:383`~~ | **Non rimosso** — è un fallback attivo quando `naabu` non torna con porte, non codice morto. Vedi §1.3. |
+| ~~`rustscan` branch in `cyboros.js:383`~~ | **Non rimosso** — è un fallback attivo quando `naabu` non torna con porte, non codice morto. Vedi §1.3. |
 
 ---
 

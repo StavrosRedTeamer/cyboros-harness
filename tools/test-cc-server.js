@@ -12,7 +12,7 @@ const { spawn } = require('child_process');
 
 const ROOT = path.join(__dirname, '..');
 const SERVER = path.join(__dirname, 'gui-server.js');
-const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'stavros-cc-server-'));
+const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'cyboros-cc-server-'));
 const SCOPE = path.join(tmp, 'scope.json');
 fs.writeFileSync(SCOPE, JSON.stringify({ allowed_hosts: [], allowed_ips: [], max_requests_per_second: 2 }, null, 2));
 

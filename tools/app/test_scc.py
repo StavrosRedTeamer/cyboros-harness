@@ -31,7 +31,7 @@ class FakePopen:
         self.args = args
         self.returncode = None
         self.stdout = iter([
-            "Stavros Console  →  http://127.0.0.1:0/\n",
+            "Cyboros Console  →  http://127.0.0.1:0/\n",
             "SCC_PORT=54321\n",
             "SCC_URL=http://127.0.0.1:54321/?token=deadbeef\n",
         ])
@@ -65,7 +65,7 @@ class ShellTests(unittest.TestCase):
 
     def test_paths_live_under_reports_app(self):
         self.assertTrue(scc.LOG_FILE.endswith(os.path.join("reports", "app", "scc.log")))
-        self.assertEqual(DEFAULT_SERVER_NAME, "stavros-cc-single")
+        self.assertEqual(DEFAULT_SERVER_NAME, "cyboros-cc-single")
 
     def test_supervisor_spawns_with_instance_and_parses_handshake(self):
         captured = {}

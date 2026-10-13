@@ -9,7 +9,7 @@ const os = require('os');
 const path = require('path');
 
 const WS = path.join(__dirname, '..');
-const T = fs.mkdtempSync(path.join(os.tmpdir(), 'stavros-cc-warroom-'));
+const T = fs.mkdtempSync(path.join(os.tmpdir(), 'cyboros-cc-warroom-'));
 
 process.env.CC_ROOT = T;
 process.env.STATE_DB = path.join(T, 'state.db');

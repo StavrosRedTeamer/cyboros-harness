@@ -6,7 +6,7 @@
 // `why`, `tier` e `cost` — e le azioni confirm-tier non partono mai da sole.
 //
 // Read-only. Il dispatch (esecuzione) vive nel router e passa SEMPRE dai wrapper esistenti
-// (run.js / workflow.js / stavros.js) — questo modulo produce solo la specifica di argv.
+// (run.js / workflow.js / cyboros.js) — questo modulo produce solo la specifica di argv.
 //
 // CLI:
 //   node tools/cc-mission.js show [--json]

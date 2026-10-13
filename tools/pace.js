@@ -51,7 +51,7 @@ function wait(rps, opts) {
   return ms;
 }
 
-// Non-blocking wait — for async orchestrators (stavros.js). Same global ceiling, but the
+// Non-blocking wait — for async orchestrators (cyboros.js). Same global ceiling, but the
 // event loop stays live during the gap so concurrent work actually overlaps.
 async function waitAsync(rps, opts) {
   const ms = reserve(rps, opts);

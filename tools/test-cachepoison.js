@@ -17,7 +17,7 @@ ok('isCacheable false on no-store', () => assert.strictEqual(cache.isCacheable({
 ok('isCacheable false on private', () => assert.strictEqual(cache.isCacheable({ 'cache-control': 'private' }), false));
 ok('cacheIndicators picks cf-cache-status', () => assert.strictEqual(cache.cacheIndicators({ 'CF-Cache-Status': 'HIT' }).cf_cache_status, 'HIT'));
 ok('reflects finds marker', () => assert.strictEqual(cache.reflects('<a href=http://x.example>', 'x.example'), true));
-ok('deceptionPaths appends static suffixes', () => { const p = cache.deceptionPaths('https://t.example/account'); assert.ok(p.some((u) => u.endsWith('/stavros.css'))); assert.ok(p.some((u) => u.includes(';.css'))); });
+ok('deceptionPaths appends static suffixes', () => { const p = cache.deceptionPaths('https://t.example/account'); assert.ok(p.some((u) => u.endsWith('/cyboros.css'))); assert.ok(p.some((u) => u.includes(';.css'))); });
 ok('UNKEYED_HEADERS includes X-Forwarded-Host', () => assert.ok(cache.UNKEYED_HEADERS.includes('X-Forwarded-Host')));
 
 // ---- poisoning probe with injected send -------------------------------------
@@ -51,7 +51,7 @@ ok('UNKEYED_HEADERS includes X-Forwarded-Host', () => assert.ok(cache.UNKEYED_HE
   });
 
   await okA('deception flags cacheable dynamic static-suffix path', async () => {
-    const send = async (url) => url.includes('stavros.css')
+    const send = async (url) => url.includes('cyboros.css')
       ? { status: 200, headers: { 'cache-control': 'public, max-age=300' }, body: 'user=marco balance=1000' }
       : { status: 404, headers: {}, body: '' };
     const res = await cache.runDeception('https://t.example/account', { send });

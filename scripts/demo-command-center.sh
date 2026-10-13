@@ -58,7 +58,7 @@ SERVER_PID=$!
 sleep 1
 trap 'kill "$SERVER_PID" 2>/dev/null || true; rm -rf "$DEMO_ROOT"' EXIT
 
-step "6/6  Open the URL below in a browser (or run: ./stavros-cc --web)"
+step "6/6  Open the URL below in a browser (or run: ./cyboros-cc --web)"
 node tools/cc-instance.js url
 
 cat <<EOF

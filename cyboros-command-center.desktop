@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Version=1.0
+Name=Cyboros Command Center
+Comment=Avvia la dashboard web locale (Command Center) di Cyboros Harness e apre il browser
+Exec=/home/stavros/Desktop/cyboros-harness/start-command-center.sh
+Icon=utilities-system-monitor
+Terminal=true
+Categories=Development;Security;
+StartupNotify=true

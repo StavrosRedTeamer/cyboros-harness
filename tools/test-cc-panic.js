@@ -8,7 +8,7 @@ const os = require('os');
 const path = require('path');
 const { spawn } = require('child_process');
 
-const T = fs.mkdtempSync(path.join(os.tmpdir(), 'stavros-cc-panic-'));
+const T = fs.mkdtempSync(path.join(os.tmpdir(), 'cyboros-cc-panic-'));
 process.env.PROC_REGISTRY_FILE = path.join(T, 'proc-registry.json');
 process.env.AUDIT_DIR = path.join(T, 'artifacts', 'audit');
 process.env.CC_ROOT = T;

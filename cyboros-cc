@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Stavros Command Center — desktop launcher (WP2).
+# Cyboros Command Center — desktop launcher (WP2).
 # Prefers the PyQt6 shell; falls back to Chromium app-mode, then the default browser.
 # The backend stays owned by tools/gui-server.js (single instance via cc-instance).
 set -euo pipefail
@@ -8,7 +8,7 @@ WS="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$WS"
 
 if ! command -v node >/dev/null 2>&1; then
-  echo "stavros-cc: node >= 22 is required" >&2
+  echo "cyboros-cc: node >= 22 is required" >&2
   exit 1
 fi
 

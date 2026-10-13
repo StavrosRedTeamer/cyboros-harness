@@ -141,7 +141,7 @@ and the harness contract in [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
 
 ## The surface
 
-The Command Center is a desktop app over the same engine (`stavros-cc`, PyQt6, falling
+The Command Center is a desktop app over the same engine (`cyboros-cc`, PyQt6, falling
 back to Chromium in app-mode). It is a **surface, not a gate**: it bypasses no guard, and
 every write it performs is a wrapper over an existing tool.
 

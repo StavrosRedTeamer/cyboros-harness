@@ -17,7 +17,7 @@
 ┌───────────────▼────────────── Parrot PC ───────────────────────┐
 │ llama-server 127.0.0.1:8080 (RTX 4050)  ← tunnel -L del F3     │
 │ sshd (tailscale only) · backend SSH di hermes-f3 per exec     │
-│ workspace master: ~/Desktop/stavrosredteamer                   │
+│ workspace master: ~/Desktop/cyboros-harness                   │
 └────────────────────────────────────────────────────────────────┘
 ```
 
@@ -135,7 +135,7 @@ hermes-f3                   # TUI: 15 tool come sul PC, cwd ~/stavros
 
 Pattern utili:
 - **Da telefono, exec su PC**: il modello usa `terminal` normalmente (backend ssh). Il cwd remoto
-  è `/home/stavros/Desktop/stavrosredteamer`.
+  è `/home/stavros/Desktop/cyboros-harness`.
 - **Da telefono, exec nel Kali del telefono**: `f3-kali` in un'altra sessione Termux, oppure il
   modello usa il tool `terminal` locale? No: il backend è UNO (ssh). Per exec locale usa
   `f3-kali` a mano o cambia `terminal.backend` (solo `local`/`ssh` alternati via env `TERMINAL_ENV`).
@@ -152,7 +152,7 @@ bash ~/stavros/tools/f3-client-setup.sh --pc-user <utente> --pc-host <ip-tailsca
 # STAVROS-PATCHES.md), poi ri-rsync PC → telefono (passo 5 dello script di setup).
 
 # Evidence produce sul telefono? riportale al PC (il report vive nel PC master):
-rsync -az ~/stavros/reports/ <utente>@<ip-tailscale>:Desktop/stavrosredteamer/reports/
+rsync -az ~/stavros/reports/ <utente>@<ip-tailscale>:Desktop/cyboros-harness/reports/
 ```
 
 ## 8. Sicurezza
@@ -171,7 +171,7 @@ qualunque superficie (shell PyQt6 sul PC, browser del telefono, TUI) si aggancia
 e non spawna un secondo backend sui PTY. Sul PC:
 
 ```bash
-./stavros-cc                 # finestra nativa; se PyQt6 manca → Chromium → browser
+./cyboros-cc                 # finestra nativa; se PyQt6 manca → Chromium → browser
 node tools/cc-instance.js url   # l'URL tokenizzato dell'istanza viva (per il telefono)
 ```
 
@@ -191,5 +191,5 @@ Note:
   `--read-only`, che rifiuta ogni write (403) e lascia la dashboard navigabile.
 - Nessuna nuova egress: il client parla solo con il tunnel. I pannelli che escono davvero (Radar →
   GitHub) mostrano il badge egress.
-- `--web` evita del tutto la shell nativa (utile da telefono): `./stavros-cc --web` apre l'URL già
+- `--web` evita del tutto la shell nativa (utile da telefono): `./cyboros-cc --web` apre l'URL già
   tokenizzato nel browser predefinito.

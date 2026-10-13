@@ -12,8 +12,8 @@ Command Center backend uses `node:sqlite`, which is why the floor is that high.
 There is **nothing to install**:
 
 ```bash
-git clone https://github.com/CSI-entitymorton/stavrosredteamer.git
-cd stavrosredteamer
+git clone https://github.com/CSI-entitymorton/cyboros-harness.git
+cd cyboros-harness
 npm test          # the full offline suite, ~35 s
 ```
 

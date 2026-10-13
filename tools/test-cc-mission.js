@@ -9,7 +9,7 @@ const path = require('path');
 const crypto = require('crypto');
 
 const WS = path.join(__dirname, '..');
-const T = fs.mkdtempSync(path.join(os.tmpdir(), 'stavros-cc-mission-'));
+const T = fs.mkdtempSync(path.join(os.tmpdir(), 'cyboros-cc-mission-'));
 const GATE_WS = path.join(T, 'gate-ws');
 fs.mkdirSync(path.join(GATE_WS, 'reports'), { recursive: true });
 

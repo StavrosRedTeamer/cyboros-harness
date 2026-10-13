@@ -7,7 +7,7 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 
-const T = fs.mkdtempSync(path.join(os.tmpdir(), 'stavros-cc-campaign-'));
+const T = fs.mkdtempSync(path.join(os.tmpdir(), 'cyboros-cc-campaign-'));
 const WS = path.join(__dirname, '..');
 process.env.CC_ROOT = T;
 process.env.CC_CAMPAIGN_FILE = path.join(T, 'campaign.json');

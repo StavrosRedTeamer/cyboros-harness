@@ -5,7 +5,7 @@
 //
 // Serves a single-page dashboard (tools/gui/) bound to 127.0.0.1 by default and
 // exposes a small JSON API over the harness data. It NEVER bypasses the guards:
-// write actions shell out to the existing tools (stavros.js resume,
+// write actions shell out to the existing tools (cyboros.js resume,
 // report-html.js) and the scope editor validates through the same rules the
 // scope-guard applies at runtime.
 //
@@ -889,7 +889,7 @@ const server = http.createServer(async (req, res) => {
         return sendJson(res, 200, r);
       }
       if (url === '/api/pipeline/resume') {
-        const id = runJob('resume', [path.join('tools', 'stavros.js'), 'resume']);
+        const id = runJob('resume', [path.join('tools', 'cyboros.js'), 'resume']);
         return sendJson(res, 202, { jobId: id });
       }
       const closeRunMatch = url.match(/^\/api\/pipeline\/runs\/(\d+)\/close$/);

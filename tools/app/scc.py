@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Stavros Command Center — desktop shell (WP2).
+# Cyboros Command Center — desktop shell (WP2).
 #
 # A thin PyQt6 frame around the SPA served by tools/gui-server.js. The shell
 # SUPERVISES the backend (spawn → health → restart with a circuit breaker), owns a
@@ -33,8 +33,8 @@ WS = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 TOOLS = os.path.join(WS, "tools")
 LOG_DIR = os.path.join(WS, "reports", "app")
 LOG_FILE = os.path.join(LOG_DIR, "scc.log")
-APP_NAME = "stavros-cc"
-SERVER_NAME = "stavros-cc-single"
+APP_NAME = "cyboros-cc"
+SERVER_NAME = "cyboros-cc-single"
 _QT_APP = None  # keeps a QApplication created outside main() alive
 
 
@@ -261,7 +261,7 @@ def fallback_browser(url):
     chromium = shutil.which("chromium") or shutil.which("chromium-browser") or shutil.which("google-chrome")
     if chromium:
         try:
-            return subprocess.Popen([chromium, "--app=" + url, "--class=StavrosCC"])
+            return subprocess.Popen([chromium, "--app=" + url, "--class=CyborosCC"])
         except OSError:
             pass
     import webbrowser
@@ -309,7 +309,7 @@ def report_startup_failure(message):
         return
     global _QT_APP
     _QT_APP = QApplication.instance() or QApplication(sys.argv)
-    QMessageBox.critical(None, "Stavros Command Center",
+    QMessageBox.critical(None, "Cyboros Command Center",
                          "%s\n\nBackend: tools/gui-server.js\nLog: %s" % (message, LOG_FILE))
 
 
@@ -328,8 +328,8 @@ def main(argv):
     app = None
     if qt is not None:
         app = qt.QApplication(sys.argv)
-        app.setApplicationName("Stavros Command Center")
-        app.setOrganizationName("StavrosRedTeamer")
+        app.setApplicationName("Cyboros Command Center")
+        app.setOrganizationName("Cyboros Harness")
         single = acquire_single_instance()
         if single == "existing":
             log("another window is already running — raising it and exiting")
@@ -370,7 +370,7 @@ def main(argv):
     QTimer, QSize, QUrl, QSettings = qt.QTimer, qt.QSize, qt.QUrl, qt.QSettings
     QWebEngineView = qt.QWebEngineView
 
-    icon_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "icons", "stavros-cc.svg")
+    icon_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "icons", "cyboros-cc.svg")
 
     def status_pixmap(color):
         pm = QPixmap(16, 16)
@@ -385,7 +385,7 @@ def main(argv):
     class MainWindow(QMainWindow):
         def __init__(self):
             super().__init__()
-            self.setWindowTitle("Stavros Command Center")
+            self.setWindowTitle("Cyboros Command Center")
             if os.path.exists(icon_path):
                 self.setWindowIcon(QIcon(icon_path))
             self.view = QWebEngineView(self)
@@ -395,7 +395,7 @@ def main(argv):
             self._build_toolbar()
             self.setStatusBar(QStatusBar(self))
             self._build_tray(status_pixmap("#2fd18a"))
-            settings = QSettings("StavrosRedTeamer", APP_NAME)
+            settings = QSettings("Cyboros Harness", APP_NAME)
             geo = settings.value("geometry")
             if geo is not None:
                 self.restoreGeometry(geo)
@@ -435,7 +435,7 @@ def main(argv):
 
         def _build_tray(self, icon):
             self.tray = QSystemTrayIcon(icon, self)
-            self.tray.setToolTip("Stavros Command Center")
+            self.tray.setToolTip("Cyboros Command Center")
             menu = QMenu()
             menu.addAction("Show", self.showNormal)
             menu.addAction("Hide", self.hide)
@@ -457,8 +457,8 @@ def main(argv):
             QMessageBox.information(self, "Backend", url)
 
         def _about(self):
-            QMessageBox.about(self, "Stavros Command Center",
-                              "Desktop shell for StavrosRedTeamer.\nBackend: %s" % url)
+            QMessageBox.about(self, "Cyboros Command Center",
+                              "Desktop shell for Cyboros Harness.\nBackend: %s" % url)
 
         def _panic(self):
             if QMessageBox.question(self, "Panic switch",
@@ -470,7 +470,7 @@ def main(argv):
                 log("panic failed: %s" % e)
 
         def closeEvent(self, event):
-            settings = QSettings("StavrosRedTeamer", APP_NAME)
+            settings = QSettings("Cyboros Harness", APP_NAME)
             settings.setValue("geometry", self.saveGeometry())
             sup.stop()
             event.accept()

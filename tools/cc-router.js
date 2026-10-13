@@ -3,7 +3,7 @@
 //
 // gui-server.js calls handle() for every /api/cc/ request AFTER its own Host/Origin + token
 // guards have run, so nothing here can bypass hardening. Every write goes through the existing
-// tool wrappers (run.js / workflow.js / stavros.js / budget.js / gate.js / report-html.js).
+// tool wrappers (run.js / workflow.js / cyboros.js / budget.js / gate.js / report-html.js).
 // All modules are required lazily so a plain dashboard start does not pay for node:sqlite etc.
 'use strict';
 const fs = require('fs');

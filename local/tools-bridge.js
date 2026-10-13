@@ -129,7 +129,7 @@ function makeDispatch({ allowRunTool = true } = {}) {
       case 'pipeline': {
         const phase = String(args.phase || '');
         if (!['recon', 'scan', 'enumerate'].includes(phase)) return 'ERRORE: phase deve essere recon|scan|enumerate';
-        const r = nodeTool('stavros.js', [phase, String(args.host || '')], { timeout: 1800000 });
+        const r = nodeTool('cyboros.js', [phase, String(args.host || '')], { timeout: 1800000 });
         return `[pipeline ${phase} exit ${r.code}]\n${r.out}`;
       }
       case 'run_tool': {

@@ -1,6 +1,6 @@
 # Cyboros Command Center — Desktop Edition (piano e work package)
 
-**Obiettivo.** Portare il Command Center da dashboard web a **programma desktop** (`stavros-cc`)
+**Obiettivo.** Portare il Command Center da dashboard web a **programma desktop** (`cyboros-cc`)
 che governa Cyboros Harness a 360°: campagna → missione → consenso → esecuzione → verifica →
 report → prova. Riferimenti di settore: Cobalt Strike / Havoc / Sliver (console operatore,
 sessioni, kill switch), Mythic / CALDERA (operazioni → task → artefatti → ATT&CK), reNgine /
@@ -19,7 +19,7 @@ desktop / browser / telefono.
 ## 0. Guardrail non negoziabili (valgono per ogni WP)
 
 1. **Nessun bypass dei guard.** Ogni scrittura resta wrapper su tool esistenti
-   (`run.js`, `workflow.js`, `stavros.js`, `gate.js`, `budget.js`, `report-html.js`). L'app non
+   (`run.js`, `workflow.js`, `cyboros.js`, `gate.js`, `budget.js`, `report-html.js`). L'app non
    esegue mai un'azione confirm-tier: la *consente*, poi l'agente la esegue con `--confirm`.
 2. **Un solo backend vivo.** Lockfile + `reports/app/server.lock`. Un secondo avvio fa **attach**,
    non spawn (due PTY sulla stessa TUI Freebuff si pestano i piedi).
@@ -40,7 +40,7 @@ desktop / browser / telefono.
 ## 1. Architettura
 
 ```
-┌──────────────────────── stavros-cc (PyQt6 6.8.2, Wayland/X11) ────────────────────────┐
+┌──────────────────────── cyboros-cc (PyQt6 6.8.2, Wayland/X11) ────────────────────────┐
 │ menubar · toolbar · statusrail · tray+notifiche · dialoghi nativi · QWebChannel bridge │
 │  ┌──────────────────────────────┐  ┌───────────────────────────────────────────────┐  │
 │  │ QWebEngineView               │  │ dock nativi: Approvals · Activity · Terminal  │  │
@@ -82,7 +82,7 @@ verificabili. La colonna *Dipende* dice cosa deve essere già in `main` prima di
 |----|--------|------|---------|
 | 0 | Stabilizzare il WIP | S | — |
 | 1 | Fondazioni backend: istanza unica, token, handshake | M | 0 |
-| 2 | Shell desktop (`stavros-cc`) | M | 1 |
+| 2 | Shell desktop (`cyboros-cc`) | M | 1 |
 | 3 | Campagna + template | M | 1 |
 | 4 | Inbox approvazioni | L | 1,3 |
 | 5 | Mission control + dispatch | M | 3,4 |
@@ -126,7 +126,7 @@ e legge i dati senza token, con banner che spiega perché le write sono disabili
 
 ---
 
-### WP2 — Shell desktop `stavros-cc`
+### WP2 — Shell desktop `cyboros-cc`
 
 **Deliverable**
 - `tools/app/scc.py` (PyQt6): QMainWindow con menubar (File/Engagement/View/Actions/Tools/Help),
@@ -139,8 +139,8 @@ e legge i dati senza token, con banner che spiega perché le write sono disabili
   supervisore del backend (spawn → health → restart con
   circuit breaker), log in `reports/app/scc.log` con rotazione, `--read-only`, `--headless`,
   `--web`, `--kiosk`, fallback Chromium app-mode / browser.
-- `tools/app/icons/stavros-cc.svg` (icona neon-duotone), `stavros-cc` (launcher),
-  `install-scc-launcher.sh` (idempotente, `StartupWMClass`, Actions), `stavros-cc.desktop`.
+- `tools/app/icons/cyboros-cc.svg` (icona neon-duotone), `cyboros-cc` (launcher),
+  `install-cyboros-cc-launcher.sh` (idempotente, `StartupWMClass`, Actions), `cyboros-cc.desktop`.
 - `tools/app/test_scc.py`: smoke test stdlib `unittest` in `QT_QPA_PLATFORM=offscreen`
   (finestra costruita, tray creato, supervisore chiama `--instance`).
 
@@ -194,7 +194,7 @@ nessun percorso consente a un'azione confirm-tier di partire senza token quando 
 - Pannello *Mission* con card azione → dispatch o richiesta di consenso; log SSE nel drawer.
 
 **AC:** i numeri del pannello coincidono con l'output CLI (stessi moduli, test golden su fixture);
-nessun dispatch parte fuori da `run.js`/`workflow.js`/`stavros.js`.
+nessun dispatch parte fuori da `run.js`/`workflow.js`/`cyboros.js`.
 
 ---
 
@@ -247,7 +247,7 @@ per `.js/.css/.svg/.json` sotto `tools/gui/`).
 
 ### WP9 — Distribuzione, doc, demo
 
-**Deliverable:** `install-scc-launcher.sh` finale + uninstall, README + questo documento aggiornati,
+**Deliverable:** `install-cyboros-cc-launcher.sh` finale + uninstall, README + questo documento aggiornati,
 `docs/f3-client-runbook.md` (l'app come client desktop di un backend tunnelato), unit systemd
 user opzionale, **script demo 2 minuti**: lancio → wizard → mission → approvazione → dispatch →
 finding → report → bundle.
@@ -321,7 +321,7 @@ l'esito, non i passi, così l'agente resta libero sulla soluzione.
 |----|---------------------|
 | 0 | `Commit del WIP in corso (fase A/B + vendor move) così il tree è pulito: verifica npm test e non includere file non correlati.` |
 | 1 | ✅ fatto — `tools/cc-instance.js`, token di sessione, attach, test offline+loopback |
-| 2 | `Implementa WP2 del piano docs/command-center-desktop.md: la shell desktop PyQt6 stavros-cc che avvia e supervisiona il backend, con tray, notifiche e fallback Chromium.` |
+| 2 | `Implementa WP2 del piano docs/command-center-desktop.md: la shell desktop PyQt6 cyboros-cc che avvia e supervisiona il backend, con tray, notifiche e fallback Chromium.` |
 | 3 | `Implementa WP3 del piano docs/command-center-desktop.md: modello campagna (manifest, template, storico) e pannello Campaign.` |
 | 4 | `Implementa WP4 del piano docs/command-center-desktop.md: inbox approvazioni con token di consenso e integrazione additiva in run.js/c2-guard.js.` |
 | 5 | `Implementa WP5 del piano docs/command-center-desktop.md: mission control che aggrega next-actions, coverage, gate e budget con dispatch.` |
@@ -351,7 +351,7 @@ mission, routes, panic). Ogni modulo riusa i tool esistenti; nessun guard è sta
 
 | WP | Stato | Note |
 |----|-------|------|
-| 2 Shell desktop | ✅ (🚧 notifiche) | `tools/app/scc.py` (tray con colore, supervisore spawn→health→restart con circuit breaker, single instance `QLocalServer`, QSettings geometria, `--read-only/--headless/--web/--kiosk/--keep-server`, fallback Chromium→browser), `tools/app/icons/stavros-cc.svg`, `stavros-cc`, `install-scc-launcher.sh`, `stavros-cc.desktop`,  `tools/app/pdf-export.py`, `tools/cc-panic.js`, `tools/app/test_scc.py` (8 test offscreen,
+| 2 Shell desktop | ✅ (🚧 notifiche) | `tools/app/scc.py` (tray con colore, supervisore spawn→health→restart con circuit breaker, single instance `QLocalServer`, QSettings geometria, `--read-only/--headless/--web/--kiosk/--keep-server`, fallback Chromium→browser), `tools/app/icons/cyboros-cc.svg`, `cyboros-cc`, `install-cyboros-cc-launcher.sh`, `cyboros-cc.desktop`,  `tools/app/pdf-export.py`, `tools/cc-panic.js`, `tools/app/test_scc.py` (8 test offscreen,
   incluso il raise fra due processi). 🚧 **mancano**: notifiche desktop con discreet mode/mute (tray + colore di stato ci sono). |
 | 3 Campagna | ✅ | `tools/cc-campaign.js`, `templates/campaign/{web-app,internal-network,wireless,mobile,red-team-full}.json`, route `/api/cc/campaign*`, pannello Campaign + wizard. Rollup ore da gate-log + run-audit. |
 | 4 Approvazioni | ✅ | `tools/cc-approvals.js` + `tools/request-approval.js`, store append-only, token `{id,host,action_class,command_hash,scope_verdict,ttl,granted_by,note}`, coda in opstate via CAS. Integrazione **additiva e default-off** in `run.js`/`c2-guard.js` (`--approval`, policy `host_ops.require_approval`). Pannello + badge. |
@@ -359,14 +359,14 @@ mission, routes, panic). Ogni modulo riusa i tool esistenti; nessun guard è sta
 | 6 Ledger/grafo/coverage | ✅ (🚧 report studio) | `tools/cc-ledger.js` (unione + chain == `gate.js` + evidence bundle tar.gz + manifest + `export-pdf`), `tools/cc-graph.js`, `tools/cc-coverage.js`, pannelli Ledger/Graph/Coverage. 🚧 **manca**: retest diff e ciclo finding avanzato dentro Reports. |
 | 7 Controllo 360° | ✅ (🚧 install) | route+pannello Control: Config (redatto, validazione scope via `scope-guard`), Team (`fleet.js plan`), Arsenal (`tool-plane` + `doctor --json`), Knowledge (`kb-search.js`), Radar (badge egress dichiarato), Doctor. 🚧 **manca**: install tool su conferma tipizzata. |
 | 8 IA + polish | ✅ (🚧 a11y) | rail a gruppi (Engagement/Attack/Control/Console), command palette estesa, split viste `views-engagement.js`/`views-control.js` (zero-build, handler statico con allowlist `.js/.css/.svg/.json`, basename-only), `prefers-reduced-motion`. 🚧 **manca**: audit tastiera completo e aria-live di dettaglio. |
-| 9 Distribuzione | ✅ | `install-scc-launcher.sh` (+`--uninstall`), `scripts/demo-command-center.sh` (2 min, CC_ROOT temporaneo), README + questo doc + `docs/f3-client-runbook.md` (§9 client desktop tunnelato). |
+| 9 Distribuzione | ✅ | `install-cyboros-cc-launcher.sh` (+`--uninstall`), `scripts/demo-command-center.sh` (2 min, CC_ROOT temporaneo), README + questo doc + `docs/f3-client-runbook.md` (§9 client desktop tunnelato). |
 | 10 War Room | ✅ | `tools/cc-warroom.js` (snapshot read-only: mission + ledger/chain + job runner + sessions + coverage + exposure + scope + budget burn/ETA + attention rail), `GET /api/cc/warroom`, `POST /api/cc/warroom/panic` (token + frase tipizzata, wrapper `cc-panic.js`), vista `views-warroom.js` (polling 5s/2s TV, delta client-side, PANIC drawer, TV mode). Test: `tools/test-cc-warroom.js` (offline) + route loopback in `tools/test-cc-routes.js`. |
 
 **File nuovi WP2..WP9:** `tools/cc-util.js`, `tools/cc-campaign.js`, `tools/cc-approvals.js`,
 `tools/request-approval.js`, `tools/cc-mission.js`, `tools/cc-ledger.js`, `tools/cc-graph.js`,
 `tools/cc-coverage.js`, `tools/cc-router.js`, `tools/cc-panic.js`, `tools/app/*`,
 `templates/campaign/*.json`, `tools/gui/views-engagement.js`, `tools/gui/views-control.js`,
-`stavros-cc`, `install-scc-launcher.sh`, `scripts/demo-command-center.sh`,
+`cyboros-cc`, `install-cyboros-cc-launcher.sh`, `scripts/demo-command-center.sh`,
 test: `tools/test-cc-{campaign,approvals,mission,routes,panic,warroom}.js`.
 **File WP10:** `tools/cc-warroom.js`, `tools/gui/views-warroom.js`, `tools/test-cc-warroom.js`;
 modificati `tools/cc-router.js` (route war room + panic), `tools/gui-server.js` (snapshot job nel

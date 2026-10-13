@@ -10,7 +10,7 @@ const fs = require('fs');
 const path = require('path');
 const { ok, summary, fixture } = require('./testkit');
 
-const T = fixture('stavros-cc-graph');
+const T = fixture('cyboros-cc-graph');
 process.env.STATE_DB = path.join(T, 'state.db');
 process.env.FINDINGS_JSONL = path.join(T, 'findings.jsonl');
 

@@ -10,7 +10,7 @@ const path = require('path');
 const { spawnSync, spawn } = require('child_process');
 
 const WS = path.join(__dirname, '..');
-const T = fs.mkdtempSync(path.join(os.tmpdir(), 'stavros-cc-approvals-'));
+const T = fs.mkdtempSync(path.join(os.tmpdir(), 'cyboros-cc-approvals-'));
 process.env.CC_APPROVALS_FILE = path.join(T, 'approvals.jsonl');
 process.env.CC_OPSTATE_FILE = path.join(T, 'operation-state.json');
 process.env.SCOPE_JSON = path.join(T, 'scope.json');

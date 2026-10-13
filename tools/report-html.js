@@ -125,7 +125,7 @@ function coverageSummary(m, findingsForHost) {
   return { host: m.host, candidatesTotal, verified, fpDiscarded, untested, tested: rows.filter((r) => r.status === 'tested').length, confirmedClasses: rows.filter((r) => r.status === 'confirmed').length };
 }
 
-// targets from state.db (mirrors stavros.js report()).
+// targets from state.db (mirrors cyboros.js report()).
 function collectFromState(db) {
   return state.listTargets(db).map((t) => ({
     target: t.host,
@@ -226,7 +226,7 @@ function chainsSection(chains) {
 }
 
 function reconSection(targets) {
-  if (!targets || !targets.length) return '<p class="muted">No recon data in state.db yet (run stavros.js recon/scan/enumerate).</p>';
+  if (!targets || !targets.length) return '<p class="muted">No recon data in state.db yet (run cyboros.js recon/scan/enumerate).</p>';
   return targets.map((t) => `<section class="target">
     <h3>${htmlEscape(t.target)}</h3>
     ${t.hosts.map((h) => `<div class="host">

@@ -5,7 +5,7 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 
-const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'stavros-cc-instance-'));
+const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'cyboros-cc-instance-'));
 process.env.CC_STATE_DIR = tmp;
 
 const cc = require('./cc-instance');

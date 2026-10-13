@@ -25,7 +25,7 @@ fi
 [[ -z "$DESKTOP_DIR" ]] && { mkdir -p "$HOME/Desktop"; DESKTOP_DIR="$HOME/Desktop"; }
 
 # Rigenera anche il template versionato nel repo (path reale) e installa sul desktop.
-for TARGET in "$EDITION/stavros-command-center.desktop" "$DESKTOP_DIR/stavros-command-center.desktop"; do
+for TARGET in "$EDITION/cyboros-command-center.desktop" "$DESKTOP_DIR/cyboros-command-center.desktop"; do
   cat > "$TARGET" <<EOF
 [Desktop Entry]
 Type=Application
@@ -43,6 +43,6 @@ EOF
   gio set "$TARGET" metadata::trusted true 2>/dev/null || true
 done
 
-echo "[stavros] launcher installato: $DESKTOP_DIR/stavros-command-center.desktop"
+echo "[stavros] launcher installato: $DESKTOP_DIR/cyboros-command-center.desktop"
 echo "[stavros] doppio clic su \"Cyboros Command Center\" per avviare la dashboard."
 echo "[stavros] prima volta: se il sistema chiede \"consenti esecuzione\", scegli Esegui/Apri."
