@@ -17,7 +17,9 @@
 //      SOLO i file tracciati, e ogni `tools/*.js` citato da un documento esiste ED è tracciato —
 //      un file che vive solo sul tuo disco non esiste per chi clona;
 //   7. l'indice committato è riproducibile da un export di HEAD, non solo dal worktree: è la
-//      differenza fra un verde locale e un rosso per chi clona, e master è stato rosso così.
+//      differenza fra un verde locale e un rosso per chi clona, e master è stato rosso così;
+//   8. la mappa del progetto (docs/project-map.html) è rigenerabile dai moduli reali: come
+//      l'indice è GENERATA, e una mappa ferma è una mappa che mente.
 //
 // Tutto offline, zero dipendenze, nessuna rete: come il resto della suite.
 'use strict';
@@ -222,6 +224,16 @@ ok('docs/INDEX.md è aggiornato (indice generato dai file reali)', () => {
     { cwd: WS, encoding: 'utf8', timeout: 30000 });
   assert.strictEqual(r.status, 0,
     'indice non aggiornato: ' + String(r.stderr || r.stdout || '').split('\n')[0]);
+});
+
+// Stesso patto per la mappa: gli 160 moduli, le famiglie e i test che li nominano vengono letti
+// dal repository. Aggiungi un modulo e la mappa è indietro di una riga — questo lo dice subito,
+// invece di lasciare in giro una pagina che descrive un repository che non esiste più.
+ok('docs/project-map.html è aggiornata (mappa generata dai moduli reali)', () => {
+  const r = spawnSync(process.execPath, [path.join(WS, 'tools', 'project-map.js'), '--check'],
+    { cwd: WS, encoding: 'utf8', timeout: 30000 });
+  assert.strictEqual(r.status, 0,
+    'mappa non aggiornata: ' + String(r.stderr || r.stdout || '').split('\n')[0]);
 });
 
 // Il check qui sopra guarda il WORKTREE, e il worktree non è ciò che si clona. Se l'indice viene
