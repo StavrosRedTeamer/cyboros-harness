@@ -23,6 +23,8 @@ if (Have go) {
     "github.com/hahwul/dalfox/v2@latest",
     "github.com/lc/gau/v2/cmd/gau@latest",
     "github.com/tomnomnom/waybackurls@latest",
+    "github.com/praetorian-inc/brutus/cmd/brutus@latest",
+    "github.com/praetorian-inc/titus/cmd/titus@latest",
     "github.com/projectdiscovery/interactsh/cmd/interactsh-client@latest"
   )
   foreach ($p in $pd) { Write-Host "go install $p"; go install $p }

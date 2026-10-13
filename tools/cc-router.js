@@ -238,6 +238,39 @@ async function handle(req, res, ctx) {
     return send(res, r.json ? 200 : 500, r.json || { error: 'doctor failed', raw: (r.raw || '').slice(0, 400) });
   }
 
+  // ── war room (WP10) — board live read-only + panic ─────────────────────────
+  if (url === '/api/cc/warroom' && req.method === 'GET') {
+    try {
+      return send(res, 200, lazy('cc-warroom').build({
+        jobs: typeof ctx.jobs === 'function' ? ctx.jobs() : [],
+        tail: parseInt(q.tail, 10) || 120,
+      }));
+    } catch (e) { return send(res, 500, { error: String((e && e.message) || e) }); }
+  }
+  // Kill switch: esegue SOLO cc-panic.js (processi registrati + PTY bridge di questo
+  // workspace). La conferma tipizzata è verificata qui, non solo nella UI.
+  if (url === '/api/cc/warroom/panic' && req.method === 'POST') {
+    if (ctx.readOnly) return send(res, 403, { error: 'read-only mode' });
+    const b = await body();
+    if (String(b.confirm || '').trim().toUpperCase() !== 'PANIC') {
+      return send(res, 400, { error: 'type PANIC to confirm', expected: 'PANIC' });
+    }
+    const r = u.runToolJson([path.join('tools', 'cc-panic.js'), '--json'], { timeoutMs: 20000 });
+    return send(res, r.json ? 200 : 500, r.json || { error: 'panic failed', raw: (r.raw || '').slice(0, 400) });
+  }
+  // Focus host della board: scrive SOLO campaign.host (via cc-campaign.update, che valida e
+  // scrive lo storico). `host: null`/'' toglie il focus e la board torna sullo scope intero.
+  if (url === '/api/cc/warroom/focus' && req.method === 'POST') {
+    if (ctx.readOnly) return send(res, 403, { error: 'read-only mode' });
+    const b = await body();
+    const W = lazy('cc-warroom');
+    if (!lazy('cc-campaign').loadActive()) return send(res, 400, { error: 'no active campaign to focus' });
+    const host = W.normalizeHost(b.host);
+    const r = lazy('cc-campaign').update(null, { host });
+    if (!r.ok) return send(res, 400, { error: r.error || 'update failed', validation: r.validation || null });
+    return send(res, 200, W.build({ jobs: typeof ctx.jobs === 'function' ? ctx.jobs() : [] }));
+  }
+
   return false;
 }
 

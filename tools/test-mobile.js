@@ -114,8 +114,15 @@ const fsUpText = fsUp.args.join(' ');
 assert.ok(fsUpText.includes('/data/local/tmp/frida-server'), 'device path pinned');
 assert.ok(fsUpText.includes('-l 127.0.0.1:4747'), 'loopback NON-default port');
 assert.ok(fsUpText.includes('su'), 'root required');
+assert.ok(fsUpText.includes('for i in 1 2 3 4 5'), 'up must poll pidof: nohup forks and one read races');
 const fsDown = mobile.fridaServerCommands('down', { serial: SERIAL })[0];
-assert.ok(fsDown.args.join(' ').includes('pkill -TERM frida-server'), 'down kills frida-server');
+const fsDownText = fsDown.args.join(' ');
+assert.ok(fsDownText.includes('pkill -TERM frida-server'), 'down kills frida-server');
+assert.ok(
+  !fsDownText.includes("pkill -KILL -f 'sh -c.*frida-server'"),
+  "down must not pkill -f a pattern its own shell matches (self-SIGKILL, exit 137)"
+);
+assert.ok(fsDownText.includes('[ "$q" = "$$" ]'), 'down skips its own pid when reaping the su/sh chain');
 const fsFwd = mobile.fridaServerCommands('forward', { serial: SERIAL, port: '4747' })[0];
 assert.deepStrictEqual(fsFwd.args, ['-s', SERIAL, 'forward', 'tcp:4747', 'tcp:4747'], 'forward mapping');
 assert.throws(() => mobile.fridaServerCommands('up', { serial: SERIAL, port: '80' }), /port invalid/, 'privileged port refused');
@@ -176,6 +183,15 @@ const fakeExec = () => ({ status: 0, stdout: '', stderr: '' });
   );
   const fsOk = await mobile.defaultRunMobile('adb', ['-s', SERIAL, 'shell', 'su', '0', 'sh', '-c', 'pidof frida-server'], { sub: 'frida-server', serial: SERIAL, confirm: 'P1 status', runBinary: fakeExec });
   assert.strictEqual(fsOk.status, 0, 'confirmed frida-server runs');
+
+  // ---- regression: defaultRunMobile must ask runBinary to CAPTURE stdout ----
+  // runBinary (tools/run.js) buffers stdout/stderr only when opts.capture is set; without it
+  // every r.stdout is "" and the tool answers "running: false" on a live frida-server.
+  // The old tests missed it because they inject a runBinary that always returns stdout: ''.
+  let seenOpts = null;
+  const spyExec = (bin, args, o) => { seenOpts = o; return { status: 0, stdout: '', stderr: '' }; };
+  await mobile.defaultRunMobile('adb', ['-s', SERIAL, 'shell', 'su', '0', 'sh', '-c', 'pidof frida-server'], { sub: 'frida-server', serial: SERIAL, confirm: 'capture probe', runBinary: spyExec });
+  assert.ok(seenOpts && seenOpts.capture === true, 'defaultRunMobile passes capture:true to runBinary');
 
   // ---- M.2: fetch-apk — allowlisted source + sha256 pinning, zero network ----
   process.env.MOBILE_APK_LOG = path.join(tmpDir, 'mobile-apk-log.jsonl');

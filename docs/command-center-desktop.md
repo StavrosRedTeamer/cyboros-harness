@@ -44,7 +44,7 @@ desktop / browser / telefono.
 │ menubar · toolbar · statusrail · tray+notifiche · dialoghi nativi · QWebChannel bridge │
 │  ┌──────────────────────────────┐  ┌───────────────────────────────────────────────┐  │
 │  │ QWebEngineView               │  │ dock nativi: Approvals · Activity · Terminal  │  │
-│  │ = SPA tools/gui/ (14 viste)  │  │ (xterm) · Doctor                              │  │
+│  │ = SPA tools/gui/ (15 viste)  │  │ (xterm) · Doctor                              │  │
 │  └──────────────────────────────┘  └───────────────────────────────────────────────┘  │
 │  supervisore: spawn/health/restart (circuit breaker) · single instance (QLocalServer)  │
 └───────────────────────────────────┬───────────────────────────────────────────────────┘
@@ -90,6 +90,7 @@ verificabili. La colonna *Dipende* dice cosa deve essere già in `main` prima di
 | 7 | Controllo 360° (config, team, arsenal, knowledge, radar, doctor) | M | 2 |
 | 8 | IA a rail + polish (a11y, perf, split viste) | M | 5,6 |
 | 9 | Distribuzione, doc, demo | S | 2..8 |
+| 10 | War Room (board live + panic) | M | 5,6 |
 
 ---
 
@@ -255,6 +256,34 @@ finding → report → bundle.
 
 ---
 
+### WP10 — War Room
+
+**Deliverable:** `tools/cc-warroom.js` — snapshot read-only che compone i moduli esistenti in una
+sola board live: mission (headline, azioni, approvazioni, gate, budget), chain del ledger +
+feed, job runner, sessioni, coverage, mappa di esposizione, scope fail-closed, orologio della
+finestra e burn budget con ETA al ritmo medio. `GET /api/cc/warroom` (read-only, loopback) e
+`POST /api/cc/warroom/panic` (token di sessione + conferma tipizzata `PANIC`, wrapper su
+`cc-panic.js`: solo processi dell'harnes). Vista `tools/gui/views-warroom.js`: polling 5s (2s in
+TV), delta evidenziati client-side — le tile cambiate fanno flash, le righe nuove del feed sono
+marcate — attention rail ordinata crit→warn→info, drawer PANIC, TV mode fullscreen leggibile da
+un secondo monitor o dal telefono via tunnel F3 (read-only). I numeri della board si
+**attribuiscono alla campagna attiva su base temporale dichiarata** (nessun record porta un
+`campaign_id`): la finestra RoE quando esiste, altrimenti l'ultimo evento `activate` di quella
+campagna nello storico append-only; le tile guidano con i numeri di campagna e tengono il totale
+di workspace nell'hint, il feed si filtra tra campagna e workspace, e il pannello *Campaign
+record* mostra finding, run (eseguiti/rifiutati/dry-run), approvazioni, gate pass e classi coperte
+sulle dichiarate dal template. Una campagna senza finestra e senza attivazione resta **non
+attribuibile**: la board lo dice e non inventa numeri. Il dispatch resta in Mission: il War Room
+non duplica nessun percorso di scrittura.
+
+**AC:** lo snapshot non scrive nulla e non aggiunge egress; i numeri coincidono con i moduli
+sorgente (`tools/test-cc-warroom.js`); la panic route rifiuta senza token e senza la frase
+tipizzata (`tools/test-cc-routes.js`); `npm test` verde.
+
+---
+
+---
+
 ## 4. Verifica (per ogni WP)
 
 1. `npm test` (gate suite `tools/test-*.js`) verde; i nuovi test backend sono `offline` o
@@ -300,6 +329,7 @@ l'esito, non i passi, così l'agente resta libero sulla soluzione.
 | 7 | `Implementa WP7 del piano docs/command-center-desktop.md: pannelli di controllo 360° (config, team, arsenal, knowledge, radar, doctor).` |
 | 8 | `Implementa WP8 del piano docs/command-center-desktop.md: navigazione a rail, command palette completa, a11y/perf e split progressivo delle viste.` |
 | 9 | `Implementa WP9 del piano docs/command-center-desktop.md: installer, documentazione e script demo di 2 minuti.` |
+| 10 | `Implementa WP10 del piano docs/command-center-desktop.md: la War Room live (snapshot aggregato, polling con delta, attention rail, TV mode e panic).` |
 
 **Chiusura di ogni sessione:** `npm test` verde · check guardrail (loopback, nessun asset esterno,
 nessun endpoint che salta i guard) · commit dei **soli** file del WP · `docs/command-center-desktop.md`
@@ -330,13 +360,18 @@ mission, routes, panic). Ogni modulo riusa i tool esistenti; nessun guard è sta
 | 7 Controllo 360° | ✅ (🚧 install) | route+pannello Control: Config (redatto, validazione scope via `scope-guard`), Team (`fleet.js plan`), Arsenal (`tool-plane` + `doctor --json`), Knowledge (`kb-search.js`), Radar (badge egress dichiarato), Doctor. 🚧 **manca**: install tool su conferma tipizzata. |
 | 8 IA + polish | ✅ (🚧 a11y) | rail a gruppi (Engagement/Attack/Control/Console), command palette estesa, split viste `views-engagement.js`/`views-control.js` (zero-build, handler statico con allowlist `.js/.css/.svg/.json`, basename-only), `prefers-reduced-motion`. 🚧 **manca**: audit tastiera completo e aria-live di dettaglio. |
 | 9 Distribuzione | ✅ | `install-scc-launcher.sh` (+`--uninstall`), `scripts/demo-command-center.sh` (2 min, CC_ROOT temporaneo), README + questo doc + `docs/f3-client-runbook.md` (§9 client desktop tunnelato). |
+| 10 War Room | ✅ | `tools/cc-warroom.js` (snapshot read-only: mission + ledger/chain + job runner + sessions + coverage + exposure + scope + budget burn/ETA + attention rail), `GET /api/cc/warroom`, `POST /api/cc/warroom/panic` (token + frase tipizzata, wrapper `cc-panic.js`), vista `views-warroom.js` (polling 5s/2s TV, delta client-side, PANIC drawer, TV mode). Test: `tools/test-cc-warroom.js` (offline) + route loopback in `tools/test-cc-routes.js`. |
 
 **File nuovi WP2..WP9:** `tools/cc-util.js`, `tools/cc-campaign.js`, `tools/cc-approvals.js`,
 `tools/request-approval.js`, `tools/cc-mission.js`, `tools/cc-ledger.js`, `tools/cc-graph.js`,
 `tools/cc-coverage.js`, `tools/cc-router.js`, `tools/cc-panic.js`, `tools/app/*`,
 `templates/campaign/*.json`, `tools/gui/views-engagement.js`, `tools/gui/views-control.js`,
 `stavros-cc`, `install-scc-launcher.sh`, `scripts/demo-command-center.sh`,
-test: `tools/test-cc-{campaign,approvals,mission,routes,panic}.js`.
+test: `tools/test-cc-{campaign,approvals,mission,routes,panic,warroom}.js`.
+**File WP10:** `tools/cc-warroom.js`, `tools/gui/views-warroom.js`, `tools/test-cc-warroom.js`;
+modificati `tools/cc-router.js` (route war room + panic), `tools/gui-server.js` (snapshot job nel
+ctx del router), `tools/cc-mission.js` (pass-through `counters`/`caps` per burn/ETA),
+`tools/gui/{index.html,app.js,app.css}` (tab, wiring, stile board/TV).
 **File modificati:** `tools/gui-server.js` (router additivo + static allowlist + `--read-only`),
 `tools/run.js` (`--approval`), `tools/c2-guard.js` (policy token), `tools/gui/index.html`,
 `tools/gui/app.js` (renderTab + palette), `tools/gui/app.css` (rail/panel), `docs/f3-client-runbook.md`.

@@ -110,6 +110,11 @@ GO_TOOLS=(
   "github.com/hahwul/dalfox/v2@latest"
   "github.com/lc/gau/v2/cmd/gau@latest"
   "github.com/tomnomnom/waybackurls@latest"
+  # community scout 2026-10 (Praetorian, Apache-2.0): credenziali multi-protocollo (workflow
+  # attack-creds) e secrets scan con scoring/estrazione binari. Titus senza tag `vectorscan`
+  # compila il motore pure-Go: nessuna lib C richiesta per `go install`.
+  "github.com/praetorian-inc/brutus/cmd/brutus@latest"
+  "github.com/praetorian-inc/titus/cmd/titus@latest"
 )
 
 if have go; then

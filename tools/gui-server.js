@@ -207,6 +207,13 @@ function runJob(name, cmdArgs, extra) {
   });
   return id;
 }
+// Snapshot dei job per /api/jobs e per il War Room (stessa forma, un solo posto).
+function jobsSnapshot() {
+  return [...jobs.values()].map((j) => ({
+    id: j.id, name: j.name, state: j.state, exitCode: j.exitCode,
+    startedAt: j.startedAt, finishedAt: j.finishedAt, out: j.out, lines: j.lines.length,
+  })).sort((a, b) => String(b.startedAt).localeCompare(String(a.startedAt)));
+}
 
 // ── embedded TUI terminals — direct PTY bridges, one per named session ──────
 // Each tab (freebuff) owns ONE fbpty.py process living in the
@@ -808,7 +815,7 @@ const server = http.createServer(async (req, res) => {
     // wrappers over the existing tools.
     if (url.startsWith('/api/cc/')) {
       const handled = await ccRouter.handle(req, res, {
-        url, query, sendJson, sendText, bodyJson, runJob,
+        url, query, sendJson, sendText, bodyJson, runJob, jobs: jobsSnapshot,
         root: ROOT, reports: REPORTS, scopeFile: SCOPE_FILE, opstateFile: OPSTATE_FILE,
         token: TOKEN, readOnly: READ_ONLY,
       });
@@ -838,12 +845,7 @@ const server = http.createServer(async (req, res) => {
         return sendJson(res, 200, { count: overviewPayload().lootCount, note: 'loot.jsonl rows are never shown (secrets)' });
       }
       if (url === '/api/reports') return sendJson(res, 200, listReports());
-      if (url === '/api/jobs') {
-        return sendJson(res, 200, [...jobs.values()].map((j) => ({
-          id: j.id, name: j.name, state: j.state, exitCode: j.exitCode,
-          startedAt: j.startedAt, finishedAt: j.finishedAt, out: j.out, lines: j.lines.length,
-        })).sort((a, b) => String(b.startedAt).localeCompare(String(a.startedAt))));
-      }
+      if (url === '/api/jobs') return sendJson(res, 200, jobsSnapshot());
       if (url === '/api/term/status') return sendJson(res, 200, await termStatus(query.name));
       if (url === '/api/term/stream') {
         const st = await termStatus(query.name);

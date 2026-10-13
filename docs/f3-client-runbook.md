@@ -51,7 +51,7 @@ Il one-shot deve restituire il verdetto REALE dello scope-guard (esito hard-code
 ## 2-bis. Arsenale dentro il proot: cosa è locale e cosa no
 
 Il Kali del F3 è l'immagine **minimale**: il bootstrap di `f3-client-setup.sh` (o
-`~/f3bot/setup-official.sh`) è l'unica cosa che popola l'arsenale. Due trappole del proot:
+`~/f3bot/setup-official.sh`) è l'unica cosa che popola l'arsenale. Tre trappole del proot:
 
 - **Niente systemd/PID1.** `jadx`/`apksigner` tirano `default-jre` → `dbus`/`gtk`/`systemd`, i cui
   postinst falliscono (`Protocol driver not attached`) e fanno abortire `apt` senza configurare
@@ -59,6 +59,16 @@ Il Kali del F3 è l'immagine **minimale**: il bootstrap di `f3-client-setup.sh` 
 - **Nomi pacchetto che non esistono.** `apkid` e `smali` non sono nei repo Kali: in una riga
   `apt-get install` fanno fallire **tutta** la transazione. `apkid`/`drozer` vanno da `pip3`, i jar
   smali da `libsmali-java`.
+- **`libpcre2-8.so.0` illeggibile nel rootfs** (EPERM lato Android, non riparabile): `grep`, `ls`,
+  `id`, `dpkg` e i tool che li chiamano muoiono con `cannot open shared object file`. La lib buona
+  sta in `/usr/local/lib` e il wrapper sul telefono la inietta: `f3-kali` gira con
+  `env LD_LIBRARY_PATH=/usr/local/lib`, quindi **`f3-kali` è l'unico ingresso supportato** (un
+  `proot-distro login kali -- <cmd>` nudo, senza login shell, resta rotto). Verifica:
+  `f3-kali bash -c "grep --version; id -u; dpkg --version | head -1"`. Dettagli: `~/f3bot/README.md`.
+
+Per far uscire una scan dal **tor del telefono**: `f3-kali proxychains4 -q nmap -sT -Pn <target>`
+(ProxyList `socks4 127.0.0.1 9050`, che è il tor di `f3-tor`; con `socks5` l'handshake non regge,
+restare su socks4). Serve `-sT`: le raw socket non passano dal proxy.
 
 Dopo l'arsenale ampio (recon, dir-busting, web, creds, AD, services, host, wireless, cloud,
 wordlist, template nuclei) il tool-plane locale copre le stesse categorie del PC, tranne:

@@ -72,6 +72,21 @@
   in un workflow automatico. Attenzione al falso positivo: su HTTPS il rilevamento è quasi
   sempre vero, su HTTP in chiaro può non essere altro che un proxy h2c che risponde all'upgrade
   senza inoltrarlo — per questo il finding nasce `triggered` e la prova resta differenziale.
+- **Credential testing (confirm-tier):** `node tools/workflow.js run workflows/attack-creds.yaml -t <host> --var port=22 --var protocol=ssh`
+  — `brutus` (Praetorian, Apache-2.0, 43 protocolli) prova le credenziali **default** del
+  servizio in `--mode cautious` e stampa in JSON **solo i successi**. È un attacco a credenziali:
+  tocca account reali, quindi va eseguito SOLO con approvazione esplicita in sessione
+  (knowledge.md regola 2) e mai in un loop; con la policy `scope.host_ops.require_approval`
+  attiva in scope.json passa `--var approval=<id>`. Per liste utente/password
+  (`-U users.txt -P pass.txt`), chiavi SSH note (`brutus badkeys`) o scan da un XML nmap
+  (`--nmap-file`) usa `node tools/run.js brutus ...` con la stessa regola di conferma.
+- **Secrets scan con Titus (alternativa a trufflehog):** `node tools/run.js titus scan <github.com/org/repo|path> [--extract=all] [--format json]`
+  — 487 regole, scoring 0–100, estrazione da binari (Office/PDF/archivi, **APK/IPA**) e scan di
+  immagini OCI incluse le layer cancellate. `--validate` e `--score-scope` sono **egress**
+  (chiamano le API del provider, come la validazione di analyze-bundle): confirm-tier, stessa
+  disciplina di docs/egress-opsec.md. In run.js un repo remoto è un host da scope.json; le
+  scansioni di file locali passano dal percorso operatore (run.js rifiuta una invocazione senza
+  host per design, fail-closed).
 - **Payload references (classes without a dedicated tool):** `tools/payloads/` — `ssti.md`,
   `deserialization.md`, `lfi.md`, `nosqli.md`, `prototype-pollution.md`, `llm-agentic.md`, `mcp.md`,
   `smuggling.md`. Read the matching file before testing that class; substitute a unique `MARKER` and
@@ -232,6 +247,42 @@
   `--repo <path>` / `--ref <r>` point elsewhere, `--keep` leaves the clone. Why it exists: a tag
   measured in the working tree is not verified — `v0.1.0` was declared green that way, and a clean
   clone of the same tag had a red gate.
+- **Agent forum (identità firmata, una sola iscrizione per credenziale):** per far collaborare più
+  agenti su un ambiente simulato, ognuno con una identità che non può duplicare né rubare.
+  L'invariante ("una sola identità, nessuna impersonation") è imposto dal **server**, non dal prompt:
+  il prompt dice *cosa fare*, il server dice *chi sei* — quindi regge anche sotto prompt injection.
+  - `node tools/forum-server.js mint --label <ruolo>` — l'operatore emette **un** token single-use
+    (fuori banda: l'agente non può coniarsene uno). `--port N` / `serve` per il servizio (loopback
+    only, porta effimera di default, endpoint in `reports/tmp/forum/endpoint.json`), `roster`,
+    `verify`.
+  - `node tools/forum.js enroll --token <T> | whoami | post "<testo>" | read [--since N] | keyring` — l'unica
+    superficie che il modello vede. **Non esistono `--as` né `--print-key`**: l'`agent_id` è derivato
+    dal keyfile, ogni post firma autore+timestamp+nonce+hash del corpo con Ed25519. Quindi
+    impersonare non è *vietato*, è non scrivibile; e nessun verbo stampa il segreto. `keyring` dice
+    dove sta la chiave senza rivelarla (vedi `forum-keystore.js` sotto).
+  - `node tools/forum-sim.js run [--agents N]` — N agenti in **processi separati**, due round
+    (osservare, poi rispondere), su un ambiente simulato in mkdtemp. Riporta
+    `agents_that_replied_to_another` (deve valere `agents_enrolled`: la collaborazione si misura
+    sui messaggi che citano un altro autore) e `rogue_refused / rogue_attempts` (ri-iscriversi,
+    impersonare, replay, body-tamper: devono essere respinti **tutti**). Exit 1 se un invariante cede.
+  - Bootstrap dell'agente: `skills/agent-forum/SKILL.md`. Prove: `tools/test-agent-forum.js`.
+- **Agent identity custody (`forum-keystore.js`):** where the agent's private key lives and whether it is
+  readable. `0600` is a **permission, not an encryption** — a reader of the filesystem, or an
+  external observer (the case in a purpose-built study environment), got the key in plaintext. Three
+  backends, chosen by availability, never plaintext-if-something-better-exists:
+  - **`linux-keyring`** (default where `keyctl` exists) — the key lives in the kernel user keyring and
+    is **never written to disk**. On disk there is only `{agent_id, backend, keystore:{desc,ring}}`. UID-scoped
+    and volatile: it dies with the session, so the identity must be re-seeded. Strongest, and the most awkward.
+  - **`passphrase`** — key on disk but **encrypted at rest**: AES-256-GCM under a scrypt(N=2^14,r=8,p=1) key,
+    fresh salt per instance. Disk holds salt, iv, auth tag, ciphertext. The passphrase arrives out of band
+    (`FORUM_KEYSTORE_PASSPHRASE`, `..._FILE`, or a hidden TTY prompt) and is **never** in the keyfile or the
+    prompt. Portable and persistent.
+  - **`plaintext`** — pre-keystore keyfile, kept for compatibility and for minimal containers/CI.
+    `node tools/forum.js keyring` reports it as `encrypted_at_rest: false`, so it is declared, not silent.
+  Fail-closed in two places: no passphrase means no enrollment (signing in plaintext is worse than not
+  signing), and a wrong passphrase is **indistinguishable** from a tampered ciphertext — AES-GCM rejects
+  both the same way, so the error is not an oracle.
+  Env: `FORUM_KEYSTORE` (force a backend), `FORUM_KEYSTORE_PASSPHRASE`, `FORUM_KEYSTORE_PASSPHRASE_FILE`.
 - **Documentation index:** `node tools/docs-index.js` regenerates `docs/INDEX.md` from the real files
   (title, first paragraph, size, plan checkbox progress); `--check` writes nothing and exits 1 when the
   index is stale, which is what `test-repo-invariants` runs. The superseded plans it lists live in

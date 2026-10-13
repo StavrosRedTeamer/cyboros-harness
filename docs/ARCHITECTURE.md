@@ -23,7 +23,7 @@ consequence of it.
 │      record-finding (severity ceiling) · oracle (live re-exec)   │
 │      evidence-quote · verify-finding · gate · coverage           │
 ├──────────────────────────────────────────────────────────────────┤
-│  L0  State — reports/state.db, findings.jsonl, memory/           │
+│  L0  State — state.db, findings.jsonl + verifications.jsonl      │
 │      Deterministic pipeline output. Survives the session.        │
 └──────────────────────────────────────────────────────────────────┘
                               ↓
@@ -121,6 +121,35 @@ mechanical part is pinned down:
   `verify_level`-eligible findings are eligible to become lessons.
 - The CLI runner executes the test suite with no network and no dependencies, which is
   what makes CI a meaningful signal.
+
+### Why `findings.jsonl` is immutable
+
+The findings log is append-only, hash-chained (A3) and externally anchored, and deduplicated by
+key. So a verification that happens *after* recording has nowhere to go inside it, and rewriting
+one of its lines is indistinguishable from tampering. A recorded finding therefore never changes:
+
+- **`tools/chain-log.js`** owns the chain mechanics once — `prev_sha256` per line, `seq`
+  continuity, and the external head anchor that catches a *wholesale* rewrite (a regenerated chain
+  is internally consistent, so the chain alone cannot see one).
+- **`tools/verification-log.js`** keeps the facts of verification in their own append-only log
+  (`reports/verifications.jsonl`) under the same discipline. A `verified` record is refused unless
+  its oracle and its verbatim quote re-validate **on disk at that moment** — never on the caller's
+  word. A failed re-fire is a fact too, and is recorded as one.
+- **`tools/effective-findings.js`** is the *view*: `findings.jsonl` folded with the side log. It is
+  fail-closed downward (no record, no promotion) and it re-validates the oracle at fold time, so a
+  deleted artifact takes the promotion away again. `gate.js` reads the view for `verify`,
+  `noPending`, `oracle`, `evidenceQuote` and `pocReplay`; every other consumer still sees the
+  recorded state, which is the conservative direction.
+- **`tools/rechain.js`** is the only supported way to reconcile a broken chain: it backs the file
+  up, rebuilds the chain over the *existing* content (only `chain` changes), and appends a
+  `findings-rechain` event — old head, new head, mandatory reason — to the anchor log, so a rewrite
+  becomes a legible fact in the history instead of an anomaly indistinguishable from an attack.
+
+The consequence worth stating: **a finding's status is a fold, not a field.** Nothing in the
+pipeline edits a recorded finding, and the gate's "no pending findings" criterion became
+falsifiable in the process — it means "a reality claim whose proof does not hold on disk", which
+its previous definition (`status === 'pending'`) could never be, since the record validator admits
+only `confirmed|inconclusive|verified` and requires the field.
 
 ## Deliberate non-goals
 

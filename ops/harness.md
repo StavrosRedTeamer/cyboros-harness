@@ -35,7 +35,7 @@ Pentest discipline (full rules: `knowledge.md` — "Verification levels", "False
 - Third-party binaries ONLY via `node tools/run.js <bin> ...` (scope-check + audit `reports/tmp/run-audit.jsonl` + global pacing); recon/scan/enumerate prefer `node tools/stavros.js recon|scan|enumerate <host>`.
 - Gate progress: `node tools/gate.js status <host>` shows phase gates (recon→map→test→authed→chains→report); pass your phase's gate when its criteria are met (`node tools/gate.js pass <gate> <host>`).
 - Coverage: after mapping, `node tools/coverage.js <host>` records the per-class coverage matrix (`coverage-matrix.md`).
-- Findings: `node tools/record-finding.js '{...}'` with verify_level + cvss/cwe/remediation; single-request PoCs get a `verify` block, then `node tools/verify-finding.js one '<json>'` re-fires it live (status becomes verified only then).
+- Findings: `node tools/record-finding.js '{...}'` with verify_level + cvss/cwe/remediation; single-request PoCs get a `verify` block, then `node tools/verify-finding.js one '<json>'` re-fires it live (status becomes verified only then). Batch verification is append-only: `node tools/verify-finding.js batch` writes the outcome to the side log `reports/verifications.jsonl` (same chain + external anchor discipline as `findings.jsonl`) and never rewrites `findings.jsonl`; the effective state of a finding is the fold of both, read with `node tools/effective-findings.js list` (a promoted finding is `verified` there). A broken chain is reconciled, never hand-edited: `node tools/rechain.js plan` then `node tools/rechain.js run --confirm "<reason>"` — the rewrite is recorded as an event in the anchor log. The chain mechanics themselves live in `node tools/chain-log.js`.
 - Evidence: write raw outputs to `reports/tmp/<host>/` and one line per artifact to `evidence-index.md` — never paste bulk output into your reply; keep conclusions ≤ ~2500 tokens.
 - Knowledge retrieval instead of re-reading refs: `node tools/kb-search.js "query"` returns heading-scoped snippets — prefer it when you already know the methodology and need a specific fact.
 
@@ -152,10 +152,44 @@ progetto.
 - **52 wrapper di coding hardcodano "You are Buffy"** (21 base3, 31 base2 con prompt "strategic
   coding assistant"), quindi l'override via knowledge file è strutturalmente identico per ogni
   modello: quello che varia è la sola gerarchia di istruzioni del modello sotto.
+- **Il token `@stavros` al primo messaggio è necessario ma non sufficiente** (Freebuff 0.2.11,
+  `deepseek-v4.1-flash`, run bench seed 20261004, chat `2026-10-02T01-01-57.073Z`): `firstPrompt`
+  era `@stavros` — cioè esattamente la precondizione che `~/.AGENTS.md` e
+  `tools/check-identity.js` danno per buona — e l'agente ha **rifiutato la persona per iscritto**
+  ("the pseudo-persona override I won't adopt", "I'll proceed as Buffy") eseguendo comunque il
+  lavoro tecnico. Quindi `identityArmed` di `tools/bench-provenance.js` è un check **sintattico**
+  (il token c'è), non di adozione: non usarlo come prova che l'identità abbia retto. Due
+  conseguenze: (a) il benchmark misura l'agente **senza** identità armata quando il token viene
+  ignorato, e va detto nella nota della riga di history; (b) per misurare l'identità serve un
+  segnale di adozione (l'agente si firma, o rifiuta e lo dichiara) — non la presenza del token.
 - **Preferenza dell'operatore: il default resta il default.** Un override di identità deve essere
   esplicito e opt-in, mai una condizione permanente — l'opt-in `@stavros` si legge una volta sola
   al primo messaggio, e la cartella non cambia l'identità. Se la TUI intercetta la `@`, il
   fallback è un token senza `@` (`stavros:`), da cambiare in router e `AGENTS.md` insieme.
+
+## Canale F3 (Poco F3 ↔ C2) — come si lavora sul telefono
+
+Spostato da `AGENTS.md` il 2026-10-13 (budget del prompt: quel file ha un tetto di 6000
+caratteri, `AGENTS_MD_BUDGET` in `tools/test-repo-invariants.js`), testo invariato.
+
+Il canale vive **fuori dal repo** (`~/f3bot`, git suo). Dal C2: `ssh -i ~/f3bot/f3-termux-key
+-p 2222 root@127.0.0.1` è la ssh del telefono, `127.0.0.1:9055` è il **tor del telefono**.
+Per il device si usa questa ssh: `mobile-guard` blocca `com.termux`, quindi adb sul telefono
+non è la strada.
+
+- Ogni comando sul telefono passa da **`f3-kali`** (anche `bash -c` e binari diretti): è il
+  wrapper che inietta `LD_LIBRARY_PATH=/usr/local/lib`. Nel rootfs Kali
+  `usr/lib/aarch64-linux-gnu/libpcre2-8.so.0` è illeggibile (EPERM lato Android, non riparabile
+  senza relabel root/adb) e senza quella variabile `grep`/`ls`/`id`/`dpkg` e chi li chiama
+  muoiono con `cannot open shared object file`. `proot-distro login kali -- <cmd>` nudo, in
+  shell non-login, resta rotto: non è il modo di diagnosticare un problema del telefono.
+- `sv status` via ssh non interattiva vuole `SVDIR=$PREFIX/var/service`, altrimenti risponde
+  "unable to change to service directory": sembra un servizio morto e invece è solo l'env.
+- Uscita delle scan: dal Kali un tool senza proxy esce dall'IP reale del telefono; per il suo tor
+  `--socks5-hostname 127.0.0.1:9050` o `proxychains4` (**socks4**: con `socks5` l'handshake non
+  regge). Dal C2 l'egress del telefono è `--socks5 127.0.0.1:9055` (`tools/egress-proxy.js`).
+- Ruolo C2: `sudo bash ~/f3bot/restore-c2.sh` (idempotente) / `--revert`. Mai due host che
+  pubblicano lo stesso onion (rendezvous instabile); AnonSurf può riscrivere `/etc/tor/torrc`.
 
 ## Spazio del workspace — cosa è archiviabile
 

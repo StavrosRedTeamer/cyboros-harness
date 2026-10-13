@@ -307,6 +307,49 @@ function parseWhatwebJson(text) {
   return out;
 }
 
+// OpenAPI 3.x + Swagger 2.0 → endpoint list. Fail-soft, come tutti i parse* del file: input
+// degradato (JSON malformato, nessun `paths`, tipi sbagliati) → [], mai un throw.
+// Il path è RELATIVO (per Swagger 2.0 il `basePath` è prefissato): l'host lo decide il chiamante,
+// che è l'unico che sa quale target è autorizzato.
+// `$ref` NON risolti: se `parameters` contiene solo `$ref`, o `requestBody` è un `$ref`, `params`
+// resta quello che si può leggere nel nodo — non si inventa un parametro.
+function parseOpenApi(raw) {
+  let doc;
+  try { doc = typeof raw === 'string' ? JSON.parse(raw) : raw; } catch { return []; }
+  if (!doc || typeof doc !== 'object' || Array.isArray(doc)) return [];
+  if (!doc.paths || typeof doc.paths !== 'object' || Array.isArray(doc.paths)) return [];
+  const prefix = doc.basePath ? String(doc.basePath).replace(/\/+$/, '') : '';
+  const METHODS = ['get', 'post', 'put', 'patch', 'delete', 'head', 'options'];
+  const out = [];
+  for (const [p, item] of Object.entries(doc.paths)) {
+    if (!item || typeof item !== 'object' || Array.isArray(item)) continue;
+    for (const m of METHODS) {
+      const op = item[m];
+      if (!op || typeof op !== 'object' || Array.isArray(op)) continue;
+      const params = [];
+      const push = (n) => { if (typeof n === 'string' && n.trim() && !params.includes(n)) params.push(n); };
+      for (const pr of Array.isArray(op.parameters) ? op.parameters : []) {
+        if (pr && typeof pr.name === 'string') push(pr.name);
+      }
+      // Swagger 2.0 mette i body in `parameters` (gestiti sopra); OpenAPI 3 li mette in
+      // requestBody.content['application/json'].schema.properties — proprietà top-level soltanto.
+      const json = op.requestBody && op.requestBody.content && typeof op.requestBody.content === 'object'
+        ? op.requestBody.content['application/json']
+        : null;
+      const schema = json && typeof json === 'object' ? json.schema : null;
+      if (schema && typeof schema === 'object' && schema.properties && typeof schema.properties === 'object')
+        for (const name of Object.keys(schema.properties)) push(name);
+      out.push({
+        method: m.toUpperCase(),
+        path: prefix + String(p),
+        operationId: typeof op.operationId === 'string' && op.operationId.trim() ? op.operationId : null,
+        params,
+      });
+    }
+  }
+  return out;
+}
+
 // `katana -jsonl` (projectdiscovery crawler) → records[] = { method, url, status }.
 function parseKatanaJsonl(text) {
   const out = [];
@@ -425,6 +468,7 @@ module.exports = {
   parseH8mailJson,
   parseTestsslJson,
   parseWhatwebJson,
+  parseOpenApi,
   parseKatanaJsonl,
   parseDirsearchJson,
   parseEnum4linuxNgJson,

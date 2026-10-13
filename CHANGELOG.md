@@ -9,6 +9,38 @@ grouped by milestone, and `v0.1.0` (2026-09-28) is the first tagged release.
 
 ### Added
 
+- **Credential testing con Brutus e secrets scan con Titus**, dalla scansione community di
+  ottobre (`docs/community-scout-2026-10.md`). `go install` in `install-tools.sh`/`.ps1` e due
+  voci in `tools/tool-registry.json` (97 → 99): `brutus` `intrusive` (43 protocolli, JSONL di
+  soli successi, `alternative: medusa`) e `titus` `read` (`alternative: trufflehog`, scoring
+  0–100, estrazione da APK/IPA, scan di immagini OCI incluse le layer cancellate). `run.js`
+  impara a estrarre l'host da `brutus --target <host:port>` (senza, ogni run moriva su "no
+  target host found" prima di arrivare al tool) e il nuovo workflow **`attack-creds`** fa il
+  default-credential audit di UN servizio — `--mode cautious`, confirm-tier: solo con
+  approvazione esplicita in sessione e, con `scope.host_ops.require_approval` attivo,
+  `--var approval=<id>`. `--validate`/`--score-scope` di Titus sono egress confirm-tier.
+- **Il Command Center ha una War Room.** Con l'operazione in corso, Mission dice *cosa fare* e il
+  Ledger *cosa è successo*: `tools/cc-warroom.js` aggiunge la board che dice **cosa sta succedendo
+  adesso**, in un solo snapshot read-only che compone i moduli esistenti — headline, azioni,
+  approvazioni, gate e budget di mission; chain e feed del ledger; job runner; sessioni; coverage;
+  mappa di esposizione; scope fail-closed — più orologio della finestra e burn budget con ETA al
+  ritmo medio. `GET /api/cc/warroom` è l'endpoint; il delta è client-side (nessuno stato sul
+  server): le tile cambiate fanno flash e le righe nuove del feed sono marcate. La vista
+  `tools/gui/views-warroom.js` porta l'attention rail ordinata crit→warn→info, il drawer PANIC con
+  conferma tipizzata (`POST /api/cc/warroom/panic`, wrapper su `cc-panic.js` — solo processi
+  dell'harnes) e il TV mode fullscreen, leggibile da un secondo monitor o dal telefono via tunnel
+  F3 (read-only). Nulla di nuovo può scrivere: il dispatch resta in Mission.
+  **I numeri si attribuiscono alla campagna attiva dichiarando la base, mai deducendola:** nessun
+  record dell'harnes porta un `campaign_id`, quindi l'attribuzione è temporale — la finestra RoE
+  se la campagna ne ha una, altrimenti l'attivazione letta dallo storico append-only — e le tile
+  guidano con i numeri della campagna tenendo il totale di workspace nell'hint (findings
+  «campaign» vs 128 workspace, gate pass della campagna vs 6/6 workspace), il feed si filtra per
+  campagna o workspace e un pannello *Campaign record* mostra cosa l'engagement ha prodotto
+  davvero (finding, run eseguiti/rifiutati, approvazioni, gate pass, classi coperte su quelle
+  dichiarate dal template). Se la campagna non ha né finestra né attivazione lo dice invece di
+  inventare numeri: nessuna riga di feed viene marcata in-campagna per silenzio.
+  `tools/test-cc-warroom.js` (offline: fail-closed, composizione, chain, burn/ETA, attention,
+  attribuzione di campagna e caso non attribuibile) e route loopback in `tools/test-cc-routes.js`.
 - Privilegi minimi per i binari di attacco, così l'agente non deve fermarsi a chiedere la password
   sudo all'operatore a metà engagement. Tre pezzi: `tools/cap-manifest.json` dichiara per ogni
   binario le capability minime **e il perché**; `grant-tool-caps.sh` le applica con `setcap` piu

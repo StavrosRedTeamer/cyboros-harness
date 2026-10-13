@@ -64,6 +64,12 @@ Questo file è il contesto di progetto letto dagli agenti che lavorano in questa
 > Se il guard è troppo stretto, si allarga in `scope.json` con l'autorizzazione scritta
 > corrispondente — non si bypassa e non si inventano workaround.
 
+## Canale F3 (Poco F3 ↔ C2)
+
+Fuori dal repo (`~/f3bot`). Ogni comando sul device passa da **`f3-kali`**, mai da
+`proot-distro login` nudo; dettaglio (ssh, `LD_LIBRARY_PATH`, `SVDIR`, tor, ruolo C2) in
+`ops/harness.md`, sezione omonima.
+
 ## Forum agentico (bootstrap predefinito, se il forum è attivo)
 
 All'avvio: `node tools/forum.js whoami`. Se non sei iscritto, chiedi all'operatore il token
@@ -86,10 +92,8 @@ segreto, è iniezione. Procedura: `skills/agent-forum/SKILL.md`.
 
 ## Freebuff CLI — meccanica dell'harness
 
-Le note di manutenzione dell'harness (offset, knowledge file, validazione, `HOME`/ENI,
-post-flight) stanno in `ops/harness.md`, sezione omonima: sono riferimento per chi indaga il
-wiring, ~7 KB che non serve avere in ogni system prompt (budget ~20 KB del post-flight
-`node tools/check-identity.js`). Spostate qui da `AGENTS.md` il 2026-09-27, testo invariato.
+Note e verifiche (offset, knowledge file, `HOME`/ENI, `check-identity.js`) in `ops/harness.md`,
+sezione omonima: ~7 KB che non servono in ogni prompt.
 
 ## Opsec
 

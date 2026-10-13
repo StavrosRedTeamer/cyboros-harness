@@ -4,6 +4,7 @@
   "masscan": { "args_schema": "-p<ports> <cidr>", "risk_tier": "intrusive", "timeout_ms": 1800000, "rate_class": "aggressive", "alternative": "nmap", "read_only": false },
   "nuclei": { "args_schema": "-u <url> [-t templates]", "risk_tier": "active", "timeout_ms": 3600000, "rate_class": "normal", "alternative": "nikto", "read_only": false },
   "httpx": { "args_schema": "[-l file] <targets>", "risk_tier": "active", "timeout_ms": 1800000, "rate_class": "normal", "alternative": "curl", "read_only": false },
+  "httpx-toolkit": { "args_schema": "-u <url> [-title -tech-detect -status-code]", "risk_tier": "active", "timeout_ms": 1800000, "rate_class": "normal", "alternative": "httpx", "read_only": false },
   "ffuf": { "args_schema": "-u <url/FUZZ> -w <wordlist>", "risk_tier": "active", "timeout_ms": 3600000, "rate_class": "aggressive", "alternative": "gobuster", "read_only": false },
   "gobuster": { "args_schema": "dir|dns|vhost -u <url> -w <wordlist>", "risk_tier": "active", "timeout_ms": 3600000, "rate_class": "aggressive", "alternative": "ffuf", "read_only": false },
   "dirsearch": { "args_schema": "-u <url>", "risk_tier": "active", "timeout_ms": 3600000, "rate_class": "aggressive", "alternative": "gobuster", "read_only": false },
@@ -99,5 +100,8 @@
   "eyewitness": { "args_schema": "-f <file> --no-prompt", "risk_tier": "active", "timeout_ms": 3600000, "rate_class": "normal", "alternative": "obscura", "read_only": false },
 
   "schemathesis": { "args_schema": "run <schema-url> [--base-url <b>] [--checks all] [--hypothesis-max-examples <n>]", "risk_tier": "active", "timeout_ms": 3600000, "rate_class": "normal", "alternative": "arjun", "read_only": false },
-  "h2csmuggler": { "args_schema": "-x <url> -t | --scan-list <file> --threads <n>", "risk_tier": "intrusive", "timeout_ms": 600000, "rate_class": "slow", "alternative": "desync.js", "read_only": false }
+  "h2csmuggler": { "args_schema": "-x <url> -t | --scan-list <file> --threads <n>", "risk_tier": "intrusive", "timeout_ms": 600000, "rate_class": "slow", "alternative": "desync.js", "read_only": false },
+
+  "brutus": { "args_schema": "creds --target <host:port> --protocol <p> [--mode cautious|default|aggressive] [--json] | badkeys --nmap-file <xml>", "risk_tier": "intrusive", "timeout_ms": 7200000, "rate_class": "aggressive", "alternative": "medusa", "read_only": false },
+  "titus": { "args_schema": "scan <path|github.com/org/repo|--git <repo>|--docker <img>> [--extract=all] [--validate] [--format json|sarif]", "risk_tier": "read", "timeout_ms": 3600000, "rate_class": "normal", "alternative": "trufflehog", "read_only": true }
 }

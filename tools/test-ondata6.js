@@ -80,7 +80,7 @@ console.log('G1 — gate: pocReplay + chainHead (coda additiva, SA1 intatto) + h
   ok('report gate: SA1 (chain/oracle/evidenceQuote) contiguo invariato + coda Ondata 6', () => {
     const kinds = gateLib.GATES.report.checks.map((c) => c.kind);
     assert.deepStrictEqual(kinds.slice(0, 4), ['findings', 'verify', 'noPending', 'coverage']);
-    assert.deepStrictEqual(kinds.slice(4), ['chain', 'oracle', 'evidenceQuote', 'pocReplay', 'chainHead', 'attackCoverage']);
+    assert.deepStrictEqual(kinds.slice(4), ['chain', 'oracle', 'evidenceQuote', 'pocReplay', 'chainHead', 'attackCoverage', 'chainHeadVerifications']);
     assert.ok(kinds.slice(4, 7).every((k) => ['chain', 'oracle', 'evidenceQuote'].includes(k)), 'SA1 resta contiguo');
   });
 

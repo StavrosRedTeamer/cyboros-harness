@@ -192,8 +192,19 @@ function similarity(a, b) {
 }
 
 // Response headers that matter for security findings (missing CSP/HSTS/XFO, cookie flags, F7/F8).
-const SEC_HEADERS = ['content-type', 'set-cookie', 'strict-transport-security', 'content-security-policy',
-  'x-frame-options', 'x-content-type-options', 'referrer-policy', 'server'];
+// La famiglia `access-control-*` è dentro per una ragione precisa: senza di essa il CORS è
+// strutturalmente non verificabile da qui. Un PoC che asserisce su `Access-Control-Allow-Origin`
+// non poteva mai passare, quindi la classe finiva per essere provata solo in prosa e mai
+// ri-sparata dall'oracolo. Non sono credenziali (a differenza di `set-cookie`, che resta fuori
+// dalla vista per igiene): sono policy di risposta, e servono a giudicare la policy.
+// `content-range` è dentro per la stessa ragione della famiglia access-control-*: è l'header che
+// PostgREST/Supabase usa per il totale di una collezione (`0-0/225`). Senza, un test di
+// enumerazione non può né asserire né vedere la magnitudine, e la classe finisce per essere
+// dichiarata "totale non esposto" per un artefatto di cattura, non per un fatto del server.
+const SEC_HEADERS = ['content-range', 'content-type', 'set-cookie', 'strict-transport-security', 'content-security-policy',
+  'x-frame-options', 'x-content-type-options', 'referrer-policy', 'server', 'vary', 'location',
+  'access-control-allow-origin', 'access-control-allow-credentials', 'access-control-allow-methods',
+  'access-control-allow-headers', 'access-control-expose-headers', 'access-control-max-age'];
 function pickSecHeaders(h) {
   const out = {};
   for (const k of SEC_HEADERS) if (h[k] != null) out[k] = h[k];
@@ -640,5 +651,5 @@ async function main() {
   console.log(privacy.tokenize(JSON.stringify(results, null, 2)));
 }
 
-module.exports = { varyRequest, pickSecHeaders, applyVars, buildMultipart, similarity, decodeBody, cookieHeader, absorbSetCookies, sendChain, resolveIdentity, DEFAULT_UA };
+module.exports = { varyRequest, pickSecHeaders, SEC_HEADERS, applyVars, buildMultipart, similarity, decodeBody, cookieHeader, absorbSetCookies, sendChain, resolveIdentity, DEFAULT_UA };
 if (require.main === module) main();

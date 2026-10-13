@@ -212,7 +212,7 @@ console.log('# tools/gate.js — A3 chain/oracle/evidenceQuote checks');
   ok('report gate keeps original checks, appends SA1 chain/oracle/evidenceQuote, then Ondata-6 tail', () => {
     const kinds = gate.GATES.report.checks.map((c) => c.kind);
     assert.deepStrictEqual(kinds.slice(0, 4), ['findings', 'verify', 'noPending', 'coverage']);
-    assert.deepStrictEqual(kinds.slice(4), ['chain', 'oracle', 'evidenceQuote', 'pocReplay', 'chainHead', 'attackCoverage']);
+    assert.deepStrictEqual(kinds.slice(4), ['chain', 'oracle', 'evidenceQuote', 'pocReplay', 'chainHead', 'attackCoverage', 'chainHeadVerifications']);
   });
   ok('runGate(report) returns one result per check', () => {
     const r = gate.runGate('report');
@@ -220,6 +220,61 @@ console.log('# tools/gate.js — A3 chain/oracle/evidenceQuote checks');
     assert.strictEqual(r.results.length, gate.GATES.report.checks.length);
     for (const res of r.results) assert.ok('ok' in res && typeof res.detail === 'string');
   });
+  // ── Ondata 7: la vista effettiva nei check del gate ──
+  // `noPending` era VACUO: `validate()` impone lo status e ammette solo
+  // confirmed|inconclusive|verified, quindi `status === 'pending'` non poteva esistere in un
+  // corpus registrato. Definizione nuova e falsificabile: un reality claim la cui prova non
+  // regge su disco è pendente.
+  ok('checkNoPending è falsificabile (reality claim senza prova valida → FAIL)', () => {
+    const ws = fs.mkdtempSync(path.join(os.tmpdir(), 'gate-nopending-'));
+    const prevGateWs = process.env.GATE_WS;
+    process.env.GATE_WS = ws;
+    try {
+      fs.mkdirSync(path.join(ws, 'reports'), { recursive: true });
+      const bad = { severity: 'High', title: 'no-proof', host: 'h', poc: 'x', status: 'confirmed', oracle: { type: 'http-diff', ref: 'artifacts/oracle/gone.json', token: 'deadbeefdeadbeef' } };
+      const hypo = { severity: 'Low', title: 'hypo', host: 'h', poc: 'x', status: 'inconclusive' };
+      writeJsonl(path.join(ws, 'reports', 'findings.jsonl'), chainUp([bad, hypo]));
+      const r = gate.checkNoPending();
+      assert.strictEqual(r.ok, false, r.detail);
+      assert.match(r.detail, /no-proof|pending/);
+      writeJsonl(path.join(ws, 'reports', 'findings.jsonl'), chainUp([hypo]));
+      assert.strictEqual(gate.checkNoPending().ok, true, 'un livello ipotesi non è pendente');
+    } finally {
+      if (prevGateWs === undefined) delete process.env.GATE_WS; else process.env.GATE_WS = prevGateWs;
+    }
+  });
+
+  ok('checkVerify conta una promozione del side log (findings.jsonl non riscritto)', () => {
+    const ws = fs.mkdtempSync(path.join(os.tmpdir(), 'gate-promoted-'));
+    const prevGateWs = process.env.GATE_WS;
+    process.env.GATE_WS = ws;
+    try {
+      fs.mkdirSync(path.join(ws, 'reports'), { recursive: true });
+      const rec = oracle.writeReceipt({ type: 'http-diff', anchor: 'outcome passed: promoted by the side log', data: {} });
+      const finding = {
+        severity: 'High', title: 'promoted', host: 'h', endpoint: '/api/p', poc: 'x', status: 'confirmed',
+        oracle: { type: 'http-diff', ref: rec.ref, token: rec.token },
+        evidence_quote: { file: rec.ref, text: 'outcome passed: promoted by the side log' },
+      };
+      const file = path.join(ws, 'reports', 'findings.jsonl');
+      writeJsonl(file, chainUp([finding]));
+      const raw = fs.readFileSync(file, 'utf8');
+      assert.strictEqual(gate.checkVerify(1).ok, false, 'prima della verifica registrata non è verificato');
+      const vlog = require('./verification-log');
+      const a = vlog.append({
+        finding_key: rf.key(finding), finding_seq: 1, outcome: 'verified', reason: '2/2 passed', verifier: 'test',
+        oracle: { type: 'http-diff', ref: rec.ref, token: rec.token },
+        evidence_quote: { file: rec.ref, text: 'outcome passed: promoted by the side log' },
+      });
+      assert.strictEqual(a.ok, true, JSON.stringify(a));
+      assert.strictEqual(gate.checkVerify(1).ok, true, 'la vista vede la promozione');
+      assert.strictEqual(gate.checkNoPending().ok, true, 'e il finding non è più pendente');
+      assert.strictEqual(fs.readFileSync(file, 'utf8'), raw, 'nessuno ha riscritto findings.jsonl per promuoverlo');
+    } finally {
+      if (prevGateWs === undefined) delete process.env.GATE_WS; else process.env.GATE_WS = prevGateWs;
+    }
+  });
+
   ok('checkScopeNonEmpty accepts dual schema (targets/exclusions superset)', () => {
     const lab = gate.checkScopeNonEmpty({ targets: ['192.168.0.0/24'], exclusions: [] });
     assert.strictEqual(lab.ok, true);

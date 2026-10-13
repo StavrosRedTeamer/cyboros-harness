@@ -125,7 +125,14 @@ const DEFAULT_SERIAL = process.env.STAVROS_ADB_SERIAL || '127.0.0.1:5555';
 
 function staticCommands(apk, opts) {
   opts = opts || {};
-  const out = opts.out || path.join('reports', 'mobile', path.basename(String(apk)).replace(/\.apk$/i, ''));
+  // Nome dir per <pkg> quando il package e' noto: i post-pass (frameworkResult/firebaseAudit/
+  // mobileSurface) cercano `reports/mobile/<pkg>-apktool|-jadx`, quindi derivarlo dal basename
+  // dell'APK li lasciava a vuoto (es. "NOA Trade Ideas (1).apk"). Fallback: basename.
+  // ASSOLUTO per forza: con `-d <dir relativa>` jadx carica e processa l'APK ma poi muore in
+  // save (`Can't create directory <dir>/sources`), perdendo in silenzio la meta' jadx del pass
+  // (osservato 2026-10-06 su "Wheel of Faith - Arena.apk", riprodotto su NOA Trade Ideas).
+  const out = path.resolve(opts.out || path.join(__dirname, '..', 'reports', 'mobile',
+    opts.package ? String(opts.package) : path.basename(String(apk)).replace(/\.apk$/i, '')));
   return [
     { bin: 'apktool', args: ['d', apk, '-o', out + '-apktool', '-f'] },
     { bin: 'jadx', args: ['-d', out + '-jadx', apk] },
@@ -270,7 +277,10 @@ function fridaServerCommands(action, opts) {
     return [{ bin: 'adb', args: adb.concat([
       'su', '0', 'sh', '-c',
       `chmod 755 ${FRIDA_DEVICE_PATH} 2>/dev/null; killall frida-server 2>/dev/null; ` +
-      `nohup ${FRIDA_DEVICE_PATH} -l 127.0.0.1:${port} >/dev/null 2>&1 & sleep 1; pidof frida-server`,
+      `nohup ${FRIDA_DEVICE_PATH} -l 127.0.0.1:${port} >/dev/null 2>&1 & ` +
+      // nohup forks: pidof can answer "" for a moment after the sleep, and that empty answer
+      // used to be reported as "binario mancante". Poll instead of trusting a single read.
+      `for i in 1 2 3 4 5; do p=$(pidof frida-server) && { echo $p; break; }; sleep 1; done`,
     ]) }];
   }
   if (action === 'down') {
@@ -279,7 +289,11 @@ function fridaServerCommands(action, opts) {
     return [{ bin: 'adb', args: adb.concat([
       'su', '0', 'sh', '-c',
       `pkill -TERM frida-server; sleep 1; pkill -KILL frida-server 2>/dev/null; ` +
-      `pkill -KILL -f 'sh -c.*frida-server' 2>/dev/null; pidof frida-server || echo STOPPED`,
+      // `pkill -f 'sh -c.*frida-server'` matched the very shell running this command (its own
+      // argv contains the pattern) and SIGKILLed it: exit 137 and no STOPPED line. Skip $$.
+      `for q in $(pgrep -f 'sh -c.*frida-server' 2>/dev/null); do ` +
+      `[ "$q" = "$$" ] || kill -KILL "$q" 2>/dev/null; done; ` +
+      `pidof frida-server || echo STOPPED`,
     ]) }];
   }
   if (action === 'status') {
@@ -856,7 +870,11 @@ async function defaultRunMobile(bin, args, opts) {
     throw e;
   }
   const runBinaryFn = opts.runBinary || runBinary;
-  const r = await runBinaryFn(bin, args, opts);
+  // capture=true is MANDATORY here: runBinary buffers stdout/stderr only when asked to, and
+  // every verdict below reads r.stdout (device list, pidof frida-server, STDOUT dei tool).
+  // Without it stdout is dropped and the tool reports "running: false" on a server that is
+  // up. Same contract as tools/ad.js, tools/cloud-enum.js, tools/crack.js.
+  const r = await runBinaryFn(bin, args, Object.assign({ capture: true }, opts));
   auditMobile(Object.assign(entry, { verdict: 'ran', status: r && r.status }));
   return r;
 }

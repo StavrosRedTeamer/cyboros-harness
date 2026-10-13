@@ -120,12 +120,31 @@ function restoreEnvAndExit(code) {
     ok('reality level exploited without oracle rejected', () => {
       const r = rf.record(JSON.stringify(base({ title: 'exp1', status: 'inconclusive', verify_level: 'exploited' })));
       assert.strictEqual(r.ok, false);
-      assert.match(r.error, /mechanical oracle/);
+      assert.match(r.error, /cannot be registered by hand/);
     });
     ok('proven_impact without oracle rejected', () => {
       const r = rf.record(JSON.stringify(base({ title: 'pi1', status: 'verified', verify_level: 'proven_impact' })));
       assert.strictEqual(r.ok, false);
-      assert.match(r.error, /mechanical oracle/);
+      assert.match(r.error, /cannot be registered by hand/);
+    });
+    // ── LA FORA CHIUSA ──────────────────────────────────────────────────────────
+    // Livelli che significano "il PoC e' stato ri-sparato e ha passato" non si registrano a
+    // mano, nemmeno allegando un oracolo perfettamente valido: prima bastava
+    // `oracle.js record` con un token inventato + la stessa riga come evidence_quote, e si
+    // otteneva un finding `verified` con zero richieste HTTP.
+    ok('verified NON si registra a mano nemmeno con oracolo+quote validi', () => {
+      const r = rf.record(JSON.stringify(withReceipt({ title: 'forged', status: 'verified', verify_level: 'proven_impact', severity: 'Critical' })));
+      assert.strictEqual(r.ok, false, 'la forgiatura deve fallire');
+      assert.match(r.error, /cannot be registered by hand/);
+    });
+    ok('exploited NON si registra a mano nemmeno con oracolo+quote validi', () => {
+      const r = rf.record(JSON.stringify(withReceipt({ title: 'forged2', status: 'confirmed', verify_level: 'exploited', severity: 'High' })));
+      assert.strictEqual(r.ok, false);
+      assert.match(r.error, /cannot be registered by hand/);
+    });
+    ok('confirmed resta registrabile a mano (e` l`affermazione dell`agente)', () => {
+      const r = rf.record(JSON.stringify(withReceipt({ title: 'asserted', status: 'confirmed' })));
+      assert.strictEqual(r.ok, true, r.error);
     });
     ok('invalid oracle object rejected even on hypothesis rows', () => {
       const r = rf.record(JSON.stringify(base({ title: 'badoracle', status: 'inconclusive', oracle: { type: 'nope' } })));

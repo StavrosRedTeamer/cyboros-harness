@@ -63,6 +63,11 @@ function budgetPayload() {
     operator_action: json && json.operator_action ? json.operator_action : null,
     exit_code: r.code,
     detail: json && json.note ? json.note : null,
+    // Pass-through per il War Room (burn % e proiezione al ritmo medio): stessi numeri
+    // della CLI, nessuna seconda spawn di budget.js.
+    counters: (json && json.counters) || null,
+    caps: (json && json.caps) || null,
+    notes: (json && json.notes) || [],
   };
 }
 

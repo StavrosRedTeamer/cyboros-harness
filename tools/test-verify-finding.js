@@ -2,7 +2,12 @@
 // Run: node tools/test-verify-finding.js
 const assert = require('assert');
 const fs = require('fs'), os = require('os'), path = require('path');
-require('./testkit').hermetic('verify-finding'); // stato condiviso in fixture, non nel workspace (vedi testkit.js)
+const HERM = require('./testkit').hermetic('verify-finding'); // stato condiviso in fixture, non nel workspace (vedi testkit.js)
+// Ondata 7: i receipt dell'oracolo devono vivere DENTRO la root del workspace (fail-closed), quindi
+// la fixture è anche la ws-root di questo test.
+process.env.DSH_WS_ROOT = HERM;
+process.env.ORACLE_LOG = path.join(HERM, 'reports', 'tmp', 'oracle-log.jsonl');
+process.env.ORACLE_ARTIFACTS = path.join(HERM, 'artifacts', 'oracle');
 const { verifyOne, checkExpect } = require('./verify-finding');
 
 // mock exec: returns canned responses in order, repeating the last one.
@@ -70,6 +75,48 @@ const mk = (responses) => { let i = 0; return async () => responses[i++] || resp
   assert.strictEqual(rec2.verify_failed, true);
   fs.rmSync(ftmp, { force: true });
   delete process.env.FINDINGS_JSONL;
+
+  // ── Ondata 7 (E1/E3): `batch` verifica e APPENDE al side log; findings.jsonl resta INTATTO ──
+  // Era il buco: il percorso documentato (knowledge.md: `verify-finding.js batch`) riscriveva le
+  // righe in place, rompendo la catena A3, e da lì `record()` rifiuta ogni append.
+  const { verifyBatch } = require('./verify-finding');
+  const chainLog = require('./chain-log');
+  const vlog = require('./verification-log');
+  const vdir = fs.mkdtempSync(path.join(os.tmpdir(), 'vfbatch-'));
+  const ffile = path.join(vdir, 'findings.jsonl');
+  const row = {
+    severity: 'High', title: 'idor-batch', host: 'h', endpoint: '/api/x', poc: 'x',
+    status: 'confirmed', verify_level: 'triggered',
+    verify: { url: 'https://h/x', expect: { status: 200 } },
+  };
+  fs.writeFileSync(ffile, chainLog.buildChainedLine(row, []) + '\n');
+  const beforeBatch = fs.readFileSync(ffile);
+  process.env.VERIFICATIONS_JSONL = path.join(vdir, 'verifications.jsonl');
+  process.env.VERIFICATIONS_HEAD_ANCHOR_FILE = path.join(vdir, 'v-anchor.jsonl');
+  const batchOut = await verifyBatch({ file: ffile, exec: async () => ({ status: 200, body: '' }) });
+  assert.strictEqual(batchOut.checked, 1, JSON.stringify(batchOut));
+  assert.strictEqual(batchOut.verified, 1);
+  assert.strictEqual(batchOut.appended, 1);
+  assert.deepStrictEqual(fs.readFileSync(ffile), beforeBatch, 'E1: findings.jsonl NON viene toccato dal batch');
+  assert.strictEqual(chainLog.verifyChain(chainLog.readLines(ffile)).ok, true, 'la catena resta intatta');
+  const vrecs = vlog.read();
+  assert.strictEqual(vrecs.length, 1, 'un fatto di verifica nel side log');
+  assert.strictEqual(vrecs[0].outcome, 'verified');
+  assert.strictEqual(vrecs[0].finding_seq, 1, 'punta alla riga del finding');
+  assert.ok(vrecs[0].oracle && vrecs[0].evidence_quote, 'con oracle e quote sul disco');
+
+  // idempotenza: un secondo batch non ri-verifica ciò che risulta già verificato
+  const again = await verifyBatch({ file: ffile, exec: async () => ({ status: 200, body: '' }) });
+  assert.strictEqual(again.skipped_verified, 1);
+  assert.strictEqual(again.checked, 0);
+
+  // fail-closed: `verifyFile` non riscrive un log incatenato (E1, alla radice)
+  const refused = await verifyFile(ffile, { exec: async () => ({ status: 200, body: '' }) });
+  assert.strictEqual(refused.ok, false);
+  assert.match(refused.error, /refusing to rewrite/);
+  assert.deepStrictEqual(fs.readFileSync(ffile), beforeBatch, 'verifyFile non ha toccato nulla');
+  delete process.env.VERIFICATIONS_JSONL;
+  delete process.env.VERIFICATIONS_HEAD_ANCHOR_FILE;
 
   console.log('verify-finding: all tests passed');
 })();

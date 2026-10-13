@@ -39,6 +39,13 @@ const MODE = 'stavros';
 //                   re-has its mechanical oracle validated against DISK now (A1);
 //   evidenceQuote → reality-level findings carry an evidence_quote whose text is a verbatim
 //                   substring of the referenced artifact (A2).
+// Ondata7 (additivo, in coda):
+//   chainHeadVerifications → la testa del log delle verifiche (tools/verification-log.js)
+//                   combacia con la sua ancora esterna, come per findings.jsonl. E i check su
+//                   findings (verify/noPending/oracle/evidenceQuote/pocReplay) leggono la VISTA
+//                   effettiva (tools/effective-findings.js): un finding promosso da una verifica
+//                   registrata dopo la registrazione conta come verificato, senza che nessuno
+//                   riscriva findings.jsonl (che è incatenato).
 const GATES = {
   recon: {
     title: 'Reconnaissance baseline',
@@ -96,6 +103,7 @@ const GATES = {
       // P0 (additivo, in coda): la matrice ATT&CK e' l'artefatto che misura la copertura offensiva
       // per tecnica (tools/attack-coverage.js --write), complementare a coverage-matrix.md.
       { kind: 'attackCoverage', hint: 'ATT&CK coverage matrix prepared' },
+      { kind: 'chainHeadVerifications', hint: 'verifications log chain head matches its external anchor' },
     ],
     manual: ['Coverage matrix complete — every class tested or marked N/A with rationale', 'Cross-check done: independent subagent reviewed the findings'],
   },
@@ -139,16 +147,27 @@ function checkFindings(min) {
   return { ok: findings.length >= min, detail: `findings: ${findings.length} >= ${min}` };
 }
 
+// Ondata 7: la VISTA effettiva (findings.jsonl + side log delle verifiche), non le righe grezze.
+// Un finding promosso da una verifica registrata DOPO la registrazione conta come verificato, e
+// nessuno ha dovuto riscrivere un file incatenato. Senza side log il risultato è identico alle
+// righe grezze (un test lo asserisce), quindi il cambio è retrocompatibile.
+function effectiveRows(file) {
+  return require('./effective-findings')
+    .effectiveFindings({ findingsFile: file || FINDINGS_FILE() }).findings;
+}
+
 function checkVerify(min) {
-  const findings = loadJsonl(path.join(REPORTS(), 'findings.jsonl'));
-  const verified = findings.filter((f) => f.status === 'verified' || f.verified);
+  const verified = effectiveRows().filter((f) => f.status === 'verified' || f.verified);
   return { ok: verified.length >= min, detail: `verified findings: ${verified.length} >= ${min}` };
 }
 
 function checkNoPending() {
-  const findings = loadJsonl(path.join(REPORTS(), 'findings.jsonl'));
-  const pending = findings.filter((f) => f.status === 'pending' || (!f.status && !f.verified));
-  return { ok: pending.length === 0, detail: `pending findings: ${pending.length}` };
+  const rows = effectiveRows();
+  const isPending = require('./effective-findings').isPending;
+  const pending = rows.filter(isPending);
+  if (!pending.length) return { ok: true, detail: `no pending findings (${rows.length} effective row(s))` };
+  const first = pending[0];
+  return { ok: false, detail: `pending findings: ${pending.length} (first: ${first.title || first.host || '?'} — ${first.verify_failed ? 'verification failed' : 'reality claim not substantiated'})` };
 }
 
 function checkCoverage() {
@@ -211,7 +230,7 @@ function checkChain(file) {
 }
 
 function realityOffenders(file, validateFn) {
-  const findings = loadJsonl(file);
+  const findings = effectiveRows(file);
   const checked = [];
   const failed = [];
   for (const f of findings) {
@@ -241,7 +260,7 @@ function checkEvidenceQuote(file) {
 
 function checkPocReplay(file) {
   file = file || FINDINGS_FILE();
-  const findings = loadJsonl(file);
+  const findings = effectiveRows(file);
   const r = require('./poc-replay').checkPocReplays(findings);
   if (!findings.length) return { ok: true, detail: 'no findings yet — pocReplay vacuous' };
   const ok = r.ok;
@@ -253,6 +272,12 @@ function checkPocReplay(file) {
 function checkChainHead(opts) {
   const r = require('./record-finding').verifyHeadAnchor(opts);
   return { ok: !!r.ok, detail: r.detail || (r.ok ? 'head anchor ok' : 'head anchor mismatch') };
+}
+
+// Ondata 7: la testa del log delle verifiche, ancorata esternamente come findings.jsonl.
+function checkChainHeadVerifications() {
+  const r = require('./verification-log').verify();
+  return { ok: !!r.ok, detail: r.detail || (r.ok ? 'verifications head anchor ok' : 'verifications head anchor mismatch') };
 }
 
 function runCheck(check) {
@@ -270,6 +295,7 @@ function runCheck(check) {
     case 'evidenceQuote': return checkEvidenceQuote(check.file);
     case 'pocReplay': return checkPocReplay(check.file);
     case 'chainHead': return checkChainHead();
+    case 'chainHeadVerifications': return checkChainHeadVerifications();
     default: return { ok: false, detail: `unknown check kind: ${check.kind}` };
   }
 }
@@ -402,4 +428,4 @@ function main() {
 
 if (require.main === module) main();
 
-module.exports = { GATES, runGate, gateChecks, loadWorkflowReports, gateLogHasPass, checkFile, checkMarkers, checkFindings, checkVerify, checkNoPending, checkCoverage, checkAttackCoverage, checkScopeNonEmpty, checkChain, checkOracle, checkEvidenceQuote, checkPocReplay, checkChainHead };
+module.exports = { GATES, runGate, gateChecks, loadWorkflowReports, gateLogHasPass, checkFile, checkMarkers, checkFindings, checkVerify, checkNoPending, checkCoverage, checkAttackCoverage, checkScopeNonEmpty, checkChain, checkOracle, checkEvidenceQuote, checkPocReplay, checkChainHead, checkChainHeadVerifications, effectiveRows };

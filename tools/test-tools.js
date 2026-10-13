@@ -37,6 +37,12 @@ assert.deepStrictEqual(collectHosts(['netexec', 'smb', '192.168.1.0/24']), ['192
 assert.deepStrictEqual(collectHosts(['impacket-GetNPUsers', 'corp/', '-dc-ip', '10.0.0.1']), ['10.0.0.1']);
 assert.deepStrictEqual(collectHosts(['ldapsearch', '-H', 'ldap://10.0.0.1']), ['10.0.0.1']);
 assert.deepStrictEqual([...hostsFromText('10.0.0.0/24\nldap://10.0.0.1\n')], ['10.0.0.0/24', '10.0.0.1']);
+// brutus --target <host:porta>: il token composito non ha schema e la porta rompe bareHost,
+// quindi l'host va estratto esplicitamente (bin-aware) o ogni run finisce "no target host found".
+assert.deepStrictEqual(collectHosts(['creds', '--target', '10.0.0.5:22'], null, 'brutus'), ['10.0.0.5']);
+assert.deepStrictEqual(collectHosts(['creds', '--target', 'ssh://10.0.0.5:22'], null, 'brutus'), ['10.0.0.5']);
+assert.deepStrictEqual(collectHosts(['creds', '--target=db.internal:5432'], null, 'brutus'), ['db.internal']);
+assert.deepStrictEqual(collectHosts(['creds', '--target', '10.0.0.5:22'], null, 'nmap'), [], 'bin-aware: nessun leak su altri binari');
 // CIDR-in-scope: target range must be a SUBSET of an authorized CIDR
 const { cidrInScope } = require('./scope-guard');
 assert.strictEqual(cidrInScope('10.0.0.0/24', { allowed_ips: ['10.0.0.0/8'] }).ok, true);

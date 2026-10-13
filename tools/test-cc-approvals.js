@@ -7,7 +7,7 @@ const assert = require('assert');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
-const { spawnSync } = require('child_process');
+const { spawnSync, spawn } = require('child_process');
 
 const WS = path.join(__dirname, '..');
 const T = fs.mkdtempSync(path.join(os.tmpdir(), 'stavros-cc-approvals-'));
@@ -109,4 +109,26 @@ const rPolicy = runCli({ allowed_hosts: ['127.0.0.1'], host_ops: { require_appro
 assert.strictEqual(rPolicy.status, 1, 'policy on: missing token blocks the run');
 assert.ok(/approval/.test(rPolicy.stderr), 'block message names the approval gate');
 
-console.log('test-cc-approvals: OK');
+// ── Ondata 7: la race grant/use — consumo CONCORRENTE dello stesso token ──────
+// `consume` è read-then-write: senza lock due processi vedono entrambi `granted` e consumano
+// entrambi lo stesso token "single-use". Il THREAT-MODEL §5 nomina esattamente questa superficie.
+// Qui si prova la proprietà che conta: su N consumatori concorrenti ne vince ESATTAMENTE uno.
+const raceReq = A.request({ host: 'lab.local', actionClass: 'c2', command: 'nmap lab.local', by: 'agent' });
+A.grant(raceReq.id, { actor: 'op' });
+const CONC = 4;
+(async () => {
+  const runs = await Promise.all(Array.from({ length: CONC }, () => new Promise((resolve) => {
+    const child = spawn(process.execPath, [
+      path.join(WS, 'tools', 'cc-approvals.js'), 'consume', raceReq.id,
+      '--host', 'lab.local', '--action', 'c2', '--command', 'nmap lab.local', '--by', 'agent',
+    ], { cwd: WS, env: process.env, stdio: ['ignore', 'pipe', 'pipe'] });
+    let out = '';
+    child.stdout.on('data', (d) => { out += d; });
+    child.on('close', (status) => resolve({ status, out }));
+  })));
+  const won = runs.filter((r) => r.status === 0);
+  assert.strictEqual(won.length, 1,
+    `esattamente un consume concorrente deve vincere, ne hanno vinti ${won.length}\n` + runs.map((r) => `${r.status}: ${r.out.trim()}`).join('\n'));
+  assert.strictEqual(A.list({ all: true }).find((t) => t.id === raceReq.id).status, 'consumed');
+  console.log(`test-cc-approvals: OK (race: 1/${CONC} consumatori hanno vinto)`);
+})();

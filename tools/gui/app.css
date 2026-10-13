@@ -817,3 +817,75 @@ th.sortable:focus-visible { outline: 2px solid var(--cyan); outline-offset: -2px
 @media (prefers-reduced-motion: reduce) {
   .cc-card, .cc-panel { transition: none !important; }
 }
+
+/* ── War Room (WP10): live situation board ── */
+.wr-head { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.wr-head .cc-spacer { flex: 1 1 auto; }
+.wr-live { display: inline-flex; align-items: center; gap: 6px; font: 10.5px var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--magenta); }
+.wr-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--magenta); box-shadow: var(--glow-mag); animation: wr-pulse 1.8s ease-in-out infinite; }
+@keyframes wr-pulse { 50% { opacity: .35; } }
+.wr-main { grid-column: 1 / -1; display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(310px, 1fr)); align-items: start; }
+.wr-main .cc-panel { min-width: 0; }
+
+/* a long KPI value (client name) stays on one readable line instead of blowing up the tile */
+.stat-tile.wr-long .stat-value { font-size: 19px; line-height: 1.15; }
+/* KPI rows must be able to shrink below their min-content: otherwise a long value widens one
+   track and the whole row overflows its container (visible in TV mode at large type). */
+.cc-stats .stat-tile { min-width: 0; }
+.cc-stats .stat-value { overflow-wrap: anywhere; }
+
+/* live ledger feed */
+.wr-feed { max-height: 46vh; overflow: auto; display: grid; gap: 1px; }
+.cc-panel.paused .wr-feed { opacity: .6; }
+.wr-feed-row { display: grid; grid-template-columns: 84px 92px minmax(0, 1fr); gap: 8px; align-items: baseline; padding: 4px 6px; border-left: 2px solid transparent; }
+.wr-feed-row:hover { background: var(--hover-bg); }
+.wr-ts { font: 10.5px var(--mono); color: var(--faint); white-space: nowrap; }
+.wr-what { font-size: 12px; min-width: 0; overflow-wrap: anywhere; }
+.wr-feed-row.wr-new { border-left-color: var(--magenta); background: rgba(255,45,149,.07); animation: wr-in .35s ease-out 1; }
+@keyframes wr-in { from { opacity: .25; transform: translateY(-3px); } }
+
+/* attention rail */
+.wr-attn-item { display: flex; gap: 8px; align-items: baseline; padding: 6px 8px; border: 1px solid var(--line); border-left: 3px solid var(--line-2); border-radius: var(--r2); background: var(--bg2); }
+.wr-attn-item.clickable { cursor: pointer; }
+.wr-attn-item.clickable:hover { border-color: var(--cyan); background: var(--hover-bg); }
+.wr-attn-item.tone-crit { border-left-color: var(--crit); }
+.wr-attn-item.tone-warn { border-left-color: var(--yellow); }
+.wr-attn-item.tone-info { border-left-color: var(--cyan); }
+.wr-attn-body { display: grid; gap: 1px; min-width: 0; }
+.wr-attn-detail { font-size: 11px; }
+
+/* budget kv rows */
+.wr-kv { display: flex; justify-content: space-between; gap: 10px; padding: 3px 0; border-bottom: 1px dashed var(--line); font-size: 12px; }
+.wr-kv-k { color: var(--muted); font: 10.5px var(--mono); text-transform: uppercase; letter-spacing: .06em; align-self: center; }
+.wr-kv-v { font: 600 12.5px var(--mono); color: var(--ink); }
+.wr-kv.tone-ok .wr-kv-v { color: var(--green); } .wr-kv.tone-warn .wr-kv-v { color: var(--yellow); } .wr-kv.tone-crit .wr-kv-v { color: var(--crit); }
+
+/* coverage / exposure / fresh findings rows */
+.wr-row-2 { display: flex; flex-wrap: wrap; gap: 8px; align-items: baseline; }
+.wr-decl { display: grid; gap: 6px; }
+.wr-decl .wr-kv-k { align-self: start; }
+/* pressed state for the feed scope toggle (campaign / workspace) */
+.btn.active { border-color: var(--cyan); color: #dcfbff; box-shadow: var(--glow-cyan), inset 0 0 8px rgba(36,227,255,.12); }
+.wr-host { font: 600 12px var(--mono); color: var(--ink); overflow-wrap: anywhere; }
+.wr-input { flex: 0 1 230px; min-width: 150px; font: 12px var(--mono); }
+
+/* delta flash on a KPI that changed since the previous tick */
+.wr-flash { animation: wr-flash 2.2s ease-out 1; }
+@keyframes wr-flash { 0% { box-shadow: 0 0 0 2px var(--magenta), 0 0 24px rgba(255,45,149,.45); } 100% { box-shadow: var(--shadow-card); } }
+.cc-card.clickable { cursor: pointer; }
+.cc-card.clickable:hover { border-color: var(--cyan); background: var(--hover-bg); }
+.cc-card.clickable:focus-visible { outline: 2px solid var(--cyan); outline-offset: 2px; }
+
+/* TV mode — board only, readable from a second monitor or a phone over the F3 tunnel */
+body.tv #topbar, body.tv #tabs, body.tv #status-rail { display: none; }
+body.tv #view { padding: 10px 14px 24px; }
+body.tv .stat-value { font-size: 36px; }
+body.tv .stat-label { font-size: 12px; }
+body.tv .cc-stats { grid-template-columns: repeat(auto-fit, minmax(124px, 1fr)); }
+body.tv .wr-main { grid-template-columns: repeat(auto-fit, minmax(360px, 1fr)); }
+body.tv .wr-feed-row { font-size: 14px; }
+body.tv .wr-feed { max-height: 58vh; }
+
+@media (prefers-reduced-motion: reduce) {
+  .wr-flash, .wr-feed-row.wr-new, .wr-dot { animation: none !important; }
+}

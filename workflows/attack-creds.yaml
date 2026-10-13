@@ -1,0 +1,32 @@
+# Workflow offensivo — attack-creds (dialetto workflow)
+# Default-credential audit di UN servizio con brutus (Praetorian, Apache-2.0, 43 protocolli):
+# `creds` prova le credenziali *di default* del protocollo scelto e stampa in JSON solo i
+# successi — niente liste di password (quelle restano un'azione operatore con -U/-P via run.js).
+#
+# CONFIRM-TIER per contratto (knowledge.md regola 2): tocca account REALI. Da eseguire solo
+# dopo approvazione esplicita in sessione; con la policy `scope.host_ops.require_approval`
+# attiva in scope.json, passa `--var approval=<id>` (token consumato da run.js). Mai in un
+# loop automatico, mai senza che l'operatore abbia visto il target.
+#
+# VAR OBBLIGATORIE: port e protocol (brutus vuole `--target <host>:<porta>` e il protocollo;
+# senza nerva non c'è auto-fingerprint). `mode` default `cautious`: meno tentativi.
+# Uso: node tools/workflow.js run workflows/attack-creds.yaml -t <host> \
+#        --var port=22 --var protocol=ssh [--var mode=cautious] [--var approval=ap-xxxx]
+name: attack-creds
+description: Default-credential audit (brutus) su un servizio — confirm-tier, con approvazione esplicita
+vars:
+  tag: target
+  outdir: reports
+  port: ""
+  protocol: ""
+  mode: cautious
+  approval: ""
+requires:
+  - brutus
+steps:
+  - id: default-creds
+    cmd: node tools/run.js brutus creds --target {target}:{port} --protocol {protocol} --mode {mode} --json --approval {approval}
+    artifacts:
+      - path: "{outdir}/attack-{tag}-creds.jsonl"
+        surface: creds
+        from: stdout

@@ -22,7 +22,10 @@ and tracked by `coverage.js`.
   Level AuthZ (BOLA, IDOR — same object id as another user) from Broken **Function** Level AuthZ
   (BFLA — low-priv user calling an admin function). Replay the request as a lower-priv/other user via
   `repeater.js --as <identity>`; compare status, bytes AND `--diff` body_similarity (same-length
-  different-content is still an IDOR). Record BOLA/BFLA with class `bola`/`bfla`.
+  different-content is still an IDOR). Record BOLA/BFLA with class `bola`/`bfla`. La ripetizione su
+  tutte le identità è meccanizzata: `node tools/permission-matrix.js --urls <file> --identities a,b`
+  produce la matrice chi-vede-cosa e i candidati `suspected` (mai severità da lì: la registrazione
+  passa da `record-finding.js`).
 - **SSRF:** parameters that fetch URLs. For BLIND SSRF start `node tools/oob.js listen`, inject
   `oob.js marker` into the param, wait, then `oob.js hits` — the target's fetch is the proof.
   Reflected SSRF: `--follow` the fetch or read the response body. Cloud metadata (169.254.169.254)

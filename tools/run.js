@@ -272,6 +272,19 @@ function collectHosts(args, stdinText, bin) {
     listFlags.add('-t');
     listFlags.add('--targets');
   }
+  // brutus --target <host[:porta]> (o <schema>://host:porta): il token composito non è un
+  // bareHost (la porta non è ammessa) e non ha schema, quindi l'host andrebbe perso e OGNI run
+  // morirebbe su "no target host found" prima ancora di brutus. Estrailo esplicitamente.
+  if (bin === 'brutus') {
+    for (let i = 0; i < args.length; i++) {
+      const m = /^--target=(.+)$/.exec(args[i]);
+      const v = m ? m[1] : (args[i] === '--target' ? args[i + 1] : null);
+      if (!v) continue;
+      const t = String(v).trim();
+      if (!t) continue;
+      try { const h = hostOf(t.includes('://') ? t : 'tcp://' + t); if (h) hosts.add(h); } catch { /* token non URL: nessun host */ }
+    }
+  }
   for (let i = 0; i < args.length; i++) {
     for (const h of hostsFromString(args[i])) hosts.add(h);
     const bh = bareHost(args[i]);

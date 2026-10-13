@@ -204,14 +204,60 @@ function grant(id, opts) { return decide(id, 'grant', (opts || {}).actor, (opts 
 function deny(id, opts) { return decide(id, 'deny', (opts || {}).actor, (opts || {}).note); }
 function revoke(id, opts) { return decide(id, 'revoke', (opts || {}).actor, (opts || {}).note); }
 
-// Consume = verify + atomically mark used. A token is single-use by design.
+// ── single-use cross-process (Ondata 7) ─────────────────────────────────────
+// `consume` è read-then-write: due processi che consumano lo STESSO token nello stesso istante
+// vedevano entrambi `granted` e appendevano entrambi la riga `consume` — cioè un token
+// dichiarato "single-use" non era atomico, e il THREAT-MODEL §5 lo nomina come la superficie da
+// attaccare ("the race between grant and use"). La sezione critica è ora protetta da un lock
+// file: `wx` (create esclusivo) è atomico sul filesystem, quindi un solo processo entra. Un lock
+// stantio (processo morto a metà) viene rotto dopo LOCK_STALE_MS; se il lock non si acquisisce
+// entro LOCK_TIMEOUT_MS la risposta è `blocked` — fail-closed: un lock non acquisibile NON
+// autorizza.
+const LOCK_TIMEOUT_MS = 3000;
+const LOCK_STALE_MS = 30000;
+function sleepSync(ms) {
+  try { Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms); }
+  catch { const end = Date.now() + ms; while (Date.now() < end) { /* spin di riserva */ } }
+}
+function withStoreLock(file, fn) {
+  const lock = file + '.lock';
+  fs.mkdirSync(path.dirname(lock), { recursive: true });
+  const deadline = Date.now() + LOCK_TIMEOUT_MS;
+  for (;;) {
+    try {
+      const fd = fs.openSync(lock, 'wx');
+      try { fs.writeSync(fd, process.pid + ' ' + nowIso() + '\n'); } finally { fs.closeSync(fd); }
+      break;
+    } catch (e) {
+      if (e.code !== 'EEXIST') throw e;
+      try {
+        if (Date.now() - fs.statSync(lock).mtimeMs > LOCK_STALE_MS) { fs.unlinkSync(lock); continue; }
+      } catch { continue; }
+      if (Date.now() > deadline) throw new Error('approval store busy (lock held > ' + LOCK_TIMEOUT_MS + 'ms)');
+      sleepSync(15);
+    }
+  }
+  try { return fn(); } finally { try { fs.unlinkSync(lock); } catch { /* già rilasciato */ } }
+}
+
+// Consume = verify + mark used, ATOMICALLY. A token is single-use by design, so the verify must
+// happen inside the lock: the second process re-reads the store and sees `consumed`.
 function consume(id, req) {
-  const v = verify(id, req);
-  if (!v.ok) return v;
-  append({ type: 'consume', id, ts: nowIso(), actor: (req && req.actor) || 'agent',
-    host: (req && req.host) || v.token.host, action_class: (req && req.actionClass) || v.token.action_class });
-  queueRemove(id, 'approval-consume');
-  return { ok: true, verdict: 'allowed', token: v.token };
+  const file = storeFile();
+  let out;
+  try {
+    out = withStoreLock(file, () => {
+      const v = verify(id, req);
+      if (!v.ok) return v;
+      append({ type: 'consume', id, ts: nowIso(), actor: (req && req.actor) || 'agent',
+        host: (req && req.host) || v.token.host, action_class: (req && req.actionClass) || v.token.action_class });
+      queueRemove(id, 'approval-consume');
+      return { ok: true, verdict: 'allowed', token: v.token };
+    });
+  } catch (e) {
+    return { ok: false, verdict: 'blocked', reason: 'approval store lock unavailable: ' + (e && e.message ? e.message : String(e)) };
+  }
+  return out;
 }
 
 function list(opts) {

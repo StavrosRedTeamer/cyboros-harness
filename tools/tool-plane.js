@@ -136,6 +136,8 @@ const TOOL_PLANE = {
     nxc: { required: false },
     kerbrute: { required: false },
     trufflehog: { required: false },
+    brutus: { required: false },
+    titus: { required: false },
     'impacket-secretsdump': { required: false },
     'impacket-getTGT': { required: false },
     'impacket-getST': { required: false },

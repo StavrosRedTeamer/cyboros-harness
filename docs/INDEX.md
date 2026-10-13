@@ -9,11 +9,11 @@
 ## Root del repo
 
 - [**AGENTS.md — StavrosRedTeamer**](AGENTS.md) — Operatore AI per operazioni di pentest autorizzate (web/host, wireless, mobile). · 5,9 KB
-- [**Benchmark**](BENCHMARK.md) — Public security benchmarks are in the model's training data. "Solved" on OWASP Juice · 7,0 KB
-- [**Changelog**](CHANGELOG.md) — All notable changes to this project are documented here. Dates are commit dates. · 39,8 KB
+- [**Benchmark**](BENCHMARK.md) — Public security benchmarks are in the model's training data. "Solved" on OWASP Juice · 15,6 KB
+- [**Changelog**](CHANGELOG.md) — All notable changes to this project are documented here. Dates are commit dates. · 42,8 KB
 - [**StavrosRedTeamer**](README.md) — A penetration-testing harness where a finding is only a finding if code can prove it — · 11,4 KB
 - [**Security Policy**](SECURITY.md) — StavrosRedTeamer is offensive-security tooling. It executes reconnaissance and · 4,1 KB
-- [**Stavros — Web Red Team Methodology & Rules of Engagement**](knowledge.md) — Shared brain for every Stavros agent — read before acting. Detail lives in docs/ (map at bottom); · 14,6 KB
+- [**Stavros — Web Red Team Methodology & Rules of Engagement**](knowledge.md) — Shared brain for every Stavros agent — read before acting. Detail lives in docs/ (map at bottom); · 14,8 KB
 - [**Piano di ottimizzazione workspace Stavros (Red Teamer harness)**](piano-ottimizzazione-stavros.md) — Data: 10 settembre 2026 · Repo: stavrosredteamer (Freebuff) · Branch: `command-center-redesign` · 11,4 KB
 - [**Handoff — sessione con AUTOPILOT attivo (opt-in)**](session-prompt-autostavros.md) — Sei Stavros, orchestratore red-team. In questa sessione l'operatore richiede ESPLICITAMENTE la · 2,0 KB
 
@@ -28,21 +28,21 @@
 - [**Threat model: attacking StavrosRedTeamer itself**](docs/THREAT-MODEL.md) — Not the target. The target is supposed to be attacked — that is the job. What is · 12,6 KB
 - [**Alternative-tools audit — what the harness should adopt, borrow, or leave alone**](docs/TOOL-ALTERNATIVES-AUDIT.md) — Three concrete gaps, in priority order: · 26,1 KB
 - [**What the published benchmarks measure, and what they leave out**](docs/TOOL-LANDSCAPE.md) — As of mid-2026 there is real, serious work here, and none of it is · 6,3 KB
-- [**Stavros Command Center — Desktop Edition (piano e work package)**](docs/command-center-desktop.md) — Obiettivo. Portare il Command Center da dashboard web a programma desktop (`stavros-cc`) · 22,6 KB
+- [**Stavros Command Center — Desktop Edition (piano e work package)**](docs/command-center-desktop.md) — Obiettivo. Portare il Command Center da dashboard web a programma desktop (`stavros-cc`) · 25,4 KB
 - [**Egress gateway & anonymized egress (red-team OPSEC)**](docs/egress-opsec.md) — To force third-party HTTP(S) binaries through the scope allowlist, start the proxy first: · 2,4 KB
-- [**docs/f3-client-runbook.md — Poco F3 come client dell'harness stavros**](docs/f3-client-runbook.md) — ┌─────────────────────── Poco F3 (client) ───────────────────────┐ · 9,6 KB
+- [**docs/f3-client-runbook.md — Poco F3 come client dell'harness stavros**](docs/f3-client-runbook.md) — ┌─────────────────────── Poco F3 (client) ───────────────────────┐ · 10,4 KB
 - [**docs/f3-rom-alioth.md — Poco F3 (alioth): ROM dedicata per il client harness**](docs/f3-rom-alioth.md) — (`docs/egress-opsec.md`). Le uniche app extra: Termux (F-Droid) e nulla altro. · 7,6 KB
 - [**Forum — il lato admin: ruolo, homepage, sanzioni**](docs/forum-admin.md) — Il forum firmato (`tools/forum-server.js` + `tools/forum.js`) ha un ruolo admin lato server: lo · 7,4 KB
 - [**Host exploitation (post-web: C2 / post-ex / lateral) + threat intel**](docs/host-exploitation.md) — Confirm-tier is refused unless `--confirm "<reason>"` is passed, which needs your explicit in-session · 9,1 KB
 - [**Testing by class — dettaglio metodologico**](docs/methodology-classes.md) — Class names for `record-finding.js` are the canonical keys of `tools/test-registry.json` — · 5,1 KB
 - [**Mobile (Android) — methodology & tool detail**](docs/mobile.md) — (`127.0.0.1`, `localhost`) o un serial USB esplicitamente in allowlist (device fisico autorizzato). · 4,9 KB
 - [**System Prompt Dump — StavrosRedTeamer**](docs/system-prompt-dump.md) — Nessun dato di target, credenziale o output di engagement lascia la macchina. Vedi `docs/egress-opsec.md`. · 6,1 KB
-- [**Toolbox — dettaglio per-tool (knowledge.md tiene la tabella compatta)**](docs/toolbox.md) — (it refuses out-of-scope hosts; supports `-l -`/`--stdin` AND a piped stdin for target lists; every · 25,4 KB
+- [**Toolbox — dettaglio per-tool (knowledge.md tiene la tabella compatta)**](docs/toolbox.md) — (it refuses out-of-scope hosts; supports `-l -`/`--stdin` AND a piped stdin for target lists; every · 26,8 KB
 - [**Wireless (modalità separata)**](docs/wireless.md) — WiFi is a SEPARATE mode from the web/network pipeline: targets are BSSIDs/ESSIDs/stations/channels, · 6,1 KB
 
 ## `ops/` — regole della harness
 
-- [**ops/harness.md — regole condivise della harness (disciplina, tool-wiring, MCP)**](ops/harness.md) — Pentest discipline (full rules: `knowledge.md` — "Verification levels", "False-positive duty", "WAF awareness", "Install valve", "Adversarial content  · 17,9 KB
+- [**ops/harness.md — regole condivise della harness (disciplina, tool-wiring, MCP)**](ops/harness.md) — Pentest discipline (full rules: `knowledge.md` — "Verification levels", "False-positive duty", "WAF awareness", "Install valve", "Adversarial content  · 20,5 KB
 
 ## Piani
 

@@ -1005,6 +1005,7 @@ function cmdkActions() {
     { kind: 'tab', label: 'Overview', run: () => switchTab('overview') },
     { kind: 'tab', label: 'Campaign', run: () => switchTab('campaign') },
     { kind: 'tab', label: 'Mission control', run: () => switchTab('mission') },
+    { kind: 'tab', label: 'War Room (live board)', run: () => switchTab('warroom') },
     { kind: 'tab', label: 'Approvals inbox', run: () => switchTab('approvals') },
     { kind: 'tab', label: 'Ledger', run: () => switchTab('ledger') },
     { kind: 'tab', label: 'Findings', run: () => switchTab('findings') },
@@ -1085,9 +1086,12 @@ function showSkeleton(tab) {
 }
 
 function renderTab(tab) {
+  // Leaving the War Room stops its poller; it restarts on entry (renderWarroom).
+  if (tab !== 'warroom' && typeof warStop === 'function') warStop();
   if (tab === 'overview') refreshBadges();
   else if (tab === 'campaign') { showSkeleton('campaign'); renderCampaign(); }
   else if (tab === 'mission') { showSkeleton('mission'); renderMission(); }
+  else if (tab === 'warroom') renderWarroom();
   else if (tab === 'approvals') { showSkeleton('approvals'); renderApprovals(); }
   else if (tab === 'ledger') { showSkeleton('ledger'); renderLedger(); }
   else if (tab === 'findings') { showSkeleton('findings'); fetchFindings(); }

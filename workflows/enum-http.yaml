@@ -1,21 +1,37 @@
 # Workflow seed — enum-http (dialetto workflow, Ondata 2 C1w)
-# Preflight richiede httpx+whatweb presenti (aggancio E5: tool-plane --require web).
+# Preflight richiede httpx-toolkit+whatweb presenti (aggancio E5: tool-plane --require web).
+#
+# NB sul nome del binario: su Kali il pacchetto ProjectDiscovery e' installato come
+# `httpx-toolkit`, perche' `/bin/httpx` e' il CLI di **Python httpx** (progetto diverso:
+# niente -title/-tech-detect, exit 2 sulla nostra sintassi). Il workflow puntava a `httpx`
+# nudo e falliva silenziosamente su questa macchina: qui e' `httpx-toolkit`.
+#
+# NB sugli artifact: httpx/whatweb scrivono su stdout e non accettano -o in modo
+# interoperabile tra le versioni -> il runner cattura stdout+stderr sul path dichiarato
+# (`from: stdout`). Senza quel campo il workflow registrava artifact `exists:false` con il
+# fingerprint perso (bug riscontrato il 2026-10-11 durante un assessment autorizzato).
+#
+# Uso:
+#   node tools/workflow.js run workflows/enum-http.yaml -t https://<host>/ --var tag=<nome>
 name: enum-http
-description: Enumerazione HTTP autorizzata (probe httpx + fingerprint whatweb)
+description: Enumerazione HTTP autorizzata (probe httpx-toolkit + fingerprint whatweb)
 vars:
+  tag: target
   outdir: reports
 requires:
-  - httpx
+  - httpx-toolkit
   - whatweb
 steps:
   - id: probe-httpx
-    cmd: node tools/run.js httpx -title -tech-detect -status-code -no-color {target}
+    cmd: node tools/run.js httpx-toolkit -u {target} -title -tech-detect -status-code -no-color
     on_error: continue
     artifacts:
-      - path: "{outdir}/enum-{target}-httpx.txt"
+      - path: "{outdir}/enum-{tag}-httpx.txt"
         surface: scan
+        from: stdout
   - id: whatweb-fingerprint
     cmd: node tools/run.js whatweb --no-errors -a 1 {target}
     artifacts:
-      - path: "{outdir}/enum-{target}-whatweb.txt"
+      - path: "{outdir}/enum-{tag}-whatweb.txt"
         surface: scan
+        from: stdout

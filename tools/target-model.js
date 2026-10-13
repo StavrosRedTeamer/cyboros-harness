@@ -20,7 +20,9 @@
 //     already-authorized-and-run tool output. It grants no capability and bypasses nothing.
 //
 // CLI:
-//   node tools/target-model.js ingest <tool> <file> [--target <host>]   # tool: nmap|httpx|ffuf|nuclei|netexec|testssl|whatweb|katana|dirsearch|enum4linux-ng|container
+//   node tools/target-model.js ingest <tool> <file> [--target <host>]   # tool: nmap|httpx|ffuf|nuclei|netexec|testssl|whatweb|katana|dirsearch|enum4linux-ng|container|openapi
+//   (openapi RICHIEDE --target: i path di una spec sono relativi, e l'host autorizzato lo sa solo
+//    chi chiama — mai dedurlo da `host`/`servers` dentro il documento)
 //   node tools/target-model.js snapshot                                 # whole model as JSON
 //   node tools/target-model.js hosts | services | vulns | creds         # focused views (JSON)
 //   node tools/target-model.js entities                                 # typed entities (validated) as JSON
@@ -42,7 +44,7 @@ const now = () => new Date().toISOString();
 // P1.4 (Ondata servizi): container (docker /version + kubelet /pods) → host/port/endpoint nodes
 // that coverage.js surfaces as the 'container' class (otherwise the matrix would claim
 // coverage of a surface nobody tested).
-const KNOWN_TOOLS = ['nmap', 'httpx', 'ffuf', 'nuclei', 'netexec', 'testssl', 'whatweb', 'katana', 'dirsearch', 'enum4linux-ng', 'container'];
+const KNOWN_TOOLS = ['nmap', 'httpx', 'ffuf', 'nuclei', 'netexec', 'testssl', 'whatweb', 'katana', 'dirsearch', 'enum4linux-ng', 'container', 'openapi'];
 
 // ------------------------------------------------------------------ store bootstrap
 // Additive tables. state.open() creates the base schema; we layer vulns + credentials on top.
@@ -292,6 +294,25 @@ function ingestWhatweb(db, raw, opts) {
   return { technologies: t };
 }
 
+// OpenAPI/Swagger → endpoint nel target model. Un endpoint relativo senza --target non si inventa:
+// si restituisce un conteggio 0 con la nota, e l'artefatto ingerito resta la provenienza (la
+// tabella `endpoints` non ha una colonna `source`: meglio niente che un campo scritto e ignorato).
+function ingestOpenApi(db, raw, opts) {
+  const rows = parsers.parseOpenApi(raw);
+  const host = (opts || {}).target;
+  if (!host) return { endpoints: 0, note: 'openapi endpoints are relative — pass --target <host>' };
+  const tid = state.upsertTarget(db, host);
+  let e = 0;
+  for (const r of rows) {
+    const p = r.path.startsWith('/') ? r.path : '/' + r.path;
+    state.upsertEndpoint(db, tid, r.method, `https://${host}${p}`, {
+      params: r.params.length ? r.params : null, auth: 0,
+    });
+    e++;
+  }
+  return { endpoints: e, host };
+}
+
 function ingestCrawl(db, raw, opts, tool) {
   let e = 0;
   const records = tool === 'dirsearch' ? parsers.parseDirsearchJson(raw) : parsers.parseKatanaJsonl(raw);
@@ -399,6 +420,7 @@ function ingest(db, tool, raw, opts) {
     case 'dirsearch': counts = ingestCrawl(db, raw, opts, 'dirsearch'); break;
     case 'enum4linux-ng': counts = ingestEnum4linuxNg(db, raw, opts); break;
     case 'container': counts = ingestContainer(db, raw, opts); break;
+    case 'openapi': counts = ingestOpenApi(db, raw, opts); break;
     default: return { ok: false, reason: `unknown tool "${tool}"` };
   }
   return { ok: true, tool: t, counts };

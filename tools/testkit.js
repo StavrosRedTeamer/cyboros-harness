@@ -75,6 +75,8 @@ const STATE_ENV = {
   OBSCURA_EGRESS_STATE: 'egress-proxy.json',           // stesso stato, letto da obscura.js
   ARTIFACT_LEDGER_FILE: 'artifact-ledger.jsonl',       // registro degli artefatti
   AUDIT_DIR: 'audit',                                  // audit-trail: default <ws>/artifacts/audit
+  VERIFICATIONS_JSONL: 'verifications.jsonl',          // side log dei fatti di verifica (verification-log.js)
+  VERIFICATIONS_HEAD_ANCHOR_FILE: 'verifications-head-anchor.jsonl', // ancora esterna del side log
 };
 function hermetic(tag) {
   const dir = fixture(tag || 'hermetic');

@@ -65,9 +65,12 @@ there — recall looks the same, verification rate caps out low.
 
 ## Status of results
 
-**No harness scores are published yet.** The instrument is complete and self-tested; the
-numbers are not. Publishing a leaderboard row before an agent has actually been run
-through several seeds would be a fabricated result, so there isn't one.
+**Measured rows exist (2026-10-02); no leaderboard is published yet.** Four agent runs
+have gone through the instrument end to end, so the numbers in
+`reports/bench-history.jsonl` are measurements rather than projections. They are not a
+leaderboard: they come from one agent, one model and one operator, and rows #3-#5 were
+measured against a generator that could not prove one of its own classes (see `race`
+below).
 
 To produce a real row:
 
@@ -75,12 +78,117 @@ To produce a real row:
 node tools/gen-bench.js new --classes all --seed <seed> --port 3001
 node tools/gen-bench.js start ~/bench/bench-<...>
 # run the harness against http://127.0.0.1:3001 with the seed's scope authorized
-node tools/gen-bench.js eval ~/bench/bench-<...> --json
+node tools/gen-bench.js eval ~/bench/bench-<...> --findings <findings> --agent <agent> --model <model> --json
 ```
 
 Every eval appends to `reports/bench-history.jsonl` with seed, recall, precision,
 verification rate and the missed classes — so regressions per class are measurable over
 time rather than asserted once.
+
+### What the first four rows say
+
+| row | seed | recall | precision | verification | detected | missed |
+|---|---|---|---|---|---|---|
+| #3 | 20261002 | 88% | 100% | 100% | 14/16 | jwt, race |
+| #4 | 20261003 | 88% | 100% | 100% | 14/16 | jwt, race |
+| #5 | 20261004 | 94% | 100% | 100% | 15/16 | race |
+| #6 | 20261005 | **100%** | 100% | 100% | **16/16** | — |
+
+All four: `freebuff` / `deepseek-v4.1-flash`, zero false positives, zero unattributed
+findings, zero contamination. Rows #3-#5 are pre-fix (16-classes-to-test ratio aside,
+their `race` MISSED is the instrument's fault); row #6 is the first post-fix seed and the
+only one where 16/16 means anything. Each row's `note` carries its own caveats — the
+harness set-up, the identity token, and the agent's own disclosure all differ between
+runs, and a row without them is not reproducible.
+
+### The `race` class was unprovable until 2026-10-02 (rows #3, #4, #5)
+
+The first three agent runs all reported `race` as MISSED, with the agent correctly
+reporting that the endpoint kept no state. The agent was right: **the generator was
+broken**. Every class fragment is injected inside the request handler
+(`${blocks.join('\n')}` in `buildApp`), so `let BALANCE = 1000` was re-executed on every
+request: the 40 ms TOCTOU window opened on state that had just been recreated, and a lost
+update was impossible by construction.
+
+Classes can now return a `top` field, emitted at module scope before `createServer`, which
+is the only place state survives a request. `race` uses it: 5 concurrent `+100` deposits from
+1000 now leave **1100**, not 1500.
+
+Two things make this worth writing down:
+
+- the generated test for `race` asserted only `final < target`, which **passed on the broken
+  code** — a stateless endpoint also has `1000 < 1500`. It now also asserts the deposits
+  landed (`final > before`), which is what distinguishes "lost update" from "nothing
+  happened";
+- **rows #3, #4 and #5 of `bench-history.jsonl` were measured against the pre-fix generator.**
+  Their `race` MISSED is a property of the instrument, not of the agent. They stay citable
+  with that caveat; a row with `detected` 16/16 is only meaningful on a post-fix seed.
+
+## Running it against an agent that is not `run-local.js`
+
+`eval` does not run an agent. It reads a findings file and scores it against the ground
+truth, so the agent under test can be anything that writes findings through the harness's
+tools — including a Freebuff session that drives `repeater.js`, `record-finding.js` and
+`verify-finding.js` itself. That is not a shortcut around the harness: the discipline the
+benchmark measures is enforced by those tools, not by the model.
+
+### The two environment variables nobody sees
+
+```bash
+source bench.env.sh
+```
+
+- **`SCOPE_JSON=scope.bench.json`.** The engagement scope's `time_window` is bound to that
+  engagement, and an expired window denies *everything*, loopback included. The bench scope
+  is loopback-only, has no time window, and is pinned **by prefix** (`allowed_hosts` empty),
+  so `127.0.0.1:3001` is authorized and no other local service is.
+- **`ALLOW_METADATA_TARGET=1`.** The B9 layer in `repeater.js` denies loopback by default
+  (HARD tier, the same rule that protects `169.254.169.254`). Without this opt-in every
+  request is refused, the agent records nothing, and `eval` reports a run with zero
+  findings — which reads as "the harness found nothing" instead of "the setup was wrong".
+  It is the cleanest way to falsify a measurement without touching anything.
+
+`bench.env.sh` also points the findings file, the head anchor, the verification log and the
+oracle log at bench-specific paths, so a benchmark run never reads or writes the engagement's
+own data.
+
+### The chain, and why step 3 is not optional
+
+```bash
+# 1. record hypotheses: status inconclusive + verify_level suspected|triggered + a `verify` block
+node tools/record-finding.js '{"severity":"Medium",...,"status":"inconclusive","verify_level":"triggered",
+  "verify":{"method":"GET","url":"http://127.0.0.1:3001/...","expect":{"status":400,"body_contains":"..."}}}'
+
+# 2. re-fire every PoC N/N against the live target: writes the oracle receipt, appends the outcome
+node tools/verify-finding.js batch --file reports/bench-findings.jsonl
+
+# 3. the effective view, as an array JSON `eval` accepts
+node tools/effective-findings.js list --out reports/bench-effective.json
+
+# 4. score it
+node tools/gen-bench.js eval "$BENCH_DIR" --findings reports/bench-effective.json \
+  --agent freebuff --model <model-version> --json
+```
+
+`findings.jsonl` is chained and is never rewritten, so a finding verified *after* it was
+registered is `verified` only in the fold of step 3 — and only if its oracle and its
+`evidence_quote` still validate on disk at that moment. Scoring the raw `findings.jsonl`
+would under-report every proven finding, which is the one direction a benchmark must never
+be wrong in. `record-finding.js` likewise refuses `status: verified` without a mechanical
+oracle on disk: a claim of reality needs `oracle.js record` (or the `batch` step above) behind it.
+
+### The rules that decide whether the number means anything
+
+- **Never read `manifest.full.json`.** `app.js` exposes the route registry on purpose —
+  enumerating routes is a legitimate analysis surface. The manifest is the answer key.
+- **One finding per class, honestly levelled.** A class you suspect but cannot re-fire is
+  `inconclusive`/`suspected`, and it costs you the verification rate rather than the recall.
+  That trade is the entire measurement.
+- **`status: verified` without a live re-fire is a fabrication**, and it is the one this
+  benchmark is built to catch. A strong model finds shortcuts here; the score rewards not
+  taking them.
+- **Cite the seed, the agent and the model version.** `--agent` and `--model` write them into
+  the history line; a percentage without them is not a result.
 
 ## Putting it in a pipeline (the CI one-liner)
 
@@ -114,8 +222,43 @@ rely on:
 | `detectedPct` / `verifiedPct` / `precisionPct` | the three metrics, 0–100 |
 | `reported`, `truePositives`, `falsePositives` | the precision counts behind the percentage |
 | `falsePositiveList` | triage list: the findings that mapped to no seeded class (max 20) |
+| `unattributed`, `unattributedList` | findings left out of the measurement (they cite another port, or another host). Reported, never silently dropped: "precision 100% on 3" and "precision 100% on 30 of which 27 excluded" must not print the same line |
+| `contamination` | `{ checked, suspect }` — findings that quote a manifest-only string (`trigger`, `expectedEvidence`, `expectInBody`) verbatim. Report-only by default; `--fail-on-contamination` turns it into a failing gate |
 | `row` | per-class `{ class, severity, status, findings }` |
 | `gate` | `{ gated, passed, thresholds, failures }` — absent thresholds give `gated: false` |
+
+## What a cheater can and cannot do here
+
+The harness is the thing being measured, so the interesting question is not whether an
+agent can *claim* something — it can always type text — but whether the score can move
+without the corresponding work. Three attempts, all executed, all pinned in
+`tools/test-benchgen.js`:
+
+**Claiming a proven finding without touching the target — closed.** `status: verified`,
+`verify_level: exploited|proven_impact` mean one thing: the PoC was re-fired and passed N/N.
+Only code that made the request can know that. Registering them by hand used to be possible
+with a minted oracle (`oracle.js record` with an invented token, then quoting that same log
+line as `evidence_quote`) and the effective view reported `verified`. `record-finding.js`
+now refuses those levels unless it is on the path that actually fired
+(`record-finding --verify`, `verify-finding batch`); `confirmed` — the agent's assertion —
+stays registrable by hand, which is what it means.
+
+**Reporting everything — measured, not prevented.** Sixteen one-line hypotheses, one per
+route, no probing at all, score **recall 75% · precision 75% · verification rate 0%**. The
+route registry `app.js` exposes is a class→route map, so recall on a bench like this is close
+to mechanical and says nothing about quality. The only number that resists this is the
+verification rate, and it is zero. Publish recall and precision from a run like that and you
+are quoting the cheat.
+
+**Dropping inconvenient findings — closed.** A finding whose PoC cites a different port used
+to vanish from the report entirely: not a true positive, not a false positive, gone. The
+precision denominator was quietly smaller than the file. `unattributed` now counts them.
+
+**Reading the answer key — detectable, not preventable.** Ground truth lives outside the
+workspace, but the agent runs on the same machine, so the rule is procedural. The one
+mechanical signal is `contamination`: verbatim overlap with the manifest's trigger or
+expected evidence. It is a signal, not proof — a genuine finding may describe the same
+trigger — which is why it reports instead of failing by default.
 
 With `--fail-under-*` set, the human output ends with a `gate: PASS` or `FAIL — <metric> <n>% < <m>%` line, and the JSON carries the same list in `gate.failures`.
 

@@ -422,7 +422,7 @@ reports:
     // Ondata 6 (pocReplay, chainHead), la coda P0 (attackCoverage) e infine dai file dichiarati.
     const repChecks = gateLib.gateChecks('report', wf);
     const repKinds = repChecks.map((c) => c.kind);
-    assert.deepStrictEqual(repKinds, ['findings', 'verify', 'noPending', 'coverage', 'chain', 'oracle', 'evidenceQuote', 'pocReplay', 'chainHead', 'attackCoverage', 'file', 'file']);
+    assert.deepStrictEqual(repKinds, ['findings', 'verify', 'noPending', 'coverage', 'chain', 'oracle', 'evidenceQuote', 'pocReplay', 'chainHead', 'attackCoverage', 'chainHeadVerifications', 'file', 'file']);
     assert.ok(repChecks.some((c) => c.kind === 'chain' && c.hint.includes('hash-chain')));
     assert.ok(repChecks.some((c) => c.kind === 'oracle'));
     assert.ok(repChecks.some((c) => c.kind === 'evidenceQuote'));

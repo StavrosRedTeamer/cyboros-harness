@@ -40,8 +40,9 @@ const path = require('path');
 const os = require('os');
 const crypto = require('crypto');
 const { lookupMaxBestEpss, normCve, normCwe } = require('./epss');
-const { claimingReality, validateOracle, GENESIS } = require('./oracle');
+const { claimingReality, validateOracle } = require('./oracle');
 const { validateQuote } = require('./evidence-quote');
+const chain = require('./chain-log');
 
 const SEV = ['Critical', 'High', 'Medium', 'Low', 'Info'];
 const REQUIRED = ['severity', 'title', 'host', 'poc'];
@@ -116,12 +117,28 @@ function standardsFor(f) {
 
 // `class` is optional but, when present, must be a known registry key (keeps the taxonomy
 // honest so standards enrichment and reporting can rely on it).
-function validate(f) {
+// opts.promoted: true solo per la promotion post-esecuzione (recordWithVerify / verify-finding
+// batch), che hanno sparato la richiesta e possono quindi scrivere i livelli piu' pesanti.
+function validate(f, opts) {
   for (const k of REQUIRED) if (!f[k] || String(f[k]).trim() === '') return `missing field: ${k}`;
   if (f.class && !REGISTRY[f.class])
     return `unknown class '${f.class}' (use one of test-registry classes: ${registryClasses().join('/')})`;
   if (!SEV.includes(f.severity)) return `severity must be one of ${SEV.join('/')}`;
   if (f.status && !['confirmed', 'inconclusive', 'verified'].includes(f.status)) return 'status must be confirmed|inconclusive|verified';
+  // ── CHIUSURA DELLA FORA PIU' ECONOMICA ────────────────────────────────────────
+  // `verified` / `exploited` / `proven_impact` significano UNA cosa sola: il PoC e' stato
+  // ri-sparato e ha passato N/N. Lo sa un codice che ha fatto la richiesta, non un testo.
+  // Prima si poteva registrare 'verified' a mano allegando un oracolo coniato
+  // (`oracle.js record` con un token inventato + la stessa riga come evidence_quote): zero
+  // traffico, finding con il peso massimo, e la vista effettiva lo dava per verificato.
+  // Ora quei livoli si raggiungono solo da un percorso che ha eseguito: `record-finding
+  // --verify` (ri-spara e poi promuove) o `verify-finding batch` (promuove a posteriori).
+  // `confirmed` resta registrabile a mano: e' per definizione l'affermazione dell'agente.
+  if (!(opts && opts.promoted) && (f.status === 'verified' || f.verify_level === 'exploited' || f.verify_level === 'proven_impact'))
+    return 'status verified / verify_level exploited|proven_impact cannot be registered by hand: they mean the PoC '
+      + 'was re-fired and passed N/N, which only code that made the request can know. Register it as '
+      + '{"status":"confirmed"} (or "inconclusive") with a `verify` block and run '
+      + '`node tools/record-finding.js --verify \'<json>\'` or `node tools/verify-finding.js batch`.';
   if (f.verify_level && !VERIFY_LEVELS.includes(f.verify_level))
     return `verify_level must be one of ${VERIFY_LEVELS.join('|')} (suspected|triggered|exploited|proven_impact)`;
   // Coherence: severity must never exceed the verification level (pentest persona rule).
@@ -354,9 +371,11 @@ function syncToFindingsTab(f, opts) {
 // prefix: they are anchored by the first chained line but never failed retroactively. Once a
 // chained line exists, the chain must be CONTINUOUS — a stripped chain after a chained line is
 // treated as tampering (fail closed).
-function sha256Hex(s) {
-  return crypto.createHash('sha256').update(s, 'utf8').digest('hex');
-}
+//
+// La meccanica vive in tools/chain-log.js: dal 2026-09-28 lo stesso contratto serve anche al
+// side log delle verifiche (tools/verification-log.js), e una seconda copia della stessa catena
+// è una seconda copia che diverge. Le funzioni sotto restano esportate con le loro firme.
+const sha256Hex = chain.sha256Hex;
 
 // ── Ondata 6: external HEAD anchoring (mitigates the A3 whole-file-rewrite limit) ──
 // A3 detects mid-chain flips, but a WHOLESALE rewrite of findings.jsonl (chain regenerated
@@ -367,85 +386,38 @@ const ANCHOR_FILE = () => process.env.FINDINGS_HEAD_ANCHOR_FILE
   || path.join(__dirname, '..', 'reports', 'tmp', 'findings-head-anchor.jsonl');
 
 function appendHeadAnchor(headSha256, seq) {
-  try {
-    const file = ANCHOR_FILE();
-    fs.mkdirSync(path.dirname(file), { recursive: true });
-    fs.appendFileSync(file, JSON.stringify({
-      kind: 'findings-head-anchor', ts: new Date().toISOString(), seq, head_sha256: headSha256,
-    }) + '\n');
-    return { ok: true, file };
-  } catch (e) {
-    return { ok: false, error: e && e.message ? e.message : String(e) };
-  }
+  return chain.appendHeadAnchor({
+    anchorFile: ANCHOR_FILE(), headSha256, seq, kind: 'findings-head-anchor',
+  });
 }
 
 // Head of the chained suffix: {seq, head_sha256} — or null when no chained line exists.
-function chainHead(lines) {
-  for (let i = (lines || []).length - 1; i >= 0; i--) {
-    let f = null;
-    try { f = JSON.parse(lines[i]); } catch { continue; }
-    if (f && f.chain && typeof f.chain === 'object') return { seq: f.chain.seq, head_sha256: sha256Hex(lines[i]) };
-  }
-  return null;
-}
+const chainHead = chain.chainHead;
 
 // Compare the latest head anchor against the current findings.jsonl on disk. Fail-closed on
 // every tamper shape: broken chain, anchors-without-chain (wipe), anchored-line hash mismatch.
 function verifyHeadAnchor(opts) {
-  const anchorFile = (opts && opts.anchorFile) || ANCHOR_FILE();
-  const findingsFile = (opts && opts.findingsFile) || OUT();
-  let anchors = [];
-  try {
-    anchors = fs.readFileSync(anchorFile, 'utf8').split('\n').filter(Boolean)
-      .map((l) => { try { return JSON.parse(l); } catch { return null; } })
-      .filter((a) => a && a.kind === 'findings-head-anchor' && typeof a.head_sha256 === 'string');
-  } catch { /* no anchors yet */ }
-  if (!anchors.length) return { ok: true, detail: 'no head anchors recorded yet — nothing to compare (informational)' };
-  let lines = [];
-  try { lines = fs.readFileSync(findingsFile, 'utf8').split('\n').filter(Boolean); } catch { /* missing file */ }
-  const chainState = verifyFindingsChain(lines);
-  if (!chainState.ok) return { ok: false, detail: `findings chain broken: ${chainState.reason}` };
-  if (!chainState.chained)
-    return { ok: false, detail: `${anchors.length} head anchor(s) exist but findings.jsonl has no chained lines — possible wipe/tampering` };
-  const last = anchors[anchors.length - 1];
-  const anchoredLine = Number.isInteger(last.seq) ? lines[last.seq - 1] : undefined;
-  if (anchoredLine != null && sha256Hex(anchoredLine) === last.head_sha256)
-    return { ok: true, detail: `head anchor #${anchors.length} (seq ${last.seq}) matches findings.jsonl line ${last.seq}` };
-  return { ok: false, detail: `head anchor mismatch: anchor seq=${last.seq} head=${String(last.head_sha256).slice(0, 12)}… does not hash-match findings.jsonl line ${last.seq} — chain was rewritten, truncated or wiped after anchoring` };
+  return chain.verifyHeadAnchor({
+    file: (opts && opts.findingsFile) || OUT(),
+    anchorFile: (opts && opts.anchorFile) || ANCHOR_FILE(),
+    kind: 'findings-head-anchor',
+    rechainKind: 'findings-rechain',
+    fileName: 'findings.jsonl',
+  });
 }
 
 // Verify a raw (non-empty) findings.jsonl line array. Returns
 //   { ok:true, chained, legacy } | { ok:false, index, reason }
-function verifyFindingsChain(lines) {
-  let chained = 0, legacy = 0;
-  for (let i = 0; i < lines.length; i++) {
-    const raw = lines[i];
-    let f = null;
-    try { f = JSON.parse(raw); } catch { /* unparseable lines still hash-chain via raw text */ }
-    if (!f || typeof f.chain !== 'object' || f.chain === null) {
-      if (chained > 0)
-        return { ok: false, index: i, reason: `chain sequence interrupted: unchained line ${i + 1} follows a chained line` };
-      legacy++;
-      continue;
-    }
-    const expectedPrev = i === 0 ? '0'.repeat(64) : sha256Hex(lines[i - 1]);
-    if (f.chain.prev_sha256 !== expectedPrev)
-      return { ok: false, index: i, seq: f.chain.seq, reason: `prev_sha256 mismatch at line ${i + 1} (expected ${expectedPrev.slice(0, 12)}…)` };
-    if (f.chain.seq !== i + 1)
-      return { ok: false, index: i, seq: f.chain.seq, reason: `seq gap at line ${i + 1}: chain.seq=${f.chain.seq}, expected ${i + 1}` };
-    chained++;
-  }
-  return { ok: true, chained, legacy };
-}
+const verifyFindingsChain = chain.verifyChain;
 
-function record(raw) {
+function record(raw, opts) {
   let f;
   try {
     f = JSON.parse(raw);
   } catch (e) {
     return { ok: false, error: 'invalid JSON: ' + e.message };
   }
-  const err = validate(f);
+  const err = validate(f, opts);
   if (err) return { ok: false, error: err };
   if (typeof f.secret === 'string') f.secret = require('./privacy').rehydrate(f.secret);
   vaultSecret(f);
@@ -459,37 +431,31 @@ function record(raw) {
   f.ts = new Date().toISOString();
 
   const existing = fs.existsSync(OUT()) ? fs.readFileSync(OUT(), 'utf8').split('\n').filter(Boolean) : [];
-  if (existing.some((l) => { try { return key(JSON.parse(l)) === key(f); } catch { return false; } })) {
-    // Already in findings.jsonl — still upsert the tab row (backfills DBs from before the sync existed; idempotent).
-    return Object.assign({ ok: true, deduped: true, key: key(f) }, syncToFindingsTab(f));
+  const dupIdx = existing.findIndex((l) => { try { return key(JSON.parse(l)) === key(f); } catch { return false; } });
+  if (dupIdx >= 0) {
+    // Already in findings.jsonl — still upsert the tab row (backfills DBs from before the sync
+    // existed; idempotent). `seq` è la riga del finding GIÀ presente: è ciò che permette a un
+    // fatto di verifica registrato dopo (tools/verification-log.js) di puntare alla riga giusta,
+    // invece di riscrivere il file (che romperebbe la catena A3: vedi E3).
+    return Object.assign({ ok: true, deduped: true, key: key(f), seq: dupIdx + 1 }, syncToFindingsTab(f));
   }
 
-  // A3: refuse to extend a broken chain (fail closed), then anchor the new line to the last
-  // raw line on disk (genesis '0'*64; legacy unchained lines are anchored transparently).
-  const chainState = verifyFindingsChain(existing);
-  if (!chainState.ok)
-    return { ok: false, error: `findings.jsonl hash-chain broken at line ${chainState.index + 1}: ${chainState.reason} — refusing to append; investigate/restore reports/findings.jsonl before recording` };
-  const line = buildChainedLine(f, existing);
-  const selfCheck = verifyFindingsChain([...existing, line]);
-  if (!selfCheck.ok)
-    return { ok: false, error: `internal chain self-check failed (${selfCheck.reason}) — nothing written` };
-
-  fs.appendFileSync(OUT(), line + '\n');
-  // Ondata 6: external head anchoring — record the new head hash right after the append.
-  const chained = JSON.parse(line);
-  const headAnchor = appendHeadAnchor(sha256Hex(line), chained.chain.seq);
-  return Object.assign({ ok: true, recorded: key(f), seq: chained.chain.seq, head_anchor: headAnchor }, syncToFindingsTab(f));
+  // A3 + Ondata 6: refuse to extend a broken chain (fail closed), then append and anchor the new
+  // head — meccanica in tools/chain-log.js, condivisa col side log delle verifiche.
+  const appended = chain.appendChained(OUT(), f, {
+    fileName: 'findings.jsonl', ts: f.ts,
+    anchorFile: ANCHOR_FILE(), anchorKind: 'findings-head-anchor',
+  });
+  if (!appended.ok) return { ok: false, error: appended.error };
+  return Object.assign(
+    { ok: true, recorded: key(f), seq: appended.seq, head_anchor: appended.head_anchor },
+    syncToFindingsTab(f));
 }
 
 // Serialize the finding deterministically and attach its chain entry: hash input is the exact
 // string written to disk minus the trailing newline.
 function buildChainedLine(f, existingRawLines) {
-  f.chain = {
-    seq: existingRawLines.length + 1,
-    prev_sha256: existingRawLines.length ? sha256Hex(existingRawLines[existingRawLines.length - 1]) : GENESIS,
-    ts: f.ts,
-  };
-  return JSON.stringify(f);
+  return chain.buildChainedLine(f, existingRawLines, f.ts);
 }
 
 // Optional inline oracle: if the finding carries a `verify` block, re-fire it and set status
@@ -506,9 +472,11 @@ function buildChainedLine(f, existingRawLines) {
 async function recordWithVerify(raw, verifier) {
   let f;
   try { f = JSON.parse(raw); } catch (e) { return { ok: false, error: 'invalid JSON: ' + e.message }; }
+  let outcome = null;
   if (f.verify) {
     verifier = verifier || ((finding) => require('./verify-finding').verifyOne(finding));
     const r = await verifier(f);
+    outcome = { verified: r.verified, reason: r.reason, runs: r.runs };
     if (r.verified) { f.status = 'verified'; f.verified = true; f.verified_at = new Date().toISOString(); }
     else { f.status = f.status || 'confirmed'; f.verify_failed = true; f.verify_reason = r.reason; }
     if (!f.oracle) {
@@ -533,7 +501,23 @@ async function recordWithVerify(raw, verifier) {
       f.evidence_quote = { file: rec.ref, text: anchor };
     }
   }
-  return record(JSON.stringify(f));
+  const res = record(JSON.stringify(f), { promoted: true });
+  // E3: se il finding era GIÀ registrato, `record()` risponde `deduped` e non tocca nulla (per
+  // costruzione: findings.jsonl è immutabile). Il risultato della verifica è un fatto nuovo e va
+  // nel side log append-only, non in una riscrittura che romperebbe la catena A3.
+  if (res.ok && res.deduped && outcome && f.oracle && f.verify) {
+    res.verification_log = require('./verification-log').append({
+      finding_key: key(f),
+      finding_seq: res.seq,
+      outcome: outcome.verified ? 'verified' : 'failed',
+      reason: outcome.reason,
+      runs: outcome.runs,
+      oracle: f.oracle,
+      evidence_quote: f.evidence_quote,
+      verifier: 'recordWithVerify/verify-finding.js',
+    });
+  }
+  return res;
 }
 
 if (require.main === module) {

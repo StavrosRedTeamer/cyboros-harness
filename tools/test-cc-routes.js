@@ -98,6 +98,12 @@ async function req(port, method, p, body, withToken) {
   const led = await req(port, 'GET', '/api/cc/ledger');
   assert.strictEqual(led.status, 200, 'GET ledger');
 
+  const warroom = await req(port, 'GET', '/api/cc/warroom');
+  assert.strictEqual(warroom.status, 200, 'GET warroom');
+  assert.ok(Array.isArray(warroom.json.attention), 'warroom exposes its attention rail');
+  assert.ok(warroom.json.headline, 'warroom composes the mission headline');
+  assert.strictEqual(warroom.json.scope.fail_closed, false, 'scope fixture is not fail-closed');
+
   // writes require the session token
   const noTok = await req(port, 'POST', '/api/cc/approvals/request', { host: 'lab.local', action_class: 'c2', command: 'nmap lab.local' });
   assert.strictEqual(noTok.status, 403, 'write without token → 403');
@@ -116,6 +122,39 @@ async function req(port, method, p, body, withToken) {
   const badDispatch = await req(port, 'POST', '/api/cc/dispatch', { argv: ['/bin/sh', '-c', 'id'] }, true);
   assert.strictEqual(badDispatch.status, 400, 'non-allowlisted dispatch refused');
 
+  // Panic: token-gated + typed confirmation, checked server-side. The refusal paths are
+  // tested here; the wrapper itself is exercised offline in test-cc-panic.js (running it
+  // for real from a test could touch live process registries).
+  const panicNoTok = await req(port, 'POST', '/api/cc/warroom/panic', { confirm: 'PANIC' });
+  assert.strictEqual(panicNoTok.status, 403, 'panic without token → 403');
+  const panicNoConfirm = await req(port, 'POST', '/api/cc/warroom/panic', { confirm: 'nope' }, true);
+  assert.strictEqual(panicNoConfirm.status, 400, 'panic without typed confirmation refused');
+  assert.strictEqual(panicNoConfirm.json.expected, 'PANIC');
+
+  // Host focus: a write (campaign.host), so it needs the token and an active campaign, and
+  // it answers with the NEW snapshot so the board does not need a second round trip.
+  const focusNoTok = await req(port, 'POST', '/api/cc/warroom/focus', { host: 'lab.local' });
+  assert.strictEqual(focusNoTok.status, 403, 'focus without token → 403');
+  const focusNoCampaign = await req(port, 'POST', '/api/cc/warroom/focus', { host: 'lab.local' }, true);
+  assert.strictEqual(focusNoCampaign.status, 400, 'focus without an active campaign refused');
+
+  const made = await req(port, 'POST', '/api/cc/campaign/create', { template: 'web-app', client: 'acme' }, true);
+  assert.strictEqual(made.status, 200, 'campaign created');
+  const activated = await req(port, 'POST', '/api/cc/campaign/activate', { campaign: made.json.campaign }, true);
+  assert.strictEqual(activated.status, 200, 'campaign activated');
+
+  const focused = await req(port, 'POST', '/api/cc/warroom/focus', { host: 'https://Lab.Local:8443/x' }, true);
+  assert.strictEqual(focused.status, 200, 'focus set');
+  assert.strictEqual(focused.json.host_focus.host, 'lab.local', 'a pasted URL is normalized to its host');
+  assert.strictEqual(focused.json.host_focus.in_scope, true, 'the fixture host is authorized');
+  assert.strictEqual(focused.json.engagement.focus.source, 'campaign');
+  assert.ok(Array.isArray(focused.json.ledger.feed), 'the focus answer carries the full snapshot');
+
+  const cleared = await req(port, 'POST', '/api/cc/warroom/focus', { host: null }, true);
+  assert.strictEqual(cleared.status, 200, 'focus cleared');
+  assert.strictEqual(cleared.json.host_focus, null, 'the board goes back to the whole scope');
+  assert.strictEqual(cleared.json.campaign.host, null, 'the manifest carries the cleared focus');
+
   // Arsenal install is gated by mode + a typed confirmation, checked server-side. None of
   // these start a job (that would install software from a test).
   const noConfirm = await req(port, 'POST', '/api/cc/arsenal/install', { mode: 'run' }, true);
@@ -129,6 +168,8 @@ async function req(port, method, p, body, withToken) {
   // WP8 static allowlist: known view assets are served, unknown ones are not.
   const viewJs = await req(port, 'GET', '/views-engagement.js');
   assert.strictEqual(viewJs.status, 200, 'view asset served by the allowlist');
+  const warView = await req(port, 'GET', '/views-warroom.js');
+  assert.strictEqual(warView.status, 200, 'war room view asset served');
   const badStatic = await req(port, 'GET', '/passwd');
   assert.strictEqual(badStatic.status, 404, 'no file traversal / unknown assets');
 

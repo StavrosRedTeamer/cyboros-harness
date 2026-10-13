@@ -68,6 +68,14 @@ async function main() {
   const manifest = JSON.parse(fs.readFileSync(path.join(outDir, 'manifest.full.json'), 'utf8'));
   check('manifest has all 16 classes', manifest.classes.length === 16, 'got ' + manifest.classes.length);
   check('routes unique', new Set(manifest.classes.map(c => c.route)).size === manifest.classes.length);
+  // Difesa strutturale sulla classe race: lo stato deve stare fuori dall'handler. Dentro, il `let`
+  // viene rieseguito a ogni richiesta e il lost update è impossibile — bug silenzioso, perché il
+  // test di trigger passava comunque (saldo fermo a 1000 < 1500).
+  const appSrc = fs.readFileSync(path.join(outDir, 'app.js'), 'utf8');
+  const balDecl = appSrc.match(/let BALANCE_\w+ = 1000;/);
+  check('race state declared at module scope (before createServer), not inside the handler',
+    !!balDecl && balDecl.index < appSrc.indexOf('http.createServer'),
+    balDecl ? 'declaration at ' + balDecl.index + ', createServer at ' + appSrc.indexOf('http.createServer') : 'nessuna dichiarazione BALANCE trovata');
   check('black-box: manifest not inside workspace', outDir.startsWith(tmpBase));
 
   // ── determinism + anti-cheat ──
@@ -116,8 +124,13 @@ async function main() {
       const after = await httpReq(port, 'GET', c.route);
       const a = JSON.parse(after.body).balance;
       const target = b + t.parallel * Number(t.body);
-      check('trigger race (final ' + a + ' < ' + target + ')',
-        res.every(r => r.status === t.expectStatus) && a < target);
+      // Le due metà del TOCTOU: `a < target` da solo passava anche quando NON succedeva niente
+      // (stato per-request → balance fermo a 1000, che è comunque < 1500). Il lost update si
+      // distingue dal "non è successo nulla" solo se il saldo è salito: serve `a > b`.
+      check('trigger race (final ' + a + ' < ' + target + ', and deposits landed: ' + (a > b) + ')',
+        res.every(r => r.status === t.expectStatus) && a < target && a > b,
+        'before=' + b + ' after=' + a + ' — se after===before i depositi non sono mai arrivati, '
+        + 'non è un lost update: è stato assente');
       continue;
     }
     const r = await httpReq(port, t.method, t.path, { headers: t.headers, body: t.body });
@@ -165,6 +178,53 @@ async function main() {
   })).join('\n') + '\n');
   const ev3 = JSON.parse(execFileSync(process.execPath, [path.join(TOOLS, 'gen-bench.js'), 'eval', outDir, '--findings', wrongHost, '--json', '--no-history'], { encoding: 'utf8' }));
   check('eval with matching keywords but foreign host → 0 detected', ev3.detected === 0, 'detected=' + ev3.detected);
+  check('findings su un altro host sono CONTATI fra gli esclusi, non spariti',
+    ev3.unattributed === manifest.classes.length, 'unattributed=' + ev3.unattributed);
+
+  // ── un finding che cita un'altra porta non puo' uscire dal report in silenzio ──
+  // Era il buco piu' subdolo della misura: "precision 100% su 3 finding" e "precision 100%
+  // su 30 finding di cui 27 esclusi" erano la stessa riga di report.
+  const otherPort = path.join(tmpBase, 'other-port.jsonl');
+  fs.writeFileSync(otherPort, [
+    JSON.stringify({ id: 'keep', title: manifest.classes[0].title, host: '127.0.0.1', endpoint: 'http://127.0.0.1:' + port + manifest.classes[0].route, status: 'verified' }),
+    JSON.stringify({ id: 'drop', title: manifest.classes[0].title + ' (OOB)', host: '127.0.0.1', endpoint: manifest.classes[0].route, poc: 'listener 127.0.0.1:9090, GET ' + manifest.classes[0].route + ' -> 200' }),
+  ].join('\n') + '\n');
+  const evDrop = JSON.parse(execFileSync(process.execPath, [path.join(TOOLS, 'gen-bench.js'), 'eval', outDir, '--findings', otherPort, '--json', '--no-history'], { encoding: 'utf8' }));
+  check('un finding che cita un`altra porta è escluso MA conteggiato',
+    evDrop.unattributed === 1 && evDrop.unattributedList[0] === 'drop' && evDrop.reported === 1,
+    'unattributed=' + evDrop.unattributed + ' reported=' + evDrop.reported);
+
+  // ── contaminazione: un finding che ricopia il manifest verbatim viene segnalato ──
+  const leaky = path.join(tmpBase, 'leaky.jsonl');
+  const ssrf = manifest.classes.find(c => c.id === 'ssrf');
+  fs.writeFileSync(leaky, JSON.stringify({
+    id: 'leaky', title: 'SSRF on the search endpoint', host: '127.0.0.1',
+    endpoint: 'http://127.0.0.1:' + port + ssrf.route, poc: ssrf.trigger, status: 'inconclusive',
+  }) + '\n');
+  const evLeak = JSON.parse(execFileSync(process.execPath, [path.join(TOOLS, 'gen-bench.js'), 'eval', outDir, '--findings', leaky, '--json', '--no-history'], { encoding: 'utf8' }));
+  check('un finding che cita il trigger del manifest verbatim è segnalato come contaminazione',
+    evLeak.contamination.suspect.length === 1 && evLeak.contamination.suspect[0].class === 'ssrf',
+    JSON.stringify(evLeak.contamination));
+  const evLeakGate = spawnSync(process.execPath, [path.join(TOOLS, 'gen-bench.js'), 'eval', outDir, '--findings', leaky, '--json', '--no-history', '--fail-on-contamination'], { encoding: 'utf8' });
+  check('--fail-on-contamination → exit 1 (la contaminazione può essere bloccante)',
+    evLeakGate.status === 1 && /contamination/.test(JSON.parse(evLeakGate.stdout).gate.failures.join(' ')),
+    'status=' + evLeakGate.status);
+  // Regressione: `test.expectInBody` NON e' ground truth, e' il payload che il bersaglio
+  // accetta. Con quel campo fra i segnali, ogni finding XSS corretto veniva flaggato come
+  // contaminato — un gate che punisce la risposta giusta e lascia passare quella falsa.
+  const xss = manifest.classes.find(c => c.id === 'xss');
+  const canonicalXss = path.join(tmpBase, 'xss-canonical.jsonl');
+  fs.writeFileSync(canonicalXss, JSON.stringify({
+    id: 'xss-ok', title: 'Cross-site scripting in name parameter', host: '127.0.0.1',
+    endpoint: 'http://127.0.0.1:' + port + xss.route, status: 'inconclusive', verify_level: 'triggered',
+    poc: 'GET ' + xss.route + '?name=' + encodeURIComponent('<script>alert(1)</script>') + ' -> 200 body echoes <h1>Hello <script>alert(1)</script></h1>, reflected unencoded',
+  }) + '\n');
+  const evXss = JSON.parse(execFileSync(process.execPath, [path.join(TOOLS, 'gen-bench.js'), 'eval', outDir, '--findings', canonicalXss, '--json', '--no-history', '--fail-on-contamination'], { encoding: 'utf8' }));
+  check('un finding XSS canonico NON è contaminazione (il payload è il bersaglio, non la risposta)',
+    evXss.contamination.suspect.length === 0 && evXss.gate.passed === true,
+    JSON.stringify(evXss.contamination.suspect));
+  check('e il finding XSS canonico viene comunque conteggiato come rilevato',
+    evXss.detected === 1 && evXss.precisionPct === 100, 'detected=' + evXss.detected);
 
   // ── eval: correct findings → all detected ──
   const goodFindings = path.join(tmpBase, 'good.jsonl');
@@ -187,6 +247,9 @@ async function main() {
   check('correct findings → 100% precision (0 FP)',
     ev1.falsePositives === 0 && ev1.precisionPct === 100,
     'fp=' + ev1.falsePositives + ' precision=' + ev1.precisionPct + '%');
+  check('finding puliti: zero contaminazione sospetta e zero esclusi',
+    ev1.contamination.suspect.length === 0 && ev1.unattributed === 0,
+    JSON.stringify({ c: ev1.contamination.suspect.length, u: ev1.unattributed }));
   const noisyFindings = path.join(tmpBase, 'noisy.jsonl');
   fs.writeFileSync(noisyFindings,
     lines.join('\n') + '\n' + [
@@ -238,7 +301,7 @@ async function main() {
     runEval([outDir, '--findings', path.join(tmpBase, 'nope.jsonl'), '--json', '--no-history']).status === 2);
 
   // ── history tracking: una riga jsonl per eval (cwd isolato in tmpBase) ──
-  const ev4 = JSON.parse(execFileSync(process.execPath, [path.join(TOOLS, 'gen-bench.js'), 'eval', outDir, '--findings', goodFindings, '--json'], { encoding: 'utf8', cwd: tmpBase }));
+  const ev4 = JSON.parse(execFileSync(process.execPath, [path.join(TOOLS, 'gen-bench.js'), 'eval', outDir, '--findings', goodFindings, '--json', '--agent', 'test-harness', '--model', 'test-model'], { encoding: 'utf8', cwd: tmpBase }));
   const histPath = path.join(tmpBase, 'reports', 'bench-history.jsonl');
   check('eval appends bench-history.jsonl', fs.existsSync(histPath));
   if (fs.existsSync(histPath)) {
@@ -248,6 +311,18 @@ async function main() {
       hist.length === 1 && last.seed === 424242 && typeof last.detectedPct === 'number' && Array.isArray(last.missed),
       'entries=' + hist.length);
     check('--json summary reports history note', typeof ev4.history === 'string' && ev4.history.includes('#1'));
+    // La provenienza viaggia con la riga. Un punteggio che dice solo "73% precision" non
+    // riproduce niente: senza agente, modello e seed la cifra non è citabile.
+    check('history entry carries the agent and model under test',
+      last.agent === 'test-harness' && last.model === 'test-model' && last.seed === 424242,
+      'agent=' + last.agent + ' model=' + last.model);
+  check('--json summary carries the same provenance',
+    ev4.agent === 'test-harness' && ev4.model === 'test-model');
+  const ev5 = JSON.parse(execFileSync(process.execPath, [path.join(TOOLS, 'gen-bench.js'), 'eval', outDir, '--findings', goodFindings, '--json', '--note', 'budget: 12/16 classi tentate'], { encoding: 'utf8', cwd: tmpBase }));
+  check('--note viaggia con la riga di history e con il JSON',
+    ev5.note === 'budget: 12/16 classi tentate' &&
+    JSON.parse(fs.readFileSync(histPath, 'utf8').split('\n').filter(Boolean).pop()).note === 'budget: 12/16 classi tentate',
+    'note=' + ev5.note);
   }
 
   // ── cleanup ──
