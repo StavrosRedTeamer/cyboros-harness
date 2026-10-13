@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // tools/llm-inject.js — deterministic prompt-injection baseline sweep (LLM01/LLM07, detection-only).
 //
-// Automates at session start what the stavros-llm agent does by hand: fingerprint an AI surface
+// Automates at session start what the cyboros-llm agent does by hand: fingerprint an AI surface
 // (chat/LLM/RAG/agent endpoints), fire the BENIGN MARKER probes from tools/payloads/llm-agentic.md
 // with a baseline comparison (false-positive duty), and report hits. Every probe goes through
 // tools/repeater.js, so the HARD scope-guard applies to each request (DNS pinning, ssrf-guard B9,
@@ -30,7 +30,7 @@ const WS = path.join(__dirname, '..');
 const AI_SURFACE_RE = /\/(chat|api\/chat|v1\/chat\/completions|v1\/messages|v1\/responses|completions|generate|ask|semantic|embed|agent|mcp|tools|openapi\.json|inference)\b/i;
 
 // Unique per-run in real engagements (substitute it); constant here keeps results deterministic.
-const MARKER = 'stavros-a1b2c3';
+const MARKER = 'cyboros-a1b2c3';
 
 // An instruction block usually opens with a role/identity phrase and is longer than small talk.
 function leakyReply(t) {

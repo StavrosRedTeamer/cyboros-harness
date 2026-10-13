@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
-# chat.sh — apre il REPL interattivo StavrosRedTeamer, assicurandosi che il modello locale
+# chat.sh — apre il REPL interattivo Cyboros Harness, assicurandosi che il modello locale
 # sia su col server PULITO (serve.sh, NIENTE DRY: il REPL fa tool-calling e il DRY lo rompe).
-# Uso:  bash ~/Desktop/stavrosredteamer/local/chat.sh [host] [--phase ...] [--class ...] [--auto]
+# Uso:  bash ~/Desktop/cyboros-harness/local/chat.sh [host] [--phase ...] [--class ...] [--auto]
 set -u
 SERVE="$HOME/models/qwen36-35b-abl/serve.sh"
-REPL="$HOME/Desktop/stavrosredteamer/local/chat-local.js"
+REPL="$HOME/Desktop/cyboros-harness/local/chat-local.js"
 
 if ! curl -s http://127.0.0.1:8080/v1/models >/dev/null 2>&1; then
   echo "· Modello non attivo → avvio serve.sh (pulito, no DRY)…"

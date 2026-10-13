@@ -131,7 +131,7 @@ function handleRequest(raw) {
   const id = req.id !== undefined ? req.id : null;
   const params = req.params === undefined ? {} : req.params;
   if (req.method === 'initialize') {
-    return { jsonrpc: '2.0', id, result: { protocolVersion: '2025-03-26', capabilities: { tools: {} }, serverInfo: { name: 'stavros-mcp-bridge', version: '1' } } };
+    return { jsonrpc: '2.0', id, result: { protocolVersion: '2025-03-26', capabilities: { tools: {} }, serverInfo: { name: 'cyboros-mcp-bridge', version: '1' } } };
   }
   if (req.method === 'tools/list') {
     return { jsonrpc: '2.0', id, result: { tools: TOOLS } };

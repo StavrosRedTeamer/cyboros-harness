@@ -26,7 +26,7 @@ const WS = () => process.env.GATE_WS || path.join(__dirname, '..');
 const REPORTS = () => path.join(WS(), 'reports');
 // GATE_LOG_FILE: override per i test (fixture in mkdtemp, MAI il gate-log reale).
 const GATE_LOG = () => process.env.GATE_LOG_FILE || path.join(REPORTS(), 'gate-log.md');
-const MODE = 'stavros';
+const MODE = 'cyboros';
 
 // ─── Gate definitions (structural checks, never model judgement) ───
 // Each gate has:
@@ -67,7 +67,7 @@ const GATES = {
     title: 'Vulnerability testing baseline',
     checks: [
       { kind: 'findings', min: 1, hint: 'findings recorded' },
-      { kind: 'markers', file: 'reports/gate-log.md', markers: ['stavros/map'], hint: 'map gate passed' },
+      { kind: 'markers', file: 'reports/gate-log.md', markers: ['cyboros/map'], hint: 'map gate passed' },
     ],
     manual: ['Each vulnerability class (sql/injection/authz/xss/ssrf/...) has been tested or intentionally skipped with rationale'],
   },

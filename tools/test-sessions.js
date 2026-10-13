@@ -5,7 +5,7 @@ const fs = require('fs');
 const path = require('path');
 const os = require('os');
 
-const tmp = path.join(os.tmpdir(), 'stavros-sessions-test-' + process.pid + '.json');
+const tmp = path.join(os.tmpdir(), 'cyboros-sessions-test-' + process.pid + '.json');
 process.env.SESSIONS_JSON = tmp;
 try { fs.unlinkSync(tmp); } catch {}
 

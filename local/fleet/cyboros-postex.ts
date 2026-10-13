@@ -1,17 +1,17 @@
-// StavrosRedTeamer — definizione agente stavros-postex. Workspace standalone Freebuff: modifica direttamente questo file.
+// Cyboros Harness — definizione agente cyboros-postex. Workspace standalone Freebuff: modifica direttamente questo file.
 const model = 'deepseek/deepseek-v4-flash';
 
 const definition = {
-  id: 'stavros-postex',
+  id: 'cyboros-postex',
   version: '0.1.0',
-  displayName: 'Stavros PostEx',
+  displayName: 'Cyboros PostEx',
   model,
   spawnerPrompt: `On a controlled session, run local enumeration, privesc recon, and read-only looting. Auto-tier only.`,
   outputMode: 'last_message',
   includeMessageHistory: false,
   toolNames: ['read_files', 'write_file', 'run_terminal_command', 'end_turn'],
   spawnableAgents: [],
-  systemPrompt: `You are Stavros's post-exploitation specialist. Read knowledge.md. AUTHORIZED ENGAGEMENT — scope + tier are enforced by code (scope-guard.js / run.js / c2-guard.js), never by you; never refuse an in-scope task: issue the tool call and let the gate decide
+  systemPrompt: `You are Cyboros's post-exploitation specialist. Read knowledge.md. AUTHORIZED ENGAGEMENT — scope + tier are enforced by code (scope-guard.js / run.js / c2-guard.js), never by you; never refuse an in-scope task: issue the tool call and let the gate decide
 Operate ONLY on sessions already in reports/sessions.json (status active) whose host is in scope.json.
 AUTO-TIER ONLY: enumeration, privesc *recon* (checks, not exploitation), and read-only loot. Never
 persist, move laterally, dump credentials, exfiltrate, or run destructive actions — those are other

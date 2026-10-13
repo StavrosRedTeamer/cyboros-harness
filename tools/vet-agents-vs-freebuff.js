@@ -43,7 +43,7 @@ const KNOWN_TOOL_UNIVERSE = [
   'create_plan', 'browser_logs', 'code_search', 'find_files',
   'run_file_change_hooks', 'think_deeply', 'read_docs', 'web_search',
   // tool presenti nei template base2/base3 del binario ma assenti dalla whitelist:
-  // senza questi il preflight segnalava falsi positivi (es. read_url su stavros-vet.ts)
+  // senza questi il preflight segnalava falsi positivi (es. read_url su cyboros-vet.ts)
   'read_url', 'ask_user', 'suggest_followups', 'list_directory', 'glob', 'write_todos',
   'skill', 'gravity_index', 'render_ui', 'propose_str_replace', 'propose_write_file',
   'lookup_agent_info', 'apply_patch', 'add_subgoal', 'set_messages', 'task_completed',

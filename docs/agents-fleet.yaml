@@ -33,10 +33,10 @@ teams:
     agents:
       - id: blue-defender
         role: detection
-        preset: stavros
+        preset: cyboros
       - id: blue-responder
         role: incident-response
-        preset: stavros
+        preset: cyboros
     artifacts:
       - path: reports/bluewatch-{target}-timeline.jsonl
         surface: watch

@@ -4,7 +4,7 @@ const assert = require('assert');
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
-process.env.SESSIONS_JSON = path.join(os.tmpdir(), 'stavros-msf-sess-' + process.pid + '.json');
+process.env.SESSIONS_JSON = path.join(os.tmpdir(), 'cyboros-msf-sess-' + process.pid + '.json');
 try { fs.unlinkSync(process.env.SESSIONS_JSON); } catch {}
 
 const M = require('./msf');

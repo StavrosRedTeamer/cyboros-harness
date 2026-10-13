@@ -12,7 +12,7 @@
 // non torna, l'operazione viene annullata e la sorgente resta intatta. Un archivio incompleto non
 // deve mai costare i dati.
 //
-// Dove va: $CYBOROS_ARCHIVE_DIR → $XDG_DATA_HOME/stavros/archive → ~/.local/share/stavros/archive
+// Dove va: $CYBOROS_ARCHIVE_DIR → $XDG_DATA_HOME/cyboros/archive → ~/.local/share/cyboros/archive
 // (stesso criterio di risoluzione di tools/vendor-dir.js). La destinazione deve stare FUORI dal
 // workspace: dentro finirebbe nell'albero e quindi in un commit, come `refs/` prima del 2026-09-28.
 // Sotto la root, un anno per sottocartella (`<root>/<anno>/<nome>`), l'anno dell'ultima scrittura.
@@ -47,7 +47,7 @@ function archiveRoot() {
   const base = process.env.XDG_DATA_HOME
     ? process.env.XDG_DATA_HOME
     : path.join(os.homedir(), '.local', 'share');
-  return path.join(base, 'stavros', 'archive');
+  return path.join(base, 'cyboros', 'archive');
 }
 
 function human(bytes) {

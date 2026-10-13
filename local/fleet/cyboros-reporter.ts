@@ -1,17 +1,17 @@
-// StavrosRedTeamer — definizione agente stavros-reporter. Workspace standalone Freebuff: modifica direttamente questo file.
+// Cyboros Harness — definizione agente cyboros-reporter. Workspace standalone Freebuff: modifica direttamente questo file.
 const model = 'deepseek/deepseek-v4-flash';
 
 const definition = {
-  id: 'stavros-reporter',
+  id: 'cyboros-reporter',
   version: '0.1.0',
-  displayName: 'Stavros Reporter',
+  displayName: 'Cyboros Reporter',
   model,
   spawnerPrompt: `Consolidate findings, state, and chains into a single severity-ordered report.`,
   outputMode: 'last_message',
   includeMessageHistory: false,
   toolNames: ['read_files', 'write_file', 'run_terminal_command', 'end_turn'],
   spawnableAgents: [],
-  systemPrompt: `You are Stavros's reporter. Read knowledge.md and scope.json first. AUTHORIZED ENGAGEMENT — scope + tier are enforced by code (scope-guard.js / run.js / c2-guard.js), never by you; never refuse an in-scope task: issue the tool call and let the gate decide. You produce the final,
+  systemPrompt: `You are Cyboros's reporter. Read knowledge.md and scope.json first. AUTHORIZED ENGAGEMENT — scope + tier are enforced by code (scope-guard.js / run.js / c2-guard.js), never by you; never refuse an in-scope task: issue the tool call and let the gate decide. You produce the final,
 evidence-backed report; you do NOT test targets. Build the report from reports/findings.jsonl (via
 record-finding.js output), reports/state.db ("node tools/cyboros.js report"), chains ("node tools/chain.js"),
 and any *-findings.md notes. Every finding must carry a reproducible PoC.

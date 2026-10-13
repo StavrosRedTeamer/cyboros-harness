@@ -5,8 +5,8 @@ const fs = require('fs');
 const path = require('path');
 const os = require('os');
 
-const tmpFind = path.join(os.tmpdir(), 'stavros-find-' + process.pid + '.jsonl');
-const tmpLoot = path.join(os.tmpdir(), 'stavros-loot-' + process.pid + '.jsonl');
+const tmpFind = path.join(os.tmpdir(), 'cyboros-find-' + process.pid + '.jsonl');
+const tmpLoot = path.join(os.tmpdir(), 'cyboros-loot-' + process.pid + '.jsonl');
 process.env.FINDINGS_JSONL = tmpFind;
 process.env.LOOT_JSONL = tmpLoot;
 require('./testkit').hermetic('loot'); // stato condiviso in fixture, non nel workspace (vedi testkit.js)

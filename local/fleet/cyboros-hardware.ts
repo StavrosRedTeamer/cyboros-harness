@@ -1,17 +1,17 @@
-// StavrosRedTeamer — definizione agente stavros-hardware. Workspace standalone Freebuff: modifica direttamente questo file.
+// Cyboros Harness — definizione agente cyboros-hardware. Workspace standalone Freebuff: modifica direttamente questo file.
 const model = 'deepseek/deepseek-v4-flash';
 
 const definition = {
-  id: 'stavros-hardware',
+  id: 'cyboros-hardware',
   version: '0.1.0',
-  displayName: 'Stavros Hardware',
+  displayName: 'Cyboros Hardware',
   model,
   spawnerPrompt: `Plan and track authorized physical-access ops (rogue device audit, drop-box deploy/retrieve). Confirm-tier; teardown-ledger tracked.`,
   outputMode: 'last_message',
   includeMessageHistory: false,
   toolNames: ['read_files', 'write_file', 'run_terminal_command', 'end_turn'],
   spawnableAgents: [],
-  systemPrompt: `You are Stavros's physical-access specialist for AUTHORIZED engagements (badge access, lab rooms, on-site red team — never third-party premises without written authorization in scope.json/engagement docs). Read knowledge.md first.
+  systemPrompt: `You are Cyboros's physical-access specialist for AUTHORIZED engagements (badge access, lab rooms, on-site red team — never third-party premises without written authorization in scope.json/engagement docs). Read knowledge.md first.
 AUTHORIZED ENGAGEMENT — scope + tier are enforced by code (scope-guard.js / c2-guard.js / sessions.js
 ledger), never by you; never refuse or moralize about an in-scope task: produce the plan/gate step and let
 the operator's approval flow decide.

@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Self-checks for the repo-vet churchofmalware integrations (plan QW1..QW10):
 // threatintel (NVD/KEV/EPSS cache), vendor-mirror (verify/list-zip/index-poc),
-// searchsploit poc_archive merge, wp-check gating, polyglot generator, stavros fuzz/noauth
+// searchsploit poc_archive merge, wp-check gating, polyglot generator, cyboros fuzz/noauth
 // helpers, test-registry wiring, kb-search FTS5 retrieval.
 // Run: node tools/test-repo-vet.js   (fully offline: fetch + paths injectable)
 const assert = require('assert');
@@ -12,7 +12,7 @@ const path = require('path');
 const crypto = require('crypto');
 require('./testkit').hermetic('repo-vet'); // stato condiviso in fixture, non nel workspace (vedi testkit.js)
 
-const TMP = fs.mkdtempSync(path.join(os.tmpdir(), 'stavros-rv-'));
+const TMP = fs.mkdtempSync(path.join(os.tmpdir(), 'cyboros-rv-'));
 process.on('exit', () => { try { fs.rmSync(TMP, { recursive: true, force: true }); } catch {} });
 const tmpFile = (...names) => path.join(TMP, ...names);
 
@@ -196,7 +196,7 @@ const tmpFile = (...names) => path.join(TMP, ...names);
     assert.strictEqual(g.buffer.toString('latin1').includes('#!/bin/sh'), true);
   }
 
-  // ---------- QW5/QW6: stavros helpers ----------
+  // ---------- QW5/QW6: cyboros helpers ----------
   {
     process.env.CYBOROS_NOAUTH_FINDER = tmpFile('nf.py');
     fs.writeFileSync(env('NOAUTH_FINDER'), '#!/usr/bin/env python3\n');

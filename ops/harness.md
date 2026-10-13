@@ -165,7 +165,7 @@ progetto.
 - **Preferenza dell'operatore: il default resta il default.** Un override di identità deve essere
   esplicito e opt-in, mai una condizione permanente — l'opt-in `@stavros` si legge una volta sola
   al primo messaggio, e la cartella non cambia l'identità. Se la TUI intercetta la `@`, il
-  fallback è un token senza `@` (`stavros:`), da cambiare in router e `AGENTS.md` insieme.
+  fallback è un token senza `@` (`cyboros:`), da cambiare in router e `AGENTS.md` insieme.
 
 ## Canale F3 (Poco F3 ↔ C2) — come si lavora sul telefono
 
@@ -202,7 +202,7 @@ dimensione apparente) e cosa è archiviabile, per voce e per età. Non scrive ni
 - `node tools/workspace-gc.js archive <nome-di-temp>` — **sposta, non cancella**: sha256 dell'albero
 prima e dopo, e l'originale viene rimosso solo a verifica riuscita (o solo dopo una copia
 verificata, se la destinazione è su un altro filesystem). Destinazione
-`$CYBOROS_ARCHIVE_DIR` → `$XDG_DATA_HOME/stavros/archive` → `~/.local/share/stavros/archive`, un
+`$CYBOROS_ARCHIVE_DIR` → `$XDG_DATA_HOME/cyboros/archive` → `~/.local/share/cyboros/archive`, un
 anno per sottocartella; **deve stare fuori dal workspace**, altrimenti finirebbe in un commit.
 - `node tools/doctor.js` la riporta come sezione 8, e `doctor --json` la espone in `space`.
 

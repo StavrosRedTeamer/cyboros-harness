@@ -34,7 +34,7 @@ function decide(input) {
     return out('STUCK');
   }
   if (targetsCount === 0) {
-    reasons.push('nessun target in stato/scope: fai il seed prima (stavros recon/scan o target-model ingest)');
+    reasons.push('nessun target in stato/scope: fai il seed prima (cyboros recon/scan o target-model ingest)');
     return out('STUCK');
   }
   if (remaining === 0) { reasons.push('coverage complete: no gaps remain'); return out('DONE'); }

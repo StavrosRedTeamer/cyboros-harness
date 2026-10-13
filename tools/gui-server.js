@@ -282,7 +282,7 @@ function fbEndAll(S) {
 }
 
 function fbNote(S, text) {
-  fbBroadcast(S, Buffer.from('\r\n\x1b[33m[stavros-console] ' + text + '\x1b[0m\r\n'));
+  fbBroadcast(S, Buffer.from('\r\n\x1b[33m[cyboros-console] ' + text + '\x1b[0m\r\n'));
 }
 
 function fbStartProc(S, cmd, cols, rows) {
@@ -389,7 +389,7 @@ function fbStreamOpen(res, name) {
     }
   } else {
     try { res.write('data: ' + Buffer.from(
-      '\x1b[2J\x1b[H\x1b[33m[stavros-console] sessione ' + S.def.label + ' non attiva — premi ▶ Start\x1b[0m\r\n'
+      '\x1b[2J\x1b[H\x1b[33m[cyboros-console] sessione ' + S.def.label + ' non attiva — premi ▶ Start\x1b[0m\r\n'
     ).toString('base64') + '\n\n'); } catch { /* ignore */ }
   }
   const ping = setInterval(() => { try { res.write(': ping\n\n'); } catch { /* ignore */ } }, 25000);

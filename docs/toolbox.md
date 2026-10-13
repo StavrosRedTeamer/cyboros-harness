@@ -188,7 +188,7 @@
   -> standalone HTML (severity + CVSS + CWE + EPSS + chains + recon). Markdown remains the source of truth.
 - **SARIF export (interoperabilità):** `node tools/report-sarif.js [--findings <f>] [--out <f>] [--host <h>]`
   -> SARIF 2.1.0 da `findings.jsonl`, per GitHub code scanning / DefectDojo / qualsiasi SIEM
-  (`--out -` va su stdout). Ogni result porta in `properties.stavros` cio che SARIF non ha un
+  (`--out -` va su stdout). Ogni result porta in `properties.cyboros` cio che SARIF non ha un
   campo per: `verify_level`, il suo `severity_ceiling`, `status`, `oracle_ref`/`oracle_type`,
   il blocco `verify` rieseguibile e `evidence_ref`. **Rifiuta** un record la cui severity eccede
   il `verify_level` (stessa regola di `record-finding.js`) e in quel caso **esce 2**: un run che

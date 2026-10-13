@@ -81,7 +81,7 @@ one verified, or **no report is produced at all**.
 
 Findings also leave as **SARIF 2.1.0** (`tools/report-sarif.js`), which GitHub code scanning
 and DefectDojo consume unmodified. The evidence ceiling travels with each result in
-`properties.stavros` — `verify_level`, its severity ceiling, the oracle reference — because a
+`properties.cyboros` — `verify_level`, its severity ceiling, the oracle reference — because a
 generic consumer cannot infer it. A record whose severity exceeds its verification level is
 **refused** and the exporter exits non-zero, so a run that dropped findings cannot pass as a
 clean scan.

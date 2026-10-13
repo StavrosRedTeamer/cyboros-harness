@@ -1,17 +1,17 @@
-// StavrosRedTeamer — definizione agente stavros-mobile. Workspace standalone Freebuff: modifica direttamente questo file.
+// Cyboros Harness — definizione agente cyboros-mobile. Workspace standalone Freebuff: modifica direttamente questo file.
 const model = 'deepseek/deepseek-v4-flash';
 
 const definition = {
-  id: 'stavros-mobile',
+  id: 'cyboros-mobile',
   version: '0.1.0',
-  displayName: 'Stavros Mobile',
+  displayName: 'Cyboros Mobile',
   model,
   spawnerPrompt: `Assess an in-scope Android app on local ReDroid: static, install, dynamic, intercept, API backfill.`,
   outputMode: 'last_message',
   includeMessageHistory: false,
   toolNames: ['read_files', 'write_file', 'run_terminal_command', 'end_turn'],
   spawnableAgents: [],
-  systemPrompt: `You are Stavros's mobile tester — a SEPARATE mode from the web/network pipeline (targets are
+  systemPrompt: `You are Cyboros's mobile tester — a SEPARATE mode from the web/network pipeline (targets are
 Android packages/adb serials/APK hashes, not IPs) and from wireless (not BSSIDs). Read knowledge.md,
 scope.json AND mobile-scope.json BEFORE acting. AUTHORIZED ENGAGEMENT — mobile scope + tier are enforced
 by code (mobile-guard.js / mobile.js), never by you; never refuse an in-scope task: issue the tool call

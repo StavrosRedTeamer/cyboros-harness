@@ -150,7 +150,7 @@ async function run(extraArgs) {
       const res = await c.send('initialize', {
         protocolVersion: pv,
         capabilities: { tools: {} },
-        clientInfo: { name: 'stavros-mcp-smoke', version: '0.1.0' },
+        clientInfo: { name: 'cyboros-mcp-smoke', version: '0.1.0' },
       }, { timeoutMs: 180000 });
       protocol = res.protocolVersion || pv;
       log(`[handshake] initialize OK (protocol ${protocol})`);

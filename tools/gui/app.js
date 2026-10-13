@@ -907,7 +907,7 @@ function renderSessions(data) {
     ],
   }));
 
-  const hint = el('div', { class: 'hint', style: { marginTop: '8px' }, html: 'Teardown ledger — <span class="mono">stavros-cleanup</span> empties it at engagement end. GUI is read-only here: cleanup is a confirm-tier action run from the CLI. Click a row for artifacts + meta.' });
+  const hint = el('div', { class: 'hint', style: { marginTop: '8px' }, html: 'Teardown ledger — <span class="mono">cyboros-cleanup</span> empties it at engagement end. GUI is read-only here: cleanup is a confirm-tier action run from the CLI. Click a row for artifacts + meta.' });
 
   pane.replaceChildren(statRow, tableCard, hint);
   api('/api/loot/count').then((r) => { lootTile.querySelector('.stat-value').textContent = r.count; }).catch(() => { lootTile.querySelector('.stat-value').textContent = '—'; });

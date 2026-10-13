@@ -63,7 +63,7 @@ function realProbe(url, timeoutMs) {
     resolveAndGuard(url, scope).then((pin) => {
       if (pin.blocked) return resolve({ blocked: pin.reason });
       const U = new URL(url);
-      const opts = { hostname: pin.address, port: 443, path: U.pathname + U.search, method: 'GET', headers: { Host: U.hostname, 'User-Agent': 'stavros-cloud/0.1' }, timeout: timeoutMs || 8000, lookup: (h, o, cb) => cb(null, pin.address, pin.family) };
+      const opts = { hostname: pin.address, port: 443, path: U.pathname + U.search, method: 'GET', headers: { Host: U.hostname, 'User-Agent': 'cyboros-cloud/0.1' }, timeout: timeoutMs || 8000, lookup: (h, o, cb) => cb(null, pin.address, pin.family) };
       const req = https.request(opts, (res) => { let d = ''; res.on('data', (c) => (d += c.length > 2048 ? '' : c)); res.on('end', () => resolve({ status: res.statusCode, headers: res.headers, body: d })); });
       req.on('timeout', () => { req.destroy(); resolve({ blocked: 'timeout' }); });
       req.on('error', (e) => resolve({ blocked: e.message }));

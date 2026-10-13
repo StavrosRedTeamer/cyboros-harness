@@ -446,7 +446,7 @@ reports:
     assert.strictEqual(r.status, 1, r.stdout);
     assert.ok(r.stderr.includes('reports/report.html missing'), r.stderr);
     // nessuna riga pass nel gate-log reale (override attivo)
-    assert.ok(fs.readFileSync(env.GATE_LOG_FILE, 'utf8').includes('stavros/recon'), 'gate-log di test scritto');
+    assert.ok(fs.readFileSync(env.GATE_LOG_FILE, 'utf8').includes('cyboros/recon'), 'gate-log di test scritto');
   });
   ok('CLI gate SENZA --workflow: comportamento legacy invariato (runGate identico)', () => {
     assert.deepStrictEqual(gateLib.runGate('recon'), gateLib.runGate('recon', {}));

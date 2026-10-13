@@ -331,9 +331,9 @@ function main() {
   if (!skipGate) {
     try {
       const log = fs.readFileSync(gateLog, 'utf8');
-      const hasPass = log.split('\n').some((l) => l.includes('stavros/report') && l.includes('pass'));
+      const hasPass = log.split('\n').some((l) => l.includes('cyboros/report') && l.includes('pass'));
       if (!hasPass) {
-        console.error(`[report-html] BLOCKED: report gate "stavros/report" not PASSed in ${gateLog}.`);
+        console.error(`[report-html] BLOCKED: report gate "cyboros/report" not PASSed in ${gateLog}.`);
         console.error('[report-html] Run: node tools/gate.js pass report  (after validating all criteria)');
         console.error('[report-html] Or use --skip-gate to bypass (not recommended for final reports).');
         process.exit(1);

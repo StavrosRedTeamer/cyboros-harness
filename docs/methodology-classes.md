@@ -18,7 +18,7 @@ and tracked by `coverage.js`.
 - **Injection — SQLi:** error-based, boolean/time-blind; `sqlmap` on candidate params.
 - **XSS:** reflected/stored/DOM; `dalfox` for reflected; `dom-check.js` (CDP) for DOM/client-side
   (postMessage handlers, sinks, localStorage); confirm execution context, not just reflection.
-- **AuthZ — BOLA/BFLA (OWASP 2025 A01, distinct):** `stavros-authz`. Distinguish Broken **Object**
+- **AuthZ — BOLA/BFLA (OWASP 2025 A01, distinct):** `cyboros-authz`. Distinguish Broken **Object**
   Level AuthZ (BOLA, IDOR — same object id as another user) from Broken **Function** Level AuthZ
   (BFLA — low-priv user calling an admin function). Replay the request as a lower-priv/other user via
   `repeater.js --as <identity>`; compare status, bytes AND `--diff` body_similarity (same-length
@@ -46,16 +46,16 @@ and tracked by `coverage.js`.
   customer/user fields.
 - **CSP:** `csp.js --url` — unsafe-inline/wildcard/missing frame-ancestors are findings.
 - **WebSockets:** `ws.js` for chat/realtime endpoints (missing auth on connect, message injection).
-- **Auth/session (stavros-authn):** login rate-limit/enumeration, password-reset & OTP/MFA
+- **Auth/session (cyboros-authn):** login rate-limit/enumeration, password-reset & OTP/MFA
   flows, JWT alg:none/HS256/RS256-confusion + jku/x5u, OAuth/OIDC redirect_uri & state flaws,
   session fixation, cookie flags (Secure/HttpOnly/SameSite).
-- **CSRF (stavros-csrf):** state-changing POST/PUT/PATCH/DELETE endpoints without a CSRF token (or
+- **CSRF (cyboros-csrf):** state-changing POST/PUT/PATCH/DELETE endpoints without a CSRF token (or
   with a stale one) + cookies with SameSite=None/absent. Cross-site request with
   `Origin: https://evil.example` via `repeater.js`; chain with a CORS reflection (read the response
   back) for Critical.
-- **Cloud (stavros-cloud):** metadata via SSRF (169.254.169.254 etc., only if `allowed_ips` allows),
+- **Cloud (cyboros-cloud):** metadata via SSRF (169.254.169.254 etc., only if `allowed_ips` allows),
   exposed S3/GCS/Azure buckets, provider fingerprint. Read the smallest proof (role NAME, not creds).
-- **LLM / GenAI / Agentic AI (stavros-llm):** `tools/payloads/llm-agentic.md` + `tools/payloads/mcp.md`.
+- **LLM / GenAI / Agentic AI (cyboros-llm):** `tools/payloads/llm-agentic.md` + `tools/payloads/mcp.md`.
   Detection-only, benign MARKER always. LLM01 prompt injection, LLM07 system-prompt leak, RAG poisoning
   (LLM08/ASI06), and Agentic AI 2026: ASI02 tool misuse / ASI03 identity (exposed `tools/list`,
   unauth-able `tools/call`/`resources/read` on an `/mcp` endpoint). OOB-mark the URL-fetching tools;

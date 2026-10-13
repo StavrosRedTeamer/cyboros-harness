@@ -11,7 +11,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 EDITION="$SCRIPT_DIR"
 
 START="$EDITION/start-command-center.sh"
-[[ -f "$START" ]] || { echo "[stavros] start-command-center.sh mancante in $EDITION" >&2; exit 1; }
+[[ -f "$START" ]] || { echo "[cyboros] start-command-center.sh mancante in $EDITION" >&2; exit 1; }
 chmod +x "$START" 2>/dev/null || true
 
 # Desktop dir: Scrivania su sistemi IT, Desktop altrimenti
@@ -43,6 +43,6 @@ EOF
   gio set "$TARGET" metadata::trusted true 2>/dev/null || true
 done
 
-echo "[stavros] launcher installato: $DESKTOP_DIR/cyboros-command-center.desktop"
-echo "[stavros] doppio clic su \"Cyboros Command Center\" per avviare la dashboard."
-echo "[stavros] prima volta: se il sistema chiede \"consenti esecuzione\", scegli Esegui/Apri."
+echo "[cyboros] launcher installato: $DESKTOP_DIR/cyboros-command-center.desktop"
+echo "[cyboros] doppio clic su \"Cyboros Command Center\" per avviare la dashboard."
+echo "[cyboros] prima volta: se il sistema chiede \"consenti esecuzione\", scegli Esegui/Apri."

@@ -13,8 +13,8 @@
 #        --check             -> smoke test dell'harness (endpoint + tools + GBNF)
 #
 # Uso:
-#   bash ~/Desktop/stavrosredteamer/local/agent-local.sh
-#   bash ~/Desktop/stavrosredteamer/local/agent-local.sh --plan target.example
+#   bash ~/Desktop/cyboros-harness/local/agent-local.sh
+#   bash ~/Desktop/cyboros-harness/local/agent-local.sh --plan target.example
 #
 # Zero dipendenze: curl, node (già richiesto dall'harness) e serve.sh del modello.
 

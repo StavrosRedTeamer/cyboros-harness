@@ -76,7 +76,7 @@ fs.writeFileSync(path.join(T, 'operation-state.json'), JSON.stringify({ revision
 const bundle = ledger.evidenceBundle({ outDir: path.join(T, 'ev') });
 assert.ok(fs.existsSync(bundle.manifest), 'manifest written');
 const manifest = JSON.parse(fs.readFileSync(bundle.manifest, 'utf8'));
-assert.strictEqual(manifest.kind, 'stavros-evidence-bundle');
+assert.strictEqual(manifest.kind, 'cyboros-evidence-bundle');
 const entry = manifest.files.find((f) => f.path === 'operation-state.json');
 assert.ok(entry, 'bundle lists the opstate file');
 const diskHash = crypto.createHash('sha256').update(fs.readFileSync(path.join(T, 'operation-state.json'))).digest('hex');

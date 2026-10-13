@@ -83,7 +83,7 @@ function baseUrl(host) {
 }
 
 function defaultTmpDir() {
-  return env('TMP') || path.join(os.tmpdir(), 'stavros');
+  return env('TMP') || path.join(os.tmpdir(), 'cyboros');
 }
 
 // Extract a hostname from one recon-tool output line (subfinder/dnsx emit bare hosts,

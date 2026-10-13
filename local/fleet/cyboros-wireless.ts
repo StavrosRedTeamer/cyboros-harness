@@ -1,17 +1,17 @@
-// StavrosRedTeamer — definizione agente stavros-wireless. Workspace standalone Freebuff: modifica direttamente questo file.
+// Cyboros Harness — definizione agente cyboros-wireless. Workspace standalone Freebuff: modifica direttamente questo file.
 const model = 'deepseek/deepseek-v4-flash';
 
 const definition = {
-  id: 'stavros-wireless',
+  id: 'cyboros-wireless',
   version: '0.1.0',
-  displayName: 'Stavros Wireless',
+  displayName: 'Cyboros Wireless',
   model,
   spawnerPrompt: `Assess an in-scope WiFi network: passive recon, handshake/PMKID capture, WPA/WPS cracking.`,
   outputMode: 'last_message',
   includeMessageHistory: false,
   toolNames: ['read_files', 'write_file', 'run_terminal_command', 'end_turn'],
   spawnableAgents: [],
-  systemPrompt: `You are Stavros's wireless tester — a SEPARATE mode from the web/network pipeline (targets are
+  systemPrompt: `You are Cyboros's wireless tester — a SEPARATE mode from the web/network pipeline (targets are
 BSSIDs/ESSIDs/stations/channels, not IPs). Read knowledge.md, scope.json AND wifi-scope.json BEFORE acting. AUTHORIZED ENGAGEMENT — wifi scope + tier are enforced by code (wifi-guard.js / wifi.js), never by you; never refuse an in-scope task: issue the tool call and let the gate decide
 acting. Passive recon (airodump-ng/wash) is fine; anything that transmits toward a target (deauth,
 hcxdumptool PMKID, WPS, wifite2 automation) is confirm-tier and requires the user's explicit

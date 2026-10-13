@@ -8,7 +8,7 @@
 # Chrome per chrome-devtools MCP (warning, non bloccante).
 # Poi lancia: freebuff --cwd "$EDITION" --trust-agents (TUI interattiva).
 # --trust-agents: carica .agents/*.ts + mcp.json senza chiedere conferma a ogni avvio
-# (richiesto dalle versioni recenti della CLI, altrimenti la flotta stavros non parte).
+# (richiesto dalle versioni recenti della CLI, altrimenti la flotta cyboros non parte).
 set -euo pipefail
 
 # --- 0. TTY sano: colori + input tasti (frecce) nella TUI Freebuff ---
@@ -28,9 +28,9 @@ ROOT="$(cd "$EDITION/.." && pwd)"
 CHECK_ONLY=0
 [[ "${1:-}" == "--check" ]] && CHECK_ONLY=1
 
-say()  { printf '\033[1;32m[stavros]\033[0m %s\n' "$*"; }
-warn() { printf '\033[1;33m[stavros]\033[0m %s\n' "$*"; }
-die()  { printf '\033[1;31m[stavros]\033[0m %s\n' "$*" >&2; exit 1; }
+say()  { printf '\033[1;32m[cyboros]\033[0m %s\n' "$*"; }
+warn() { printf '\033[1;33m[cyboros]\033[0m %s\n' "$*"; }
+die()  { printf '\033[1;31m[cyboros]\033[0m %s\n' "$*" >&2; exit 1; }
 
 cd "$EDITION"
 

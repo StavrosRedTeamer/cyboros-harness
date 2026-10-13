@@ -23,7 +23,7 @@ const os = require('os');
 const path = require('path');
 
 // Il db di stato deve puntare a una fixture temporanea: nessun test tocca reports/state.db.
-const TMP = fs.mkdtempSync(path.join(os.tmpdir(), 'stavros-local-plan-'));
+const TMP = fs.mkdtempSync(path.join(os.tmpdir(), 'cyboros-local-plan-'));
 process.env.STATE_DB = path.join(TMP, 'state.db');
 
 const plan = require('../local/plan');

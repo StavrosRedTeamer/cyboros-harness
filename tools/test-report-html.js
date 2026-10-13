@@ -60,7 +60,7 @@ assert.ok(html.includes('OpenSSH 8.2'));
 assert.ok(html.includes('verified'));
 
 // collectFromState reads targets/hosts/ports from a temp STATE_DB
-const tmpDb = path.join(os.tmpdir(), 'stavros-report-' + process.pid + '.db');
+const tmpDb = path.join(os.tmpdir(), 'cyboros-report-' + process.pid + '.db');
 try { fs.unlinkSync(tmpDb); } catch {}
 const db = state.open(tmpDb);
 const tid = state.upsertTarget(db, 'target.com');

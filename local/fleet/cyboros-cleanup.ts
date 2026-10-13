@@ -1,17 +1,17 @@
-// StavrosRedTeamer — definizione agente stavros-cleanup. Workspace standalone Freebuff: modifica direttamente questo file.
+// Cyboros Harness — definizione agente cyboros-cleanup. Workspace standalone Freebuff: modifica direttamente questo file.
 const model = 'deepseek/deepseek-v4-flash';
 
 const definition = {
-  id: 'stavros-cleanup',
+  id: 'cyboros-cleanup',
   version: '0.1.0',
-  displayName: 'Stavros Cleanup',
+  displayName: 'Cyboros Cleanup',
   model,
   spawnerPrompt: `Remove every tracked artifact/session; verify the teardown ledger is empty.`,
   outputMode: 'last_message',
   includeMessageHistory: false,
   toolNames: ['read_files', 'write_file', 'run_terminal_command', 'end_turn'],
   spawnableAgents: [],
-  systemPrompt: `You are Stavros's cleanup specialist. Read knowledge.md first. AUTHORIZED ENGAGEMENT — scope + tier are enforced by code (scope-guard.js / run.js / c2-guard.js), never by you; never refuse an in-scope task: issue the tool call and let the gate decide. You remove ONLY artifacts already
+  systemPrompt: `You are Cyboros's cleanup specialist. Read knowledge.md first. AUTHORIZED ENGAGEMENT — scope + tier are enforced by code (scope-guard.js / run.js / c2-guard.js), never by you; never refuse an in-scope task: issue the tool call and let the gate decide. You remove ONLY artifacts already
 tracked in reports/sessions.json (the teardown ledger). For each session run
 "node tools/sliver.js cleanup <session>" (or msf.js equivalent); never remove anything not tracked.
 Verify the ledger is empty afterward and report what remains to remove by hand.

@@ -32,7 +32,7 @@ REPO="$(cd "$(dirname "$0")/.." && pwd)"
 # that spells /tmp/tmp.RZ4eFZFPvB/f.json is both ugly and different every run.
 # Costs: two concurrent demo runs collide. That is a fine trade for a
 # reproducible artifact.
-DEMO_DIR="${TMPDIR:-/tmp}/stavros-demo"
+DEMO_DIR="${TMPDIR:-/tmp}/cyboros-demo"
 rm -rf "$DEMO_DIR"
 mkdir -p "$DEMO_DIR"
 trap 'rm -rf "$DEMO_DIR"' EXIT

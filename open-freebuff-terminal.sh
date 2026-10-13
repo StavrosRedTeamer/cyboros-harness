@@ -18,7 +18,7 @@ export TERM=xterm-256color COLORTERM=truecolor FORCE_COLOR=1
 
 # Comando eseguito DENTRO la finestra: avvia il launcher e tiene aperta la finestra
 # a fine sessione, così eventuali errori di pre-flight restano leggibili.
-INNER="'$LAUNCH'; rc=\$?; echo; printf '\\033[1;33m[stavros] freebuff terminato (exit %s)\\033[0m\\n' \"\$rc\"; read -n1 -s -r -p 'Premi un tasto per chiudere...'; echo"
+INNER="'$LAUNCH'; rc=\$?; echo; printf '\\033[1;33m[cyboros] freebuff terminato (exit %s)\\033[0m\\n' \"\$rc\"; read -n1 -s -r -p 'Premi un tasto per chiudere...'; echo"
 
 if command -v konsole >/dev/null 2>&1; then
   exec konsole -e bash -lc "$INNER"
@@ -31,7 +31,7 @@ elif command -v x-terminal-emulator >/dev/null 2>&1; then
 elif command -v xterm >/dev/null 2>&1; then
   exec xterm -e bash -lc "$INNER"
 else
-  printf '\033[1;31m[stavros]\033[0m Nessun terminale grafico trovato (konsole/qterminal/x-terminal-emulator/xterm).\n' >&2
-  printf '[stavros] Avvia manualmente: %s\n' "$LAUNCH" >&2
+  printf '\033[1;31m[cyboros]\033[0m Nessun terminale grafico trovato (konsole/qterminal/x-terminal-emulator/xterm).\n' >&2
+  printf '[cyboros] Avvia manualmente: %s\n' "$LAUNCH" >&2
   exit 1
 fi

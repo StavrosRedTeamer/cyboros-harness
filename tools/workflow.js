@@ -2,7 +2,7 @@
 // Declarative workflow runner (Ondata 2 — C1w + E7). Executes a YAML "dialetto workflow"
 // file where EVERY step is a scope-enforcing wrapper call: cmd must always start with one of
 //   node tools/run.js <binary> ...     (third-party binaries: scope-guard + enforce + audit)
-//   node tools/{repeater,stavros,ad,wifi,mobile,jwt,cors,csp,desync,cachepoison,graphql,ws,
+//   node tools/{repeater,cyboros,ad,wifi,mobile,jwt,cors,csp,desync,cachepoison,graphql,ws,
 //              oob,dom-check,header-check,verify-finding}.js ...   (per-mode wrappers, same
 //              discipline — each one scope-checks its target before acting, verified in code)
 // so scope-guard/enforce/audit coverage is inherited by construction (never bypassed).
@@ -98,7 +98,7 @@ const COVERAGE_FILE = process.env.COVERAGE_WORKFLOW_FILE || path.join(WS_ROOT, '
 const EVIDENCE_FILE = process.env.EVIDENCE_INDEX_FILE || path.join(WS_ROOT, 'evidence-index.md');
 // Dialect allowlist: every step must invoke a wrapper that enforces its own scope/tier gate.
 // run.js covers third-party binaries; the sibling wrappers are the same discipline for their
-// mode (repeater = HTTP tampering + rate/pacing, stavros = recon pipeline, ad/wifi/mobile =
+// mode (repeater = HTTP tampering + rate/pacing, cyboros = recon pipeline, ad/wifi/mobile =
 // per-mode guards and tier gates, jwt/cors/csp/desync/cachepoison/graphql/ws/oob/dom-check/
 // header-check/verify-finding = scoped analysis, each verified to loadScope+inScope before
 // touching a target). Adding a wrapper here is the ONLY way to widen the dialect — raw

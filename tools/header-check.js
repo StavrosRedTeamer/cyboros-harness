@@ -134,7 +134,7 @@ function request(url, timeoutMs) {
         port: reqOpts.port || (reqOpts.protocol === 'https:' ? 443 : 80),
         path: reqOpts.pathname + reqOpts.search,
         method: 'GET',
-        headers: { 'User-Agent': 'stavros-header-check/0.1', Host: reqOpts.hostname, Accept: '*/*' },
+        headers: { 'User-Agent': 'cyboros-header-check/0.1', Host: reqOpts.hostname, Accept: '*/*' },
         timeout: timeoutMs,
         lookup: (host, o, cb) => cb(null, pin.address, pin.family), // force the pinned address
       };

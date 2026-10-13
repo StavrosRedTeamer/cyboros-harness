@@ -39,7 +39,7 @@ StartupNotify=true
 EOF
 chmod +x "$DESKTOP_FILE"
 
-echo "[stavros] launcher installato: $DESKTOP_FILE"
-echo "[stavros] doppio clic su \"Cyboros RedTeaming — Freebuff\" per avviare."
-echo "[stavros] prima volta: se il sistema chiede \"consenti esecuzione\", scegli Esegui/Apri."
-echo "[stavros] pre-flight: ./freebuff-edition/launch-freebuff.sh --check"
+echo "[cyboros] launcher installato: $DESKTOP_FILE"
+echo "[cyboros] doppio clic su \"Cyboros RedTeaming — Freebuff\" per avviare."
+echo "[cyboros] prima volta: se il sistema chiede \"consenti esecuzione\", scegli Esegui/Apri."
+echo "[cyboros] pre-flight: ./freebuff-edition/launch-freebuff.sh --check"

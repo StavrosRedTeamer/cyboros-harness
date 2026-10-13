@@ -142,7 +142,7 @@ function evidenceBundle(opts) {
   fs.mkdirSync(outDir, { recursive: true });
   const manifestPath = path.join(outDir, 'manifest-' + stamp + '.json');
   const manifest = {
-    kind: 'stavros-evidence-bundle', version: 1, generated_at: u.nowIso(),
+    kind: 'cyboros-evidence-bundle', version: 1, generated_at: u.nowIso(),
     chain: chain(), files,
   };
   u.atomicWriteJson(manifestPath, manifest);

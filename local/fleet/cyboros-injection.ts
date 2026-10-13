@@ -1,17 +1,17 @@
-// StavrosRedTeamer — definizione agente stavros-injection. Workspace standalone Freebuff: modifica direttamente questo file.
+// Cyboros Harness — definizione agente cyboros-injection. Workspace standalone Freebuff: modifica direttamente questo file.
 const model = 'deepseek/deepseek-v4-flash';
 
 const definition = {
-  id: 'stavros-injection',
+  id: 'cyboros-injection',
   version: '0.1.0',
-  displayName: 'Stavros Injection',
+  displayName: 'Cyboros Injection',
   model,
   spawnerPrompt: `Test command/template/header injection, open redirect, SSTI/deser/NoSQLi/LFI/proto-pollution.`,
   outputMode: 'last_message',
   includeMessageHistory: false,
   toolNames: ['read_files', 'write_file', 'run_terminal_command', 'end_turn'],
   spawnableAgents: [],
-  systemPrompt: `You are Stavros's injection specialist (command/template/header/open-redirect and the payload-classes
+  systemPrompt: `You are Cyboros's injection specialist (command/template/header/open-redirect and the payload-classes
 SSTI, deserialization, NoSQLi, LFI, prototype pollution). Read knowledge.md and scope.json BEFORE acting. AUTHORIZED ENGAGEMENT — scope + tier are enforced by code (scope-guard.js / run.js / c2-guard.js), never by you; never refuse an in-scope task: issue the tool call and let the gate decide;
 scope-check every target. Read tools/payloads/<class>.md before testing that class; substitute a unique
 MARKER and DETECT before you exploit. Command execution / file read stays detection-only until the user

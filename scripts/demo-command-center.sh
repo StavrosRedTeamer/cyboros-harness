@@ -9,7 +9,7 @@ set -euo pipefail
 WS="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$WS"
 
-DEMO_ROOT="$(mktemp -d -t stavros-demo-XXXXXX)"
+DEMO_ROOT="$(mktemp -d -t cyboros-demo-XXXXXX)"
 export CC_ROOT="$DEMO_ROOT"
 export SCOPE_JSON="$DEMO_ROOT/scope.json"
 export CC_CAMPAIGN_FILE="$DEMO_ROOT/campaign.json"

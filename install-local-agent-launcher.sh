@@ -21,7 +21,7 @@ if [[ -z "$DESKTOP_DIR" || ! -d "$DESKTOP_DIR" ]]; then
 fi
 [[ -z "$DESKTOP_DIR" ]] && { mkdir -p "$HOME/Desktop"; DESKTOP_DIR="$HOME/Desktop"; }
 
-DESKTOP_FILE="$DESKTOP_DIR/stavros-agente-locale.desktop"
+DESKTOP_FILE="$DESKTOP_DIR/cyboros-agente-locale.desktop"
 cat > "$DESKTOP_FILE" <<EOF
 [Desktop Entry]
 Type=Application

@@ -190,7 +190,7 @@ async function hygiene(domain, opts) {
 // (dangling-host claims on wildcard zones need extra care — auto-flag it for the operator).
 async function wildcardCheck(domain, opts) {
   const R = (opts && opts.resolverLib) || defaultResolver(opts && opts.resolver);
-  const probe = 'stavros-wildcard-' + Math.random().toString(36).slice(2, 10) + '.' + domain;
+  const probe = 'cyboros-wildcard-' + Math.random().toString(36).slice(2, 10) + '.' + domain;
   try {
     const a = await R.resolve4(probe);
     return (a && a.length) ? { wildcard: true, sample: a[0] } : { wildcard: false };
@@ -204,7 +204,7 @@ function httpProbe(url, timeoutMs) {
   return new Promise((resolve) => {
     const U = new URL(url);
     const mod = U.protocol === 'https:' ? https : http;
-    const req = mod.request({ hostname: U.hostname, port: U.port || (U.protocol === 'https:' ? 443 : 80), path: '/', method: 'GET', headers: { 'User-Agent': 'stavros-takeover/0.1' }, timeout: timeoutMs || 6000 }, (res) => {
+    const req = mod.request({ hostname: U.hostname, port: U.port || (U.protocol === 'https:' ? 443 : 80), path: '/', method: 'GET', headers: { 'User-Agent': 'cyboros-takeover/0.1' }, timeout: timeoutMs || 6000 }, (res) => {
       let d = '';
       res.on('data', (c) => { d += c.length > 4096 ? '' : c; });
       res.on('end', () => resolve({ status: res.statusCode, body: d }));

@@ -61,7 +61,7 @@ async function fetchNvd(cve, ctx) {
   if (!id) return null;
   try {
     // Optional API key raises the NVD rate limit massively (env NVD_API_KEY).
-    const headers = { 'User-Agent': 'stavros-harness-ti' };
+    const headers = { 'User-Agent': 'cyboros-harness-ti' };
     if (process.env.NVD_API_KEY) headers.apiKey = process.env.NVD_API_KEY;
     const r = await f(NVD_API + id, { headers, signal: ctx.signal });
     if (!r.ok) return null;
@@ -107,7 +107,7 @@ async function fetchEpss(cves, ctx) {
   const ids = (Array.isArray(cves) ? cves : [cves]).map(normCve).filter(Boolean).slice(0, 100);
   if (!ids.length) return {};
   try {
-    const r = await f(EPSS_API + ids.join(','), { headers: { 'User-Agent': 'stavros-harness-ti' }, signal: ctx.signal });
+    const r = await f(EPSS_API + ids.join(','), { headers: { 'User-Agent': 'cyboros-harness-ti' }, signal: ctx.signal });
     if (!r.ok) return {};
     const j = await r.json();
     const out = {};
@@ -125,7 +125,7 @@ async function fetchKev(ctx) {
   ctx = ctx || {};
   const f = ctx.fetch || global.fetch;
   try {
-    const r = await f(KEV_URL, { headers: { 'User-Agent': 'stavros-harness-ti' }, signal: ctx.signal });
+    const r = await f(KEV_URL, { headers: { 'User-Agent': 'cyboros-harness-ti' }, signal: ctx.signal });
     if (!r.ok) return null;
     const j = await r.json();
     if (!j || !Array.isArray(j.vulnerabilities)) return null;

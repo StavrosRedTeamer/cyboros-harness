@@ -33,7 +33,7 @@ const UNKEYED_HEADERS = [
   'X-Original-Host', 'X-HTTP-Host-Override', 'Forwarded',
 ];
 
-function newMarker() { return 'stavros-c' + Math.random().toString(36).slice(2, 8); }
+function newMarker() { return 'cyboros-c' + Math.random().toString(36).slice(2, 8); }
 
 // ---- cache signal analysis (pure) -------------------------------------------
 function cacheIndicators(headers) {
@@ -75,7 +75,7 @@ function realSend(url, method, extraHeaders, timeoutMs) {
       if (pin.blocked) return resolve({ blocked: pin.reason });
       const U = new URL(url);
       const lib = U.protocol === 'https:' ? https : http;
-      const headers = Object.assign({ 'User-Agent': 'stavros-cache/0.1', Host: U.hostname, Accept: '*/*' }, extraHeaders || {});
+      const headers = Object.assign({ 'User-Agent': 'cyboros-cache/0.1', Host: U.hostname, Accept: '*/*' }, extraHeaders || {});
       const opts = {
         hostname: pin.address, port: U.port || (U.protocol === 'https:' ? 443 : 80),
         path: U.pathname + U.search, method: method || 'GET', headers,

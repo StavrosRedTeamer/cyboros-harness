@@ -11,7 +11,7 @@ const { spawn } = require('child_process');
 require('./testkit').hermetic('repeater-e2e'); // stato condiviso in fixture, non nel workspace (vedi testkit.js)
 
 const ROOT = path.join(__dirname, '..');
-const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'stavros-e2e-'));
+const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'cyboros-e2e-'));
 const scopePath = path.join(tmpDir, 'scope.json');
 fs.writeFileSync(scopePath, JSON.stringify({
   allowed_hosts: [], allowed_url_prefixes: [], allowed_ips: ['127.0.0.1'], max_requests_per_second: 100,

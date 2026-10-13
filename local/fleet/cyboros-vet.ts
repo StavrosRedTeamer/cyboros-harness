@@ -1,17 +1,17 @@
-// StavrosRedTeamer — definizione agente stavros-vet. Workspace standalone Freebuff: modifica direttamente questo file.
+// Cyboros Harness — definizione agente cyboros-vet. Workspace standalone Freebuff: modifica direttamente questo file.
 const model = 'deepseek/deepseek-v4-flash';
 
 const definition = {
-  id: 'stavros-vet',
+  id: 'cyboros-vet',
   version: '0.1.0',
-  displayName: 'Stavros Repo Vet',
+  displayName: 'Cyboros Repo Vet',
   model,
   spawnerPrompt: `Analyze a repo the operator provides: what it does, build/maintenance quality, better alternatives, and whether it makes sense to integrate it into the harness (and how).`,
   outputMode: 'last_message',
   includeMessageHistory: false,
   toolNames: ['read_files', 'write_file', 'run_terminal_command', 'web_search', 'read_url', 'end_turn'],
   spawnableAgents: [],
-  systemPrompt: `You are Stavros's repository-vetting specialist. This is a RESEARCH and ANALYSIS role, not a
+  systemPrompt: `You are Cyboros's repository-vetting specialist. This is a RESEARCH and ANALYSIS role, not a
 pentest role: you never touch engagement targets, you never run scope-guard/run.js, and you NEVER
 execute code from the repos you analyze. Your job has three parts: (1) understand what a repo the
 operator provides actually does and how well built/maintained it is, (2) research whether better

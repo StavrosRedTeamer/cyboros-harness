@@ -1,4 +1,4 @@
-# StavrosRedTeamer — Edizione LOCALE (modello abliterato via llama.cpp)
+# Cyboros Harness — Edizione LOCALE (modello abliterato via llama.cpp)
 
 Versione **secondaria** dell'harness, ottimizzata per girare **senza cloud** su un modello
 locale abliterato (es. **Qwen3.6-35B-A3B abliterated Q4_K_M** servito da `llama-server`).
@@ -126,10 +126,10 @@ Regole della modalità (`local/plan.js`, testato da `tools/test-local-plan.js`):
 ## Launcher sul desktop (un clic)
 
 ```bash
-./install-local-agent-launcher.sh     # scrive ~/Desktop/stavros-agente-locale.desktop
+./install-local-agent-launcher.sh     # scrive ~/Desktop/cyboros-agente-locale.desktop
 ```
 
-Doppio clic su **"Stavros — Agente Locale"** → si apre konsole con il launcher
+Doppio clic su **"Cyboros — Agente Locale"** → si apre konsole con il launcher
 `local/agent-local.sh`, che:
 
 1. **avvia il modello solo se non è già attivo** (`curl :8080/v1/models`; se spento lancia
@@ -306,20 +306,20 @@ modello debole.
 
 ## `local/fleet/` — i 26 specialisti come playbook (2026-09-26)
 
-I 26 file `stavros-*.ts` (più `stavros.ts`, l'orchestratore originale) **non stanno più in
+I 26 file `cyboros-*.ts` (più `cyboros.ts`, l'orchestratore originale) **non stanno più in
 `.agents/`**. Motivo: il core Freebuff si auto-aggiorna a ogni avvio del launcher
 (`~/.config/manicode/freebuff`), e con la 0.0.203 la validazione pre-invio fallisce quando
 `.agents/` contiene molte definizioni — senza dire perché (`Agent validation failed
 unexpectedly`, `errors: []` sul log `log.jsonl`). Empiricamente: 2 agenti reggono, 23 no.
 Nessun preflight esistente lo intercetta, perché modelli e tool erano tutti validi.
 
-Ora `.agents/` contiene **un solo file**, `stavros-root.ts` (displayName **Stavros**), che:
+Ora `.agents/` contiene **un solo file**, `cyboros-root.ts` (displayName **Cyboros**), che:
 
-- ha un **id locale** (`stavros-root`), non uno preso dal registry. L'id collidingi è una
+- ha un **id locale** (`cyboros-root`), non uno preso dal registry. L'id collidingi è una
   trappola: il validatore risolve `base3-free-deepseek-flash` contro il template *bundled*,
   non contro il file locale, e rifiuta con `Non-empty spawnableAgents array requires the
   'spawn_agents' tool` descrivendo un agente che non è quello che hai scritto;
-- contiene il contratto d'engagement di `local/fleet/stavros.ts` — regole byte-identiche,
+- contiene il contratto d'engagement di `local/fleet/cyboros.ts` — regole byte-identiche,
   meno i passaggi di delega agli sub-agent;
 - ha `spawnableAgents: []` e `run_terminal_command`, e pilota il motore deterministico
   (`tools/cyboros.js`, `run.js`, `workflow.js`, `planner.js`, `coverage.js`, `gate.js`,
@@ -346,8 +346,8 @@ L'approccio "un solo root in `.agents/`" è corretto per la **validazione**, ma 
 bundled: `settings.json:freebuffModel` è uno slug di modello (`Ra` è il catalogo dei modelli,
 non degli agenti) e l'agente ne deriva — `"deepseek/deepseek-v4-flash"` →
 `"base3-free-deepseek-flash"` via `HuA()`/`OaH[]`. Non esiste `--agent`, e `settings.json`
-non ha un override del system prompt. `stavros-root.ts` viene comunque caricato e
-registrato (`fileContext.agentTemplates["stavros-root"]._sourceFilePath`): è un sub-agent
+non ha un override del system prompt. `cyboros-root.ts` viene comunque caricato e
+registrato (`fileContext.agentTemplates["cyboros-root"]._sourceFilePath`): è un sub-agent
 valido, non il main agent.
 
 L'identità entra quindi dai **knowledge file**, che la CLI inietta nel prompt in quest'ordine:
@@ -369,9 +369,9 @@ Quindi l'identità entra dai **knowledge file**, che la CLI inietta nel prompt i
 | `4368` | ` ```~/.AGENTS.md ` | home | router (3,9 KB) |
 | `11592` | `# Freebuff Meta-information` | built-in | "You are the AI agent behind Freebuff" |
 
-### Stavros è opt-in: `@stavros` come primo messaggio (2026-09-26)
+### Cyboros è opt-in: `@stavros` come primo messaggio (2026-09-26)
 
-Il default è tornato quello del prodotto. **Stavros si attiva solo se il primo messaggio
+Il default è tornato quello del prodotto. **Cyboros si attiva solo se il primo messaggio
 della conversazione inizia con il token `@stavros`**; ogni altra sessione resta l'agente di
 coding predefinito, anche dentro questa cartella. La cartella non cambia l'identità — cambia
 il token.
@@ -386,7 +386,7 @@ I due pezzi che lo descrivono:
   metà conversazione non ri-arma niente, e toglierlo non la disarma.
 
 Nota sul trigger: se la TUI intercetta la `@` con un popup di autocomplete, il token
-arriverebbe alterato. Se è il caso, il fallback è un token senza `@` (es. `stavros:`), che
+arriverebbe alterato. Se è il caso, il fallback è un token senza `@` (es. `cyboros:`), che
 nel prompt si cambia in un punto solo — router e `AGENTS.md` di progetto.
 
 Verifica del wiring (non legge i messaggi: controlla che le condizioni dell'opt-in siano nel
@@ -464,7 +464,7 @@ l'ha fatta così, distinguendo i due casi:
 - **Blocco identità/autorizzazione** (`AUTHORIZED ENGAGEMENT: …`, 800 B in 29 file): resta
   **byte-identico nel prompt**. Non è pigrizia: quel blocco non ha proprietario esterno, e il
   fallimento che previene (rifiutare un task in-scope) avviene **prima** della prima lettura, quindi
-  nessun puntatore può prevenirlo. Le varianti di classe (es. `stavros-llm`, `stavros-exploit`) sono
+  nessun puntatore può prevenirlo. Le varianti di classe (es. `cyboros-llm`, `cyboros-exploit`) sono
   restate intere.
 
 Risultato: flotta 184.810 → 154.296 byte, duplicazione 86.086 → 51.986 byte (di cui 22.400 il blocco

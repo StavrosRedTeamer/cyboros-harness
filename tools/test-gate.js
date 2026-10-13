@@ -40,7 +40,7 @@ const findingsOne = checkFindings(1);
 ok('checkFindings min 1 passes (fixture has one finding)', findingsOne.ok);
 
 // Gate log hasPass
-const sampleLog = '| 2025-01-01T00:00:00Z | stavros/recon | pass | scope ok |';
+const sampleLog = '| 2025-01-01T00:00:00Z | cyboros/recon | pass | scope ok |';
 ok('gateLogHasPass finds existing', gateLogHasPass(sampleLog, 'recon'));
 ok('gateLogHasPass rejects missing', !gateLogHasPass(sampleLog, 'report'));
 

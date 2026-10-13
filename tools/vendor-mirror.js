@@ -31,14 +31,14 @@ function sha256(buf) {
 
 async function api(ctx, instance, urlPath) {
   const fetchFn = ctx.fetch || global.fetch;
-  const r = await fetchFn(instance.replace(/\/+$/, '') + urlPath, { headers: { 'User-Agent': 'stavros-vendor-mirror' } });
+  const r = await fetchFn(instance.replace(/\/+$/, '') + urlPath, { headers: { 'User-Agent': 'cyboros-vendor-mirror' } });
   if (!r.ok) throw new Error('HTTP ' + r.status + ' for ' + urlPath);
   return r.json();
 }
 
 async function fetchBytes(ctx, url) {
   const fetchFn = ctx.fetch || global.fetch;
-  const r = await fetchFn(url, { headers: { 'User-Agent': 'stavros-vendor-mirror' } });
+  const r = await fetchFn(url, { headers: { 'User-Agent': 'cyboros-vendor-mirror' } });
   if (!r.ok) throw new Error('HTTP ' + r.status + ' for ' + url);
   return Buffer.from(await r.arrayBuffer());
 }

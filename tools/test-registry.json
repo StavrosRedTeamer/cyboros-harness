@@ -1,6 +1,6 @@
 {
   "_meta": {
-    "name": "stavros-test-registry",
+    "name": "cyboros-test-registry",
     "model": "REDflare-style stable test-ID registry (repo-vet churchofmalware plan QW7)",
     "standards": {
       "wstg": "OWASP WSTG v4.2 category/test ids",

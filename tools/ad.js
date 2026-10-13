@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Cyboros AD — deterministic Active-Directory orchestrator (the AD analog of wifi.js).
 //
-// Today stavros-ad drives enum4linux-ng / netexec / impacket / certipy as FREEFORM binaries via
+// Today cyboros-ad drives enum4linux-ng / netexec / impacket / certipy as FREEFORM binaries via
 // run.js. This tool replaces that with a scope-checked, tier-gated, STRUCTURED-PARSING front end,
 // the same discipline the rest of the harness applies to every other class.
 //

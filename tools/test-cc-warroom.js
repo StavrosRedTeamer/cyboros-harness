@@ -171,8 +171,8 @@ fs.writeFileSync(process.env.SCOPE_JSON, JSON.stringify({ allowed_hosts: ['lab.l
   ].join('\n') + '\n');
   // one gate pass since activation, one before it
   fs.appendFileSync(process.env.GATE_LOG_FILE, [
-    `| ${nowIso} | stavros/map | pass | criteria | campaign |`,
-    `| ${oldTs} | stavros/recon | pass | criteria | legacy |`,
+    `| ${nowIso} | cyboros/map | pass | criteria | campaign |`,
+    `| ${oldTs} | cyboros/recon | pass | criteria | legacy |`,
   ].join('\n') + '\n');
 
   const s = war.build({

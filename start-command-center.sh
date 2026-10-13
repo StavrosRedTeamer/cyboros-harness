@@ -13,9 +13,9 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
 
-say()  { printf '\033[1;32m[stavros]\033[0m %s\n' "$*"; }
-warn() { printf '\033[1;33m[stavros]\033[0m %s\n' "$*"; }
-die()  { printf '\033[1;31m[stavros]\033[0m %s\n' "$*" >&2; exit 1; }
+say()  { printf '\033[1;32m[cyboros]\033[0m %s\n' "$*"; }
+warn() { printf '\033[1;33m[cyboros]\033[0m %s\n' "$*"; }
+die()  { printf '\033[1;31m[cyboros]\033[0m %s\n' "$*" >&2; exit 1; }
 
 # --- 0. parse args (i flag ignoti vengono inoltrati a gui-server.js) ---
 HOST="127.0.0.1"

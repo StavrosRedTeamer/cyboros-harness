@@ -4,7 +4,7 @@
 // is classified by c2-guard (auto runs; confirm-tier refused without --confirm),
 // the destination host must be in scope, and a successful connection registers an
 // `ssh-<user>@<host>` session in the shared teardown ledger (reports/sessions.json)
-// so stavros-cleanup sees it like any C2 session.
+// so cyboros-cleanup sees it like any C2 session.
 //
 // ponytail: spawns the system ssh client per invocation (stateless). No multiplexing,
 // no persistent master socket yet. Password auth requires sshpass reading the secret

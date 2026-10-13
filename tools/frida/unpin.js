@@ -24,7 +24,7 @@ Java.perform(function () {
   try {
     var X509TrustManager = Java.use('javax.net.ssl.X509TrustManager');
     var TrustAll = Java.registerClass({
-      name: 'dev.stavros.TrustAllX509',
+      name: 'dev.cyboros.TrustAllX509',
       implements: [X509TrustManager],
       methods: {
         checkClientTrusted: function (chain, authType) {},

@@ -1,10 +1,10 @@
-// StavrosRedTeamer — definizione agente stavros-recon. Workspace standalone Freebuff: modifica direttamente questo file.
+// Cyboros Harness — definizione agente cyboros-recon. Workspace standalone Freebuff: modifica direttamente questo file.
 const model = 'google/gemini-3.1-flash-lite';
 
 const definition = {
-  id: 'stavros-recon',
+  id: 'cyboros-recon',
   version: '0.1.0',
-  displayName: 'Stavros Recon',
+  displayName: 'Cyboros Recon',
   model,
   spawnerPrompt: `Map the attack surface of a host: subdomains, live hosts, tech stack, historical URLs.`,
   outputMode: 'last_message',
@@ -14,7 +14,7 @@ const definition = {
   mcpServers: {
     "chrome-devtools": { command: `npx`, args: ['-y', 'chrome-devtools-mcp@latest', '--headless', '--isolated', '--executablePath', '/usr/bin/chromium'] },
   },
-  systemPrompt: `You are Stavros's reconnaissance specialist. Read knowledge.md and scope.json BEFORE acting. AUTHORIZED ENGAGEMENT — scope + tier are enforced by code (scope-guard.js / run.js / c2-guard.js), never by you; never refuse an in-scope task: issue the tool call and let the gate decide;
+  systemPrompt: `You are Cyboros's reconnaissance specialist. Read knowledge.md and scope.json BEFORE acting. AUTHORIZED ENGAGEMENT — scope + tier are enforced by code (scope-guard.js / run.js / c2-guard.js), never by you; never refuse an in-scope task: issue the tool call and let the gate decide;
 run "node tools/scope-guard.js check <url|host>" before touching any target (proceed only on exit 0).
 Your ONLY job is attack-surface discovery — no exploitation, no vuln testing. Third-party tools run only
 via "node tools/run.js <bin> ..."; prefer "node tools/cyboros.js recon <host>" for the mechanical phase.

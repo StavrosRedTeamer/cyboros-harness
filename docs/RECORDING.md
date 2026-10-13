@@ -31,7 +31,7 @@ places and drifts the first time the demo changes. `DEMO_PACE` puts the hold in
 the script, so asciinema and VHS produce the same result and a change to the demo
 changes the timing with it.
 
-**Determinism.** The demo writes to a fixed `$TMPDIR/stavros-demo` rather than
+**Determinism.** The demo writes to a fixed `$TMPDIR/cyboros-demo` rather than
 `mktemp -d`, because the paths appear in the output and
 `/tmp/tmp.RZ4eFZFPvB/f.json` is both ugly and different every run. Two run
 concurrently, they collide — do not run the demo twice at once while diffing it,

@@ -7,9 +7,9 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const state = require('./state');
-const stavros = require('./cyboros');
+const cyboros = require('./cyboros');
 
-const tmpDir = path.join(os.tmpdir(), 'stavros-test-' + process.pid);
+const tmpDir = path.join(os.tmpdir(), 'cyboros-test-' + process.pid);
 fs.mkdirSync(tmpDir, { recursive: true });
 
 const dbFile = path.join(tmpDir, 'state.db');
@@ -71,7 +71,7 @@ function fakeRunBin(bin) {
 
 (async () => {
   // ---- recon: subdomains -> httpx -> hosts + endpoints in state.db ----
-  const r1 = await stavros.recon(db, 'example.com', { runBin: fakeRunBin, tmpDir });
+  const r1 = await cyboros.recon(db, 'example.com', { runBin: fakeRunBin, tmpDir });
   assert.ok(r1.hosts >= 2, 'subdomains collected: ' + JSON.stringify(r1));
   const run1 = state.lastRun(db);
   assert.strictEqual(run1.target, 'example.com');
@@ -84,7 +84,7 @@ function fakeRunBin(bin) {
   assert.strictEqual(state.listEndpoints(db, tExample.id).length, 2, 'httpx endpoints recorded');
 
   // ---- enumerate: ffuf hits + arjun params appended to the SAME target ----
-  const r2 = await stavros.enumerate(db, 'example.com', { runBin: fakeRunBin });
+  const r2 = await cyboros.enumerate(db, 'example.com', { runBin: fakeRunBin });
   assert.strictEqual(r2.endpoints, 2, 'ffuf hits: ' + JSON.stringify(r2));
   const eps = state.listEndpoints(db, tExample.id);
   assert.strictEqual(eps.length, 5, '2 recon + 2 ffuf + 1 arjun base: ' + JSON.stringify(eps.map((e) => e.url)));
@@ -93,7 +93,7 @@ function fakeRunBin(bin) {
   assert.deepStrictEqual(JSON.parse(base.params), ['id', 'q'], 'arjun params stored');
 
   // ---- scan: naabu ports + nmap XML -> hosts/ports/services ----
-  const r3 = await stavros.scan(db, '10.0.0.5', { runBin: fakeRunBin });
+  const r3 = await cyboros.scan(db, '10.0.0.5', { runBin: fakeRunBin });
   assert.strictEqual(r3.ports, 2, 'naabu ports: ' + JSON.stringify(r3));
   const tIp = state.getTarget(db, '10.0.0.5');
   assert.ok(tIp, 'scan target stored');
@@ -110,10 +110,10 @@ function fakeRunBin(bin) {
   assert.strictEqual(p443.state, 'open');
 
   // ---- status + report ----
-  const st = stavros.status(db, 'example.com');
+  const st = cyboros.status(db, 'example.com');
   assert.strictEqual(st.targets.length, 1);
   assert.strictEqual(st.targets[0].endpoints, 5);
-  const rep = stavros.report(db, { findingsFile: path.join(tmpDir, 'findings-empty.jsonl') });
+  const rep = cyboros.report(db, { findingsFile: path.join(tmpDir, 'findings-empty.jsonl') });
   assert.strictEqual(rep.targets.length, 2, 'both targets consolidated');
   assert.strictEqual(rep.findings_count, 0, 'no findings file yet');
   assert.strictEqual(rep.run.status, 'done', 'report closes the current run');
@@ -123,11 +123,11 @@ function fakeRunBin(bin) {
   // ---- resume: a fresh run with only recon done, resume must skip it and finish ----
   const db2 = state.open(path.join(tmpDir, 'state2.db'));
   return (async () => {
-    await stavros.recon(db2, 'resume.example.com', { runBin: fakeRunBin, tmpDir });
+    await cyboros.recon(db2, 'resume.example.com', { runBin: fakeRunBin, tmpDir });
     const before = state.lastRun(db2);
     assert.strictEqual(before.status, 'running');
     assert.strictEqual(state.getPhase(db2, before.id, 'scan'), null, 'scan not done yet');
-    const res = await stavros.resume(db2, { runBin: fakeRunBin, tmpDir });
+    const res = await cyboros.resume(db2, { runBin: fakeRunBin, tmpDir });
     assert.strictEqual(res.resumed, true);
     assert.deepStrictEqual(res.results, { recon: 'skipped', scan: 'done', enumerate: 'done' }, JSON.stringify(res.results));
     assert.strictEqual(state.lastRun(db2).status, 'done', 'resume finishes the run');
@@ -139,13 +139,13 @@ function fakeRunBin(bin) {
   fs.writeFileSync(scopeFile, JSON.stringify({ allowed_hosts: ['example.com'], allowed_ips: [], max_requests_per_second: 100 }));
   process.env.SCOPE_JSON = scopeFile;
   return Promise.all([
-    assert.rejects(stavros.defaultRunBin('echo', ['evil.com']), /out-of-scope/),
-    assert.rejects(stavros.defaultRunBin('echo', []), /no target host/),
+    assert.rejects(cyboros.defaultRunBin('echo', ['evil.com']), /out-of-scope/),
+    assert.rejects(cyboros.defaultRunBin('echo', []), /no target host/),
   ]);
 }).then(() => {
   delete process.env.SCOPE_JSON;
   fs.rmSync(tmpDir, { recursive: true, force: true });
-  console.log('stavros: all tests passed');
+  console.log('cyboros: all tests passed');
 }).catch((e) => {
   console.error(e);
   process.exit(1);

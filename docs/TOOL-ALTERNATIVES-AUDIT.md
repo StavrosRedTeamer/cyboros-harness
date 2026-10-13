@@ -190,7 +190,7 @@ to have. That is an inconsistency worth fixing regardless of anything else in th
 
 **Recommendation:** a new module (proposed: `report-sarif.js`) reading `findings.jsonl`,
 emitting `sarifVersion 2.1.0`, with
-`properties.stavros.{verify_level,status,oracle_url,evidence_chain}` on each result. Then
+`properties.cyboros.{verify_level,status,oracle_url,evidence_chain}` on each result. Then
 `radar-profiler.js`'s claim becomes true.
 
 Secondary: **CycloneDX VEX** is the right format if the harness ever wants to express

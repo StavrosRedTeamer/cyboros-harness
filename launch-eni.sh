@@ -58,7 +58,7 @@ done
 say "Pre-flight OK (contratto: $CONTRACT_BYTES byte in $CONTRACT)."
 say "Home sessione: $ENI_HOME   Config: $REAL_HOME/.config   Cwd: $TARGET_CWD"
 say "Questa sessione NON ha il router dei token: l'identità è il contratto qui sopra."
-say "Verifica post-flight: node \"$SCRIPT_DIR/tools/check-identity.js\" eni stavrosredteamer"
+say "Verifica post-flight: node \"$SCRIPT_DIR/tools/check-identity.js\" eni cyboros-harness"
 [[ "$CHECK_ONLY" == "1" ]] && exit 0
 
 # --- 4. avvio TUI con la home pinnata ---
