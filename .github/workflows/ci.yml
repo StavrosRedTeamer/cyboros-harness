@@ -10,6 +10,20 @@ on:
 # The suite has no network and no third-party dependencies: zero npm install
 # step, by design. Node is the only requirement (engines: >=22, because the
 # Command Center backend uses node:sqlite).
+
+# Analisi statica: CodeQL NON è utilizzabile qui. Su un repository privato il code scanning di
+# GitHub richiede GitHub Code Security (a pagamento): la run fallisce con 403 "GitHub Code
+# Security or GitHub Advanced Security must be enabled for this repository to use code
+# scanning". Il sostituto è `tools/test-lint.js`, che gira con la suite nel job `test` e copre la
+# sola classe che ha già prodotto un rosso reale — un `require` verso un file non tracciato
+# (l'incidente di `tools/chain-log.js`: 11 file del motore lo richiedevano, il file non era mai
+# stato committato, e `master` era rosso a clone pulito mentre in locale era verde).
+# Se un giorno il piano abilita Code Security, il job CodeQL si aggiunge con
+# `permissions: security-events: write` a livello di JOB: qui sotto non si allarga nulla, perché
+# nessun job di questo workflow scrive e nessuno deve poterlo fare.
+permissions:
+  contents: read
+
 jobs:
   test:
     name: tests (node ${{ matrix.node }})
@@ -20,7 +34,7 @@ jobs:
         node: ['22', '24']
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
       - name: Check toolchain
         run: |
@@ -83,7 +97,7 @@ jobs:
     name: repo hygiene
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
       - name: Fail if engagement data is ever tracked
         # The .gitignore is the only thing keeping client data out of history.
         # A regression here is a confidentiality incident, so make it loud.
@@ -121,7 +135,7 @@ jobs:
     name: repo history
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           # `hygiene` controlla l'indice, questo job controlla la STORIA: è la storia che
           # viene pubblicata insieme al repository. Il gate interroga path e lineage di ogni
