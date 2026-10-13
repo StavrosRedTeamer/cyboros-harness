@@ -52,7 +52,7 @@ function waitFor(s, re, ms) {
 async function req(port, pathname, opts) {
   const o = opts || {};
   const headers = {};
-  if (o.token) headers['X-Stavros-Token'] = o.token;
+  if (o.token) headers['X-Cyboros-Token'] = o.token;
   if (o.body) headers['Content-Type'] = 'application/json';
   const res = await fetch('http://127.0.0.1:' + port + pathname, {
     method: o.method || 'GET',

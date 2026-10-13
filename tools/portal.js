@@ -24,7 +24,7 @@ const path = require('path');
 const { loadScope, inScope, hostOf } = require('./scope-guard');
 const { resolveAndGuard } = require('./net');
 
-const UA = 'stavros-portal/0.1';
+const UA = 'cyboros-portal/0.1';
 
 // ---------------------------------------------------------------------------
 // HTML helpers (pure)

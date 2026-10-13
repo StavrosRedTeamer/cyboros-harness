@@ -47,7 +47,7 @@ ok('emits a SARIF 2.1.0 run with one result per finding', () => {
   assert.equal(doc.version, '2.1.0');
   assert.equal(doc.runs.length, 1);
   assert.equal(doc.runs[0].results.length, 2);
-  assert.equal(doc.runs[0].tool.driver.name, 'StavrosRedTeamer');
+  assert.equal(doc.runs[0].tool.driver.name, 'Cyboros Harness');
 });
 
 ok('every result carries a ruleId and a message', () => {
@@ -64,9 +64,9 @@ ok('rules are deduplicated across findings of the same class', () => {
 });
 
 // --- the part that actually matters: evidence travels with the severity -----------------
-ok('properties.stavros carries verify_level and its ceiling', () => {
+ok('properties.cyboros carries verify_level and its ceiling', () => {
   const doc = buildSarif([finding({ verify_level: 'triggered', severity: 'Medium' })], {});
-  const p = doc.runs[0].results[0].properties.stavros;
+  const p = doc.runs[0].results[0].properties.cyboros;
   assert.equal(p.verify_level, 'triggered');
   assert.equal(p.severity, 'Medium');
   assert.equal(p.severity_ceiling, 'Medium');
@@ -84,17 +84,37 @@ ok('severity is level-mapped into SARIF error/warning/note', () => {
 
 ok('an unclassified finding is emitted and flagged, never promoted', () => {
   const doc = buildSarif([finding({ verify_level: undefined })], {});
-  const p = doc.runs[0].results[0].properties.stavros;
+  const p = doc.runs[0].results[0].properties.cyboros;
   assert.equal(p.verify_level, 'unclassified');
   assert.equal(p.severity_ceiling, null);
   assert.equal(doc.runs[0].results.length, 1, 'unclassified must still be reported, not dropped');
+});
+
+// --- compatibility window: both key sets are emitted for one release --------------------
+ok('the properties bag is emitted under both keys, with identical content', () => {
+  const doc = buildSarif([finding({ verify_level: 'triggered', severity: 'Medium' })], {});
+  const r = doc.runs[0].results[0].properties;
+  assert.deepEqual(r.cyboros, r.stavros);            // a consumer on the old key loses nothing
+  assert.equal(r.cyboros.verify_level, 'triggered');
+  assert.equal(r.cyboros.severity_ceiling, 'Medium');
+  const inv = doc.runs[0].invocations[0].properties;
+  assert.deepEqual(inv.cyboros, inv.stavros);
+  assert.equal(inv.cyboros.severity_bounded_by_evidence, true);
+});
+
+ok('the driver and fingerprint use the new name, and the old keys stay for one release', () => {
+  const doc = buildSarif([finding({})], {});
+  assert.equal(doc.runs[0].tool.driver.name, 'Cyboros Harness');
+  assert.equal(doc.runs[0].tool.driver.informationUri, 'https://github.com/CSI-entitymorton/cyboros-harness');
+  const fp = doc.runs[0].results[0].partialFingerprints;
+  assert.equal(fp.cyborosFindingId, fp.stavrosFindingId);
 });
 
 // --- the refusal path: an incoherent record must not be laundered ----------------------
 ok('REFUSES a record whose severity exceeds its verification level', () => {
   // A hand-edited / merged findings.jsonl that bypassed record-finding.js's writer.
   const doc = buildSarif([finding({ severity: 'Critical', verify_level: 'suspected' })], {});
-  const inv = doc.runs[0].invocations[0].properties.stavros;
+  const inv = doc.runs[0].invocations[0].properties.cyboros;
   assert.equal(doc.runs[0].results.length, 0, 'the incoherent result must not be emitted');
   assert.equal(inv.findings_refused, 1);
   assert.equal(inv.findings_refused > 0 ? doc.runs[0].invocations[0].executionSuccessful : true, false);
@@ -106,8 +126,8 @@ ok('a coherent finding in the same file still exports', () => {
     finding({ severity: 'High', verify_level: 'exploited' }),
   ], {});
   assert.equal(doc.runs[0].results.length, 1);
-  assert.equal(doc.runs[0].invocations[0].properties.stavros.findings_refused, 1);
-  assert.equal(doc.runs[0].invocations[0].properties.stavros.findings_total, 2);
+  assert.equal(doc.runs[0].invocations[0].properties.cyboros.findings_refused, 1);
+  assert.equal(doc.runs[0].invocations[0].properties.cyboros.findings_total, 2);
 });
 
 // --- fingerprints: stable across runs, different across findings -----------------------
@@ -129,7 +149,7 @@ ok('reads oracle/verify/evidence from the field names actually on disk', () => {
     evidence: { ref: 'reports/evidence/e1.md' },
     id: 'F-0001',
   });
-  const p = buildSarif([f], {}).runs[0].results[0].properties.stavros;
+  const p = buildSarif([f], {}).runs[0].results[0].properties.cyboros;
   assert.equal(p.oracle_ref, 'artifacts/oracle/x.json#3');
   assert.equal(p.oracle_type, 'http-diff');
   assert.equal(p.verify.method, 'GET');
@@ -138,7 +158,7 @@ ok('reads oracle/verify/evidence from the field names actually on disk', () => {
 });
 
 ok('a finding with no oracle exports null rather than inventing one', () => {
-  const p = buildSarif([finding({})], {}).runs[0].results[0].properties.stavros;
+  const p = buildSarif([finding({})], {}).runs[0].results[0].properties.cyboros;
   assert.equal(p.oracle_ref, null);
   assert.equal(p.oracle_type, null);
 });

@@ -128,7 +128,7 @@ function get(rec, pathname, timeoutMs) {
       port: rec.port,
       path: pathname,
       method: 'GET',
-      headers: rec.token ? { 'X-Stavros-Token': rec.token } : {},
+      headers: rec.token ? { 'X-Cyboros-Token': rec.token } : {},
       timeout: timeoutMs,
     }, (res) => {
       let data = '';

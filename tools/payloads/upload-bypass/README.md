@@ -26,8 +26,9 @@ handles the multipart; scope-guard stays hard on every hop.
 
 1. **In scope only** — `node tools/scope-guard.js check <url>` first.
 2. **Detection before exploitation.** The default embedded command is a benign MARKER echo
-   (`echo STAVROS-MARKER`) so you can attribute any execution to YOUR artifact. Replace the
-   marker per run (`--marker stavros-a1b2c3`).
+   (`echo CYBOROS-MARKER`) so you can attribute any execution to YOUR artifact. Replace the
+   marker per run (`--marker cyboros-a1b2c3`). The marker was `STAVROS-MARKER` before
+   2026-10-13: to attribute a run that predates the rename, look for either string.
 3. **Custom scripts are an operator decision** (`--script`) inside an AUTHORIZED engagement or
    lab — this tool never stages payloads by itself and never touches a target.
 4. **Execution evidence** belongs in a finding with `verify_level` honest to what you actually

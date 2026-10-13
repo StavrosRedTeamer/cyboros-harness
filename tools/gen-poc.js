@@ -73,7 +73,7 @@ def build_request(base):
     # Original PoC evidence (structural, scrubbed): ${pocLine}
     url = base.rstrip('/') + '${String(f.endpoint || '').replace(/"/g, '\\"')}'
     req = urllib.request.Request(url, method='${method}')
-    req.add_header('User-Agent', 'StavrosReproducer/1.0')
+    req.add_header('User-Agent', 'CyborosReproducer/1.0')
     return req
 
 def check_indicator(body, status):

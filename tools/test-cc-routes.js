@@ -68,7 +68,10 @@ function waitFor(fn, ms) {
 }
 async function req(port, method, p, body, withToken) {
   const headers = {};
-  if (withToken) headers['X-Stavros-Token'] = TOKEN;
+  // Dual-name window (Cyboros rename): new clients send X-Cyboros-Token, a client already
+  // open on an earlier release still sends X-Stavros-Token and must not get a mute 403.
+  if (withToken === 'legacy') headers['X-Stavros-Token'] = TOKEN;
+  else if (withToken) headers['X-Cyboros-Token'] = TOKEN;
   if (body) headers['Content-Type'] = 'application/json';
   const res = await fetch('http://127.0.0.1:' + port + p, { method, headers, body: body ? JSON.stringify(body) : undefined });
   let json = null;
@@ -112,6 +115,9 @@ async function req(port, method, p, body, withToken) {
   const apReq = await req(port, 'POST', '/api/cc/approvals/request', { host: 'lab.local', action_class: 'c2', command: 'nmap lab.local' }, true);
   assert.strictEqual(apReq.status, 200, 'write with token → 200');
   assert.strictEqual(apReq.json.scope_verdict, 'allowed');
+
+  const apLegacy = await req(port, 'POST', '/api/cc/approvals/request', { host: 'lab.local', action_class: 'c2', command: 'nmap lab.local' }, 'legacy');
+  assert.strictEqual(apLegacy.status, 200, 'legacy X-Stavros-Token still accepted during the rename window');
 
   const granted = await req(port, 'POST', '/api/cc/approvals/grant', { id: apReq.json.id }, true);
   assert.strictEqual(granted.status, 200, 'grant');

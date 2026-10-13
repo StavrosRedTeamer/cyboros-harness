@@ -10,7 +10,7 @@
 //   node tools/payloads/upload-bypass/gen-polyglot-jpeg.js --self-test
 //
 // Ethics (same rules as every payload in this directory): the DEFAULT embedded command is a
-// benign MARKER echo (`echo STAVROS-MARKER`) for detection/attribution only. Passing a custom
+// benign MARKER echo (`echo CYBOROS-MARKER`) for detection/attribution only. Passing a custom
 // --script is the operator's decision inside an AUTHORIZED engagement/lab; this tool never
 // stages payloads by itself and never touches a target.
 const fs = require('fs');
@@ -31,11 +31,11 @@ function baseJpeg() {
 // trailing bytes after EOI.
 const MODES = {
   sh: (marker, extraLines) =>
-    ['#!/bin/sh', '# stavros upload-filter test artifact (polyglot jpeg)', ...lines(marker, extraLines)].join('\n'),
+    ['#!/bin/sh', '# cyboros upload-filter test artifact (polyglot jpeg)', ...lines(marker, extraLines)].join('\n'),
   pwsh: (marker, extraLines) =>
-    ['# stavros upload-filter test artifact (polyglot jpeg)', ...lines(marker, extraLines).map((l) => l)],
+    ['# cyboros upload-filter test artifact (polyglot jpeg)', ...lines(marker, extraLines).map((l) => l)],
   bat: (marker, extraLines) =>
-    ['@echo off', 'REM stavros upload-filter test artifact (polyglot jpeg)', ...lines(marker, extraLines)].join('\r\n'),
+    ['@echo off', 'REM cyboros upload-filter test artifact (polyglot jpeg)', ...lines(marker, extraLines)].join('\r\n'),
 };
 
 function lines(marker, extraLines) {
@@ -47,7 +47,7 @@ function lines(marker, extraLines) {
 function generate(opts) {
   opts = opts || {};
   const mode = MODES[opts.mode] ? opts.mode : 'sh';
-  const marker = String(opts.marker || 'STAVROS-MARKER').replace(/[\r\n]/g, '');
+  const marker = String(opts.marker || 'CYBOROS-MARKER').replace(/[\r\n]/g, '');
   const jpeg = baseJpeg();
   const scriptBody = MODES[mode](marker, [opts.script]) + '\n';
   const buf = Buffer.concat([jpeg, Buffer.from('\n' + scriptBody, 'utf8')]);

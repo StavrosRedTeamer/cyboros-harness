@@ -10,7 +10,7 @@
 // harness claims. SARIF is the OASIS standard for exactly this shape of data, accepted by GitHub
 // code scanning and DefectDojo out of the box, with consumer-side deduplication.
 //
-// The interesting part is not the JSON, it is the `properties.stavros` bag: a finding here
+// The interesting part is not the JSON, it is the `properties.cyboros` bag: a finding here
 // carries a verification level, a status, and a machine-re-executed oracle, and its severity is
 // bounded by that evidence (record-finding.js refuses the incoherent combinations). SARIF has no
 // field for that, so it would be silently dropped on export — and severity capped by evidence is
@@ -113,10 +113,14 @@ function toResult(f, idx) {
       logicalLocations: logicalLocation(f),
       properties: { host: f.host || null, endpoint: f.endpoint || null },
     }],
-    partialFingerprints: { stavrosFindingId: fingerprint(f) },
+    // Due chiavi per una release: `cyboros*` è il nome nuovo, `stavros*` resta emesso perché un
+    // consumatore terzo (GitHub code scanning, DefectDojo) già cablato sulla chiave vecchia non
+    // perda in silenzio la deduplica e il tetto di severità — l'unica cosa che un consumatore
+    // generico non può dedurre. Deprecazione: una release, con la nota in CHANGELOG.md.
+    partialFingerprints: { cyborosFindingId: fingerprint(f), stavrosFindingId: fingerprint(f) },
     // SARIF has no PoC field. The evidence goes in properties so nothing is lost, and so the
     // harness's own report remains the human-readable artifact while this is the machine one.
-    properties: { stavros: props },
+    properties: { cyboros: props, stavros: props },
   };
 }
 
@@ -125,9 +129,9 @@ function buildSarif(findings, opts) {
   const o = opts || {};
   const tool = {
     driver: {
-      name: 'StavrosRedTeamer',
+      name: 'Cyboros Harness',
       version: require('../package.json').version,
-      informationUri: 'https://github.com/CSI-entitymorton/stavrosredteamer',
+      informationUri: 'https://github.com/CSI-entitymorton/cyboros-harness',
       rules: [],
     },
   };
@@ -151,13 +155,21 @@ function buildSarif(findings, opts) {
       tool.driver.rules.push({
         id,
         name: String(f.class || id).replace(/[^A-Za-z0-9_]/g, '_'),
-        shortDescription: { text: f.class ? `Stavros vulnerability class: ${f.class}` : (f.cwe || 'unclassified') },
+        shortDescription: { text: f.class ? `Cyboros vulnerability class: ${f.class}` : (f.cwe || 'unclassified') },
         defaultConfiguration: { level: SARIF_LEVEL[sev] },
         properties: { tags: ['security', ...(f.class ? [f.class] : []), ...(f.cwe ? [f.cwe] : [])] },
       });
     }
   });
 
+  // Una sola verità per l'invocazione, emessa sotto due chiavi per una release.
+  const inv = {
+    findings_total: findings.length,
+    findings_emitted: results.length,
+    findings_refused: refused.length,
+    refused,
+    severity_bounded_by_evidence: true,
+  };
   const run = {
     $schema: 'https://json.schemastore.org/sarif-2.1.0.json',
     version: '2.1.0',
@@ -171,13 +183,8 @@ function buildSarif(findings, opts) {
         // Declared explicitly because it is load-bearing for this harness and a consumer has no
         // way to infer it: which findings the runtime itself re-executed, and how many times.
         properties: {
-          stavros: {
-            findings_total: findings.length,
-            findings_emitted: results.length,
-            findings_refused: refused.length,
-            refused,
-            severity_bounded_by_evidence: true,
-          },
+          cyboros: inv,
+          stavros: inv,
         },
       }],
     }],
@@ -224,7 +231,7 @@ function main(argv) {
     console.error(JSON.stringify({ error: 'write_failed', detail: String(e && e.message || e) }));
     return 1;
   }
-  const inv = doc.runs[0].invocations[0].properties.stavros;
+  const inv = doc.runs[0].invocations[0].properties.cyboros;
   console.log(JSON.stringify({
     ok: true, out, sarifVersion: '2.1.0',
     findings_total: inv.findings_total, emitted: inv.findings_emitted, refused: inv.findings_refused,

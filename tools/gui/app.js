@@ -84,7 +84,7 @@ const epBreak = (s) => esc(s).replace(/(\/|\?|=|&amp;|_|-)/g, '$1<wbr>');
 
 async function api(path, opts) {
   const o = Object.assign({}, opts);
-  if (CC_TOKEN) o.headers = Object.assign({}, (opts && opts.headers) || {}, { 'X-Stavros-Token': CC_TOKEN });
+  if (CC_TOKEN) o.headers = Object.assign({}, (opts && opts.headers) || {}, { 'X-Cyboros-Token': CC_TOKEN });
   const res = await fetch(path, o);
   let body = null;
   try { body = await res.json(); } catch { /* empty */ }

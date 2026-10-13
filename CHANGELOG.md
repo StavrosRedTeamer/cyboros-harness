@@ -17,6 +17,16 @@ grouped by milestone, and `v0.1.0` (2026-09-28) is the first tagged release.
   cerca `CYBOROS_TMP`, poi `STAVROS_TMP`, poi il default. Il prefisso vecchio resta letto per una
   release — un env var caduto non produce un errore visibile, produce report scritti altrove, quindi
   la finestra è esplicita invece che silenziosa. Una stringa vuota vale come assente.
+- **Il formato dati verso terzi passa a `properties.cyboros`.** Nel SARIF il sacco delle proprietà,
+  il `partialFingerprints` di deduplica e il driver (`Cyboros Harness`) usano il nome nuovo; le
+  chiavi `properties.stavros` / `stavrosFindingId` restano emesse per una release, perché un
+  consumatore terzo già cablato sulla vecchia chiave (GitHub code scanning, DefectDojo) perderebbe
+  in silenzio il `verify_level` e il tetto di severità — l'unica cosa che un consumatore generico
+  non può dedurre. Stessa finestra sull'header di sessione del Command Center: il server accetta
+  `X-Cyboros-Token` e ancora `x-stavros-token`, il client emette solo il nuovo. Sul filo verso il
+  target il marker benigno diventa `CYBOROS-MARKER` e lo User-Agent `CyborosReproducer/1.0`; le run
+  antecedenti al 2026-10-13 restano attribuibili cercando `STAVROS-MARKER` (nota di compatibilita` in
+  [`tools/payloads/upload-bypass/README.md`](tools/payloads/upload-bypass/README.md)).
 
 ### Added
 

@@ -152,7 +152,9 @@ function guardOk(req) {
 // ── session token (writes + interactive streams) ────────────────────────────
 function tokenOk(req, query) {
   if (!TOKEN) return true;
-  const given = String((req.headers && req.headers['x-stavros-token']) || (query && query.token) || '');
+  // Due nomi per una release: i client nuovi mandano x-cyboros-token, i client gia` aperti su una
+  // versione precedente mandano ancora x-stavros-token e non devono ricevere un 403 muto.
+  const given = String((req.headers && (req.headers['x-cyboros-token'] || req.headers['x-stavros-token'])) || (query && query.token) || '');
   if (given.length !== TOKEN.length) return false;   // timingSafeEqual needs equal lengths
   try { return crypto.timingSafeEqual(Buffer.from(given), Buffer.from(TOKEN)); } catch { return false; }
 }
