@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Stavros saml — SAML response analysis + XML Signature Wrapping (XSW) attack-payload generation.
+// Cyboros saml — SAML response analysis + XML Signature Wrapping (XSW) attack-payload generation.
 // Closes a real gap: OAuth/OIDC was covered (jwt.js/authn), SAML was not. This is the SAML analog
 // of jwt.js — it DECODES and ANALYSES a SAMLResponse and MINTS attack payloads; it does NOT send.
 // Replay a minted payload against an in-scope SP ONLY through repeater.js (scope-gated).

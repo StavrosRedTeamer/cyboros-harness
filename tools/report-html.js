@@ -248,7 +248,7 @@ function buildHtml(data) {
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Stavros Red Team Report</title>
+<title>Cyboros Red Team Report</title>
 <style>
   :root { color-scheme: light dark; }
   body { font-family: -apple-system, Segoe UI, Roboto, sans-serif; margin: 0; background: #0f1216; color: #dbe2ea; }
@@ -276,7 +276,7 @@ function buildHtml(data) {
 </head>
 <body>
 <div class="wrap">
-  <h1>Stavros Red Team Report</h1>
+  <h1>Cyboros Red Team Report</h1>
   <p class="muted">Generated ${htmlEscape(generatedAt)} &middot; authorized targets only (scope.json)</p>
 
   <div class="kpis">

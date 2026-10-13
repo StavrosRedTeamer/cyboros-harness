@@ -1,4 +1,4 @@
-# Installer best-effort dei binari usati da Stavros (Windows).
+# Installer best-effort dei binari usati da Cyboros (Windows).
 # Non e obbligatorio: cio che manca, gli agent lo aggirano con curl/repeater.js.
 # Richiede: Go (per i tool ProjectDiscovery) e Python+pipx (per sqlmap). Salta cio che non c'e.
 #
@@ -8,7 +8,7 @@
 # Questo script NON installa tool wireless (i pacchetti apt aircrack-ng/hostapd/dnsmasq/...
 # non esistono come tali su Windows).
 
-Write-Host "== Stavros tool installer ==" -ForegroundColor Cyan
+Write-Host "== Cyboros tool installer ==" -ForegroundColor Cyan
 
 function Have($c) { return [bool](Get-Command $c -ErrorAction SilentlyContinue) }
 

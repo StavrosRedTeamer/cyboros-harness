@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
-# Stavros RedTeamer — avvio del Command Center (dashboard web locale).
+# Cyboros RedTeamer — avvio del Command Center (dashboard web locale).
 #
 #   ./start-command-center.sh                 # avvia e apre il browser su 127.0.0.1:8787
 #   ./start-command-center.sh --port 9000     # porta custom
 #   ./start-command-center.sh --host 0.0.0.0  # bind diverso (sconsigliato: la console è loopback-only per design)
 #   ./start-command-center.sh --no-open       # non aprire il browser
 #
-# Serve la SPA tools/gui/ ("Stavros Redteamer · Command Center") via
+# Serve la SPA tools/gui/ ("Cyboros Redteamer · Command Center") via
 # tools/gui-server.js: zero-dipendenze, bound su loopback, non bypassa mai i guard.
 set -euo pipefail
 

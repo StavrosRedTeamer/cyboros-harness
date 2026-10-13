@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Stavros takeover — subdomain takeover + DNS hygiene audit (P1.3, detection-only, read-only).
+// Cyboros takeover — subdomain takeover + DNS hygiene audit (P1.3, detection-only, read-only).
 //
 //   node tools/takeover.js scan <domain> [--subs <file>] [--resolver <ip>]    audit → reports/takeover-<domain>.json
 //   node tools/takeover.js parse <records-file>                               offline verdicts from saved records

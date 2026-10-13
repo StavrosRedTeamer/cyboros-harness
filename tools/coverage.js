@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Coverage matrix for the Stavros harness: vulnerability-class × status per host.
+// Coverage matrix for the Cyboros harness: vulnerability-class × status per host.
 //   node tools/coverage.js <host>            # matrix to stdout
 //   node tools/coverage.js <host> --json     # machine-readable
 //   node tools/coverage.js <host> --write    # write reports/coverage-matrix.md (report gate input)

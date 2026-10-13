@@ -1,6 +1,6 @@
 # ops/harness.md — regole condivise della harness (disciplina, tool-wiring, MCP)
 
-> File di riferimento **unico** per le regole comuni a tutti gli agenti Stavros.
+> File di riferimento **unico** per le regole comuni a tutti gli agenti Cyboros.
 > Gli agenti leggono QUESTO file su richiesta (grep del punto che serve) — non
 > deve essere iniettato inline nel prompt. Le regole invarianti critiche (scope-guard,
 > non-distruttivo, verify_level) stanno anche in `knowledge.md` e nei guard-hard dei tool.

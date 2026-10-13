@@ -1,5 +1,5 @@
 [Unit]
-Description=Stavros Radar Ecosystem Intelligence Scout
+Description=Cyboros Radar Ecosystem Intelligence Scout
 After=network.target
 
 [Service]

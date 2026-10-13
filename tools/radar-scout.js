@@ -1,5 +1,5 @@
 'use strict';
-// tools/radar-scout.js — Stavros Radar: GitHub & web discovery engine.
+// tools/radar-scout.js — Cyboros Radar: GitHub & web discovery engine.
 // Query GitHub Search API per topic (redteam, pentest, mcp, ...), filtra
 // candidati già visti/archiviati/vecchi/pochi-stelle e deduplica per full_name.
 // Zero dipendenze (node:https). Supporta GITHUB_TOKEN e gestisce 403/429.
@@ -53,7 +53,7 @@ function fetchGithubQuery(query, token = process.env.GITHUB_TOKEN) {
     const encoded = encodeURIComponent(query);
     const url = `https://api.github.com/search/repositories?q=${encoded}&sort=updated&order=desc&per_page=15`;
     const headers = {
-      'User-Agent': 'StavrosRedTeamer-Radar/1.0',
+      'User-Agent': 'Cyboros-Radar/1.0',
       'Accept': 'application/vnd.github.v3+json'
     };
     if (token) headers['Authorization'] = `Bearer ${token}`;

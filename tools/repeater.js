@@ -143,7 +143,7 @@ function varyRequest(url, data, param, value) {
 
 // Multipart body from --form fields and --upload file fields.
 function buildMultipart(fields, uploads) {
-  const boundary = '----Stavros' + Math.random().toString(16).slice(2);
+  const boundary = '----Cyboros' + Math.random().toString(16).slice(2);
   const parts = [];
   for (const [k, v] of Object.entries(fields || {}))
     parts.push(`--${boundary}\r\nContent-Disposition: form-data; name="${k}"\r\n\r\n${v}\r\n`);

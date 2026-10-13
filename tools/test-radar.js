@@ -1,5 +1,5 @@
 // test-tags: offline
-// Stavros Radar — unit e integration test offline (nessuna chiamata di rete live).
+// Cyboros Radar — unit e integration test offline (nessuna chiamata di rete live).
 // Copre: capability profiler, scout filtering/deduplication, analyst prompt+fallback,
 // e generatore di report markdown. Eseguito da `node tools/run-tests.js` (npm test).
 //
@@ -119,7 +119,7 @@ test('generateMarkdownReport formats clean markdown with badges and recipes', ()
   }];
 
   const md = generateMarkdownReport(profile, proposals, '2026-09-08');
-  assert.ok(md.includes('# Stavros Radar Intelligence Report'));
+  assert.ok(md.includes('# Cyboros Radar Intelligence Report'));
   assert.ok(md.includes('super-scanner'));
   assert.ok(md.includes('Cloudflare rate limiting'));
   assert.ok(md.includes('TOOL_WRAPPER'));

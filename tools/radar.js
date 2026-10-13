@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 'use strict';
-// tools/radar.js — Stavros Radar: CLI orchestrator e report generator.
+// tools/radar.js — Cyboros Radar: CLI orchestrator e report generator.
 // Pipeline: profile -> scout -> analyze (OmniRoute) -> report md/json -> cache.
 //
 // Comandi:
@@ -44,7 +44,7 @@ function saveCache(cache) {
 const EFFORT_RANK = { LOW: 0, MEDIUM: 1, HIGH: 2 };
 
 function generateMarkdownReport(profile, proposals, dateStr = new Date().toISOString().split('T')[0]) {
-  let md = `# Stavros Radar Intelligence Report — ${dateStr}\n\n`;
+  let md = `# Cyboros Radar Intelligence Report — ${dateStr}\n\n`;
   md += `> **Ecosystem Scanner & Capability Scout**\n`;
   md += `> Baseline: ${profile.agents.length} agenti, ${profile.tools.length} tool, ${profile.categories.length} categorie coperte.\n\n`;
 
@@ -94,7 +94,7 @@ function generateMarkdownReport(profile, proposals, dateStr = new Date().toISOSt
     md += `\n`;
   }
 
-  md += `---\n*Generato automaticamente da Stavros Radar via OmniRoute.*\n`;
+  md += `---\n*Generato automaticamente da Cyboros Radar via OmniRoute.*\n`;
   return md;
 }
 
@@ -106,7 +106,7 @@ async function runRadar(opts = {}) {
   const rootDir = opts.rootDir || ROOT_DIR;
   const cache = loadCache();
 
-  console.log('[Radar] Profilazione della codebase StavrosRedTeamer...');
+  console.log('[Radar] Profilazione della codebase Cyboros Harness...');
   const profile = profileCodebase(rootDir);
   console.log(`[Radar] Profilati ${profile.agents.length} agenti e ${profile.tools.length} tool in ${profile.categories.length} categorie.`);
 
@@ -155,7 +155,7 @@ if (require.main === module) {
   } else if (cmd === 'status') {
     const cache = loadCache();
     const seenCount = Object.keys(cache.seen || {}).length;
-    console.log('Stavros Radar Status:');
+    console.log('Cyboros Radar Status:');
     console.log(`- Progetti archiviati in cache: ${seenCount}`);
     console.log(`- Ultima scansione: ${cache.lastScan || 'Mai eseguita'}`);
   } else {

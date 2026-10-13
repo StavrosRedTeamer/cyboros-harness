@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# ops/install-radar-timer.sh — abilita il timer systemd user di Stavros Radar.
+# ops/install-radar-timer.sh — abilita il timer systemd user di Cyboros Radar.
 # Uso (dalla root del progetto): bash ops/install-radar-timer.sh
 set -e
 
@@ -12,5 +12,5 @@ cp ops/radar.timer "$SYSTEMD_DIR/radar.timer"
 systemctl --user daemon-reload
 systemctl --user enable --now radar.timer
 
-echo "✔ Stavros Radar systemd user timer abilitato con successo!"
+echo "✔ Cyboros Radar systemd user timer abilitato con successo!"
 echo "Verifica con: systemctl --user list-timers radar.timer"

@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 'use strict';
-// tools/doctor.js — Stavros Doctor: controllo dipendenze + installazione guidata.
+// tools/doctor.js — Cyboros Doctor: controllo dipendenze + installazione guidata.
 //
 // Cosa controlla (tutto LOCALE, nessuna richiesta verso target):
 //   1. runtime      node >= 22 (engines di package.json), python3, go, pipx, git, unzip, xz
@@ -438,7 +438,7 @@ async function main() {
     return j.summary.core_broken ? 2 : (j.summary.registry_present < j.summary.registry_total ? 1 : 0);
   }
 
-  console.log(`\n${C.b}Stavros Doctor — controllo dipendenze (${new Date().toISOString().split('T')[0]})${C.n}`);
+  console.log(`\n${C.b}Cyboros Doctor — controllo dipendenze (${new Date().toISOString().split('T')[0]})${C.n}`);
   console.log(dimS(`root: ${ROOT}`));
 
   // 1. runtime
@@ -534,11 +534,11 @@ async function main() {
       console.log(dimS('\n(--check: solo report. Lancia senza --check per installare.)'));
       return 1;
     }
-    console.log(`${C.g}Tutto il necessario per Stavros è presente.${C.n}`);
+    console.log(`${C.g}Tutto il necessario per Cyboros è presente.${C.n}`);
     return 0;
   }
   if (!missingRuntime.length && !missingRegistry.length) {
-    console.log(`${C.g}Tutto il necessario per Stavros è presente. Nulla da installare.${C.n}`);
+    console.log(`${C.g}Tutto il necessario per Cyboros è presente. Nulla da installare.${C.n}`);
     console.log(dimS('Suggerimento: npm test (gate offline), ./install-tools.sh per l\'arsenale esteso.'));
     return 0;
   }

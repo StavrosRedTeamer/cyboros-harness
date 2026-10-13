@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Stavros api-authz — API object/function/property-level authorization differentials, built on
+// Cyboros api-authz — API object/function/property-level authorization differentials, built on
 // repeater.js primitives (identity resolution + body_similarity). Covers the API-Top-10 classes the
 // harness only touched by hand: mass assignment, BFLA (function-level), BOPLA (property-level).
 //

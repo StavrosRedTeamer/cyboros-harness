@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Stavros spray — lockout-aware password spraying / credential stuffing. This touches REAL
+// Cyboros spray — lockout-aware password spraying / credential stuffing. This touches REAL
 // accounts, so it is CONFIRM-TIER BY CONSTRUCTION: it refuses without --confirm "<reason>" plus
 // explicit in-session user approval (knowledge.md rule 2), scope-checks the target first, and
 // NEVER exceeds (lockout_threshold - 1) attempts per account per window (fail-closed to 1 if the

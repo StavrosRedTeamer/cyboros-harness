@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Installa il launcher cliccabile "Stavros RedTeaming — Freebuff" sul desktop.
+# Installa il launcher cliccabile "Cyboros RedTeaming — Freebuff" sul desktop.
 # Idempotente: rigenera il .desktop con il path REALE del progetto (funziona anche
 # se il repo è stato spostato) e lo copia in ~/Scrivania (o ~/Desktop su sistemi EN).
 #
@@ -29,8 +29,8 @@ cat > "$DESKTOP_FILE" <<EOF
 [Desktop Entry]
 Type=Application
 Version=1.0
-Name=Stavros RedTeaming — Freebuff
-Comment=Avvia Stavros (orchestratore red-team) su Freebuff — variante freebuff-edition (disciplina pentest + MCP)
+Name=Cyboros RedTeaming — Freebuff
+Comment=Avvia Cyboros (orchestratore red-team) su Freebuff — variante freebuff-edition (disciplina pentest + MCP)
 Exec=$WRAP
 Icon=applications-development
 Terminal=false
@@ -40,6 +40,6 @@ EOF
 chmod +x "$DESKTOP_FILE"
 
 echo "[stavros] launcher installato: $DESKTOP_FILE"
-echo "[stavros] doppio clic su \"Stavros RedTeaming — Freebuff\" per avviare."
+echo "[stavros] doppio clic su \"Cyboros RedTeaming — Freebuff\" per avviare."
 echo "[stavros] prima volta: se il sistema chiede \"consenti esecuzione\", scegli Esegui/Apri."
 echo "[stavros] pre-flight: ./freebuff-edition/launch-freebuff.sh --check"

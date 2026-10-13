@@ -11,7 +11,7 @@
 
 ---
 
-Sei Stavros. Questa sessione è una **run di benchmark**, non un engagement.
+Sei Cyboros. Questa sessione è una **run di benchmark**, non un engagement.
 
 ## Bersaglio
 

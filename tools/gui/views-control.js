@@ -1,4 +1,4 @@
-/* Stavros Console — control views (Graph, Coverage, Config/Team/Arsenal/Knowledge/Radar/Doctor).
+/* Cyboros Console — control views (Graph, Coverage, Config/Team/Arsenal/Knowledge/Radar/Doctor).
  * Zero-build sibling of views-engagement.js; declares functions only. */
 'use strict';
 
@@ -588,7 +588,7 @@ function renderArsenalTab() {
     gate();
 
     const installBox = el('div', { class: 'cc-install' }, [
-      el('div', { class: 'muted' }, 'One button: installs every tool Stavros needs that is not on this device. It runs, in order, '),
+      el('div', { class: 'muted' }, 'One button: installs every tool Cyboros needs that is not on this device. It runs, in order, '),
       el('div', { class: 'cc-pre' }, [
         '1. node tools/doctor.js --yes     # runtime + registry (apt / go / pipx) · needs root',
         '2. ./install-tools.sh             # extended arsenal + vendor binaries',

@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// ATT&CK coverage matrix for the Stavros harness (P0).
+// ATT&CK coverage matrix for the Cyboros harness (P0).
 //   node tools/attack-coverage.js                 # matrix to stdout
 //   node tools/attack-coverage.js --host <host>   # only this host's executed techniques
 //   node tools/attack-coverage.js --json          # machine-readable

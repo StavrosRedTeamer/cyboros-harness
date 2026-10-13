@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Stavros Console — local dashboard GUI (zero-dependencies).
+// Cyboros Console — local dashboard GUI (zero-dependencies).
 //
 //   node tools/gui-server.js [--port N] [--host 127.0.0.1]
 //
@@ -498,7 +498,7 @@ function saveScope(body) {
     max_requests_per_second: v.rps,
   });
   if (noteBits.length) {
-    const line = stamp.slice(0, 10) + ': Stavros Console update — ' + noteBits.join('; ');
+    const line = stamp.slice(0, 10) + ': Cyboros Console update — ' + noteBits.join('; ');
     next.notes = (cur.notes ? cur.notes.trimEnd() + '\n' : '') + line;
   }
   // L'autorizzazione scritta non si accorcia per sbaglio: togliere host è l'unica modifica che
@@ -962,7 +962,7 @@ function onListening() {
       url: tokenized, startedAt: STARTED_AT,
     });
   }
-  console.log('Stavros Console  →  ' + tokenized + '   (ctrl-c to stop)');
+  console.log('Cyboros Console  →  ' + tokenized + '   (ctrl-c to stop)');
   if (PRINT_HANDSHAKE) {
     console.log('SCC_PORT=' + boundPort);
     console.log('SCC_URL=' + tokenized);

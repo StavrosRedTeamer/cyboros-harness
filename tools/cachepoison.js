@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Stavros cache — web cache poisoning / cache deception detection. Fills a real coverage gap
+// Cyboros cache — web cache poisoning / cache deception detection. Fills a real coverage gap
 // (no cache-attack tool existed). Reuses the harness's DNS-rebinding-safe, scope-checked request
 // path (net.resolveAndGuard + scope-guard), same as header-check.js/cors.js.
 //

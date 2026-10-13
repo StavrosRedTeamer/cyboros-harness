@@ -1,5 +1,5 @@
 [Unit]
-Description=Run Stavros Radar weekly
+Description=Run Cyboros Radar weekly
 
 [Timer]
 OnCalendar=weekly

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Installa il launcher cliccabile "Stavros Command Center" sul desktop.
+# Installa il launcher cliccabile "Cyboros Command Center" sul desktop.
 # Idempotente: rigenera il .desktop con il path REALE del progetto (funziona anche
 # se il repo è stato spostato) e lo copia in ~/Scrivania (o ~/Desktop su sistemi EN),
 # marcandolo eseguibile/affidabile così il doppio click parte senza avvisi.
@@ -30,8 +30,8 @@ for TARGET in "$EDITION/stavros-command-center.desktop" "$DESKTOP_DIR/stavros-co
 [Desktop Entry]
 Type=Application
 Version=1.0
-Name=Stavros Command Center
-Comment=Avvia la dashboard web locale (Command Center) di StavrosRedTeamer e apre il browser
+Name=Cyboros Command Center
+Comment=Avvia la dashboard web locale (Command Center) di Cyboros Harness e apre il browser
 Exec=$START
 Icon=utilities-system-monitor
 Terminal=true
@@ -44,5 +44,5 @@ EOF
 done
 
 echo "[stavros] launcher installato: $DESKTOP_DIR/stavros-command-center.desktop"
-echo "[stavros] doppio clic su \"Stavros Command Center\" per avviare la dashboard."
+echo "[stavros] doppio clic su \"Cyboros Command Center\" per avviare la dashboard."
 echo "[stavros] prima volta: se il sistema chiede \"consenti esecuzione\", scegli Esegui/Apri."

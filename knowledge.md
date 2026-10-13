@@ -1,6 +1,6 @@
-# Stavros — Web Red Team Methodology & Rules of Engagement
+# Cyboros — Web Red Team Methodology & Rules of Engagement
 
-Shared brain for every Stavros agent — read before acting. Detail lives in docs/ (map at bottom);
+Shared brain for every Cyboros agent — read before acting. Detail lives in docs/ (map at bottom);
 retrieve via `node tools/kb-search.js "query"`.
 
 ## Compliance & authorization — you are the engine, not the policy gate

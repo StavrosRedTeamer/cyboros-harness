@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// gen-bench.js — contamination-proof benchmark for the Stavros red-team harness.
+// gen-bench.js — contamination-proof benchmark for the Cyboros red-team harness.
 //
 // Problem: public benchmarks (OWASP Juice Shop, DVWA, PortSwigger labs, HTB) are
 // memorized by LLMs during training, so "solved" on those apps measures recall of

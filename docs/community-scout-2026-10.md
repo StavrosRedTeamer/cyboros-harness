@@ -53,7 +53,7 @@ perché le scelte sono vicine ma non identiche.
 
 ### Cosa hanno che noi non abbiamo (o abbiamo in forma diversa)
 
-| Idea Violin | Stato in Stavros | Cosa vale la pena prendere |
+| Idea Violin | Stato in Cyboros | Cosa vale la pena prendere |
 |---|---|---|
 | **Ricevute di esecuzione firmate**: `violin_submit_finding` non accetta un finding senza una o più ricevute firmate che contengono la richiesta/risposta decisiva; la guardia **autentica ricevute e digest delle evidenze prima di appendere** a `evidence/findings.jsonl`; `evidence_outputs` dichiara nella stessa esecuzione i file il cui digest entra nella ricevuta | Ondata 7 (spec 2026-09-28, file in worktree: `chain-log`, `verification-log`, `effective-findings`, `rechain`) costruisce catena + side log + fold con ri-validazione di oracle e quote. Noi **rieseguiamo** la prova; loro la **autenticano** | Confronto diretto: la nostra catena dà integrità, la loro ricevuta dà anche *autenticità* (chi ha prodotto la prova, con digest dei byte salvati). Da decidere se il record di verifica debba referenziare i digest degli artefatti, e se `evidence_outputs` vada aggiunto al wrapper di esecuzione |
 | **PTT (Pentest Task Tracking) con gating di fase**: una fase nuova richiede un task attivo sotto quella fase; i task non si spostano tra sezioni | Abbiamo coverage matrix, stage gate, workflow `enum-*`/`attack-*` | Il check "nessuna fase senza task" è piccolo e falsificabile: impedisce la deriva di fase che oggi il gate non vede |
@@ -279,7 +279,7 @@ livello diverso. Riferimenti più maturi per lo stesso lavoro: `cisco-ai-defense
 
 ---
 
-## 8. Priorità per Stavros
+## 8. Priorità per Cyboros
 
 Ordinate per valore/costo, dentro i vincoli (zero-dipendenze npm, Node ≥ 22, registry dei
 binari, egress disciplinato).

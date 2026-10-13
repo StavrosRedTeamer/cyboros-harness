@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Apre Stavros/Freebuff in una VERA finestra di terminale interattivo.
+# Apre Cyboros/Freebuff in una VERA finestra di terminale interattivo.
 #
 # Perche: il launcher .desktop con Terminal=true puo avviare la TUI in un contesto TTY
 # degradato (frecce che non navigano nel picker dei modelli, colori assenti). Qui apriamo

@@ -1,4 +1,4 @@
-/* Stavros Console — War Room (WP10): live situation board.
+/* Cyboros Console — War Room (WP10): live situation board.
  * Loaded as a zero-build script before app.js; only declares functions, which resolve the
  * shared helpers (el/api/toast/switchTab/statTile/...) at call time.
  *

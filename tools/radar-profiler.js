@@ -1,5 +1,5 @@
 'use strict';
-// tools/radar-profiler.js — Stavros Radar: codebase capability profiler.
+// tools/radar-profiler.js — Cyboros Radar: codebase capability profiler.
 // Scansiona .agents/, tools/ e vendor/ per estrarre agenti, tool, MCP server e
 // categorie di vulnerabilità coperte. Zero dipendenze (node:fs, node:path).
 //
@@ -21,7 +21,7 @@ const CATEGORY_KEYWORDS = {
 };
 
 /**
- * @param {string} rootDir radice del progetto StavrosRedTeamer
+ * @param {string} rootDir radice del progetto Cyboros Harness
  * @returns {{categories: string[], agents: string[], tools: string[], mcpServers: string[], vendors: string[]}}
  */
 function profileCodebase(rootDir = process.cwd()) {

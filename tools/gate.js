@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Stage-gate structural validation for the Stavros harness.
+// Stage-gate structural validation for the Cyboros harness.
 //   node tools/gate.js status <host>     # show passed/missing gates per phase
 //   node tools/gate.js pass <phase>      # validate criteria and write pass to gate-log.md
 //   node tools/gate.js check <phase>     # check if a gate is passed (exit 0/1)

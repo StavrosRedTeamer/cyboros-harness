@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Stavros cloud-enum — cloud asset & IAM enumeration. Today the cloud surface is only metadata-via-
+// Cyboros cloud-enum — cloud asset & IAM enumeration. Today the cloud surface is only metadata-via-
 // SSRF; this adds (1) public bucket/asset discovery (S3/GCS/Azure) and (2) READ-ONLY IAM
 // enumeration from a LOOTED key. Both stay inside the harness invariants:
 //   - Bucket probes are scope-checked (the derived bucket host must be authorized in scope.json —

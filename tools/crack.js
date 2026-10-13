@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Stavros crack — offline hash cracking (hashcat primary, john fallback). Closes the loot loop:
+// Cyboros crack — offline hash cracking (hashcat primary, john fallback). Closes the loot loop:
 // hashes harvested by ad.js/postex land in the gitignored vault (reports/loot.jsonl); this tool
 // cracks them offline and the recovered credentials feed back into auth.json / chain.js.
 //

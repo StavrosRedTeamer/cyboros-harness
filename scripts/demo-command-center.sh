@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Stavros Command Center — 2-minute demo (WP9).
+# Cyboros Command Center — 2-minute demo (WP9).
 #
 # Runs the whole lifecycle against a THROWAWAY engagement root (CC_ROOT in mktemp), so it never
 # touches your real scope.json / campaign.json / reports. Nothing here bypasses a guard: every

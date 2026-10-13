@@ -71,7 +71,7 @@ Rileggi `findings` + `evidence-index.md` + `residue.md` del run, poi proponi lez
 QUESTO schema di prompt (delega o esecuzione diretta):
 
 ```
-Sei il distiller della memoria di Stavros. Dal materiale dell'engagement [allegare/indicare:
+Sei il distiller della memoria di Cyboros. Dal materiale dell'engagement [allegare/indicare:
 reports/, evidence-index, residue], estrai AL MASSIMO 10 lezioni trasferibili:
 - 1 lezione = 1 pattern tecnico riutilizzabile (classe target / stack / tecnica / esito / causa).
 - outcome "worked" SOLO per quanto verificato; i fallimenti sono oro: registra causa.

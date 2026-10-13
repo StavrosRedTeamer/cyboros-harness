@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Tool-plane detection for the Stavros harness: batch `command -v` on expected binaries,
+// Tool-plane detection for the Cyboros harness: batch `command -v` on expected binaries,
 // writes reports/tmp/tool-plane.json + a readable table. Agents MUST read this before choosing
 // a tool — never invent output for a tool that is not installed (same discipline as knowledge.md,
 // now deterministic). Install-failed tools are registered here so the harness does not retry them.

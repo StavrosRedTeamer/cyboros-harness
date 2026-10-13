@@ -1,5 +1,5 @@
 'use strict';
-// tools/radar-analyst.js — Stavros Radar: OmniRoute AI gap & integration analyst.
+// tools/radar-analyst.js — Cyboros Radar: OmniRoute AI gap & integration analyst.
 // Costruisce il prompt di gap analysis, interroga OmniRoute
 // (http://127.0.0.1:20128/v1/chat/completions) e, se irraggiungibile o con
 // risposta non parsabile, ripiega su analisi euristica deterministica.
@@ -93,21 +93,21 @@ function postOmniRoute(body, port, options = {}) {
  * @returns {string}
  */
 function buildAnalysisPrompt(profile, candidates) {
-  return `You are an expert security engineer and system architect for StavrosRedTeamer, a multi-agent penetration testing harness.
+  return `You are an expert security engineer and system architect for Cyboros Harness, a multi-agent penetration testing harness.
 
-Current Stavros Capabilities:
+Current Cyboros Capabilities:
 - Categories covered: ${(profile.categories || []).join(', ')}
 - Registered Tools: ${(profile.tools || []).slice(0, 20).join(', ')}
 - Registered Agents: ${(profile.agents || []).slice(0, 20).join(', ')}
 - MCP Servers: ${(profile.mcpServers || []).join(', ') || 'none'}
 
-Evaluate EACH of the following new GitHub projects for integration into Stavros.
+Evaluate EACH of the following new GitHub projects for integration into Cyboros.
 Return EXACTLY one JSON object per project (even for projects you would reject):
 ${candidates.map(c => `- ID: ${c.id}\n  URL: ${c.htmlUrl}\n  Description: ${c.description}\n  Stars: ${c.stars}\n  Topics: ${c.topics.join(', ')}`).join('\n\n')}
 
 Gap analysis rules:
-1. Compare each project against the Current Stavros Capabilities listed above (tools, agents, categories). If the project duplicates an existing capability (e.g. an existing tool already covers the same attack class), set "relevant": false and explain the redundancy in "gapFilled".
-2. For relevant projects, be specific about the concrete gap: name the Stavros file/agent that would host the integration.
+1. Compare each project against the Current Cyboros Capabilities listed above (tools, agents, categories). If the project duplicates an existing capability (e.g. an existing tool already covers the same attack class), set "relevant": false and explain the redundancy in "gapFilled".
+2. For relevant projects, be specific about the concrete gap: name the Cyboros file/agent that would host the integration.
 3. "integrationStrategy" values: TOOL_WRAPPER (add a zero-dependency Node.js script in tools/), MCP_SERVER (register in mcp.example.json / agent config), VENDOR_BINARY (precompiled binary into vendor/ or install-tools.sh), AGENT_PLAYBOOK (methodology into .agents/ or knowledge.md).
 4. "priority" is a 1-5 integer (1 = integrate immediately, 5 = nice-to-have), balancing gap size, stars, maturity and effort.
 
@@ -117,7 +117,7 @@ Reply ONLY with a valid JSON array of objects with the following keys:
     "repoId": "full_name",
     "relevant": true/false,
     "category": "Evasion / Recon / Exploit / MCP / Performance",
-    "gapFilled": "Concise explanation of what this adds that Stavros currently lacks (or why it is redundant if relevant=false)",
+    "gapFilled": "Concise explanation of what this adds that Cyboros currently lacks (or why it is redundant if relevant=false)",
     "integrationStrategy": "TOOL_WRAPPER / MCP_SERVER / VENDOR_BINARY / AGENT_PLAYBOOK",
     "integrationRecipe": "Short actionable technical recipe: which file to edit or create",
     "riskEffort": "LOW / MEDIUM / HIGH",

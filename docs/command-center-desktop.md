@@ -1,4 +1,4 @@
-# Stavros Command Center — Desktop Edition (piano e work package)
+# Cyboros Command Center — Desktop Edition (piano e work package)
 
 **Obiettivo.** Portare il Command Center da dashboard web a **programma desktop** (`stavros-cc`)
 che governa Cyboros Harness a 360°: campagna → missione → consenso → esecuzione → verifica →

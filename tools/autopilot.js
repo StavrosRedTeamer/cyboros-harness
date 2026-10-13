@@ -3,7 +3,7 @@
 //
 // Boundary: this runs as `node tools/autopilot.js`. It CAN run other node tools (via
 // child_process through the guarded entrypoints) but CANNOT call the DSH `subagent`
-// primitive (model-facing). So `tick` RETURNS directives; the Stavros persona executes
+// primitive (model-facing). So `tick` RETURNS directives; the Cyboros persona executes
 // any subagent directive and calls back. Control flow (plan/loop/stop/checkpoint) is 100%
 // here — deterministic, replayable, fail-closed.
 //

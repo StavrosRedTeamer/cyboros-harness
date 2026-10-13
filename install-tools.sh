@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Installer best-effort dell'arsenale usato da Stavros, per Parrot OS / Debian-based (echo/Debian 13).
+# Installer best-effort dell'arsenale usato da Cyboros, per Parrot OS / Debian-based (echo/Debian 13).
 #   ./install-tools.sh            -> apt (tool Parrot) + go install (ProjectDiscovery) + nuclei templates
 #   ./install-tools.sh --sliver   -> in piu stampa il comando di install di Sliver (NON lo esegue)
 #

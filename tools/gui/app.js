@@ -1,4 +1,4 @@
-/* Stavros Console — frontend (vanilla, no deps) */
+/* Cyboros Console — frontend (vanilla, no deps) */
 'use strict';
 
 const $ = (s, r) => (r || document).querySelector(s);

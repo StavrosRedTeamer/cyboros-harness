@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// POC replay for the Stavros harness (Ondata 2 — B7): re-executes the stored reproducer
+// POC replay for the Cyboros harness (Ondata 2 — B7): re-executes the stored reproducer
 //   python3 reports/exp/<id>.py -u <target>
 // read-only by convention (gen-poc.js generates -u/--target-required scripts whose exit 0
 // means "reproduced"), captures exit code + marker, and APPENDS a machine-auditable row to

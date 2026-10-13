@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Deterministic dangerous-command / rate-discipline scanner for the Stavros harness.
+// Deterministic dangerous-command / rate-discipline scanner for the Cyboros harness.
 // Ported from SeaOf0/dsh-redteam-model (MIT) — plugins/dsh-sec-enforce/lib/index.js
 // (scanDangerous / scanRate), adapted to the project's zero-dependency Node style.
 //

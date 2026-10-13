@@ -51,7 +51,7 @@ function request(url, body, headers, timeoutMs) {
     const fin = (r) => { if (!done) { done = true; resolve(r); } };
     const req = lib.request(url, {
       method: 'POST',
-      headers: Object.assign({ 'Content-Type': 'application/json', 'User-Agent': 'Stavros/0.1' }, headers),
+      headers: Object.assign({ 'Content-Type': 'application/json', 'User-Agent': 'Cyboros/0.1' }, headers),
       timeout: timeoutMs,
     }, (res) => {
       const chunks = [];

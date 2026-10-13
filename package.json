@@ -25,11 +25,11 @@
   },
   "homepage": "https://github.com/CSI-entitymorton/cyboros-harness#readme",
   "bin": {
-    "stavros": "tools/cyboros.js",
-    "stavros-doctor": "tools/doctor.js",
-    "stavros-record-finding": "tools/record-finding.js",
-    "stavros-gen-bench": "tools/gen-bench.js",
-    "stavros-mcp-guard-proxy": "tools/mcp-guard-proxy.js"
+    "cyboros": "tools/cyboros.js",
+    "cyboros-doctor": "tools/doctor.js",
+    "cyboros-record-finding": "tools/record-finding.js",
+    "cyboros-gen-bench": "tools/gen-bench.js",
+    "cyboros-mcp-guard-proxy": "tools/mcp-guard-proxy.js"
   },
   "files": [
     "tools/",

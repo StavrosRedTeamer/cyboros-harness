@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Installa il launcher cliccabile "Stavros — Agente Locale" sul desktop.
+# Installa il launcher cliccabile "Cyboros — Agente Locale" sul desktop.
 # Idempotente: rigenera il .desktop con il path REALE del progetto (funziona anche se il
 # repo viene spostato) e lo copia in ~/Scrivania (o ~/Desktop su sistemi EN).
 #
@@ -26,7 +26,7 @@ cat > "$DESKTOP_FILE" <<EOF
 [Desktop Entry]
 Type=Application
 Version=1.0
-Name=Stavros — Agente Locale
+Name=Cyboros — Agente Locale
 Comment=Avvia il modello Qwen3.6-35B-A3B-abliterated (se non è già attivo) e apre l'harness locale: REPL interattivo o recon→opzioni
 Exec=$WRAP
 Icon=utilities-terminal
@@ -39,6 +39,6 @@ chmod +x "$DESKTOP_FILE"
 command -v gio >/dev/null 2>&1 && gio set "$DESKTOP_FILE" metadata::trusted true >/dev/null 2>&1 || true
 
 echo "[local] launcher installato: $DESKTOP_FILE"
-echo "[local] doppio clic su \"Stavros — Agente Locale\" per avviare."
+echo "[local] doppio clic su \"Cyboros — Agente Locale\" per avviare."
 echo "[local] prima volta: se il sistema chiede \"consenti esecuzione\", scegli Esegui/Apri."
 echo "[local] avvio da terminale: $LAUNCH"

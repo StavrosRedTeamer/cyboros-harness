@@ -48,7 +48,7 @@ function buildPayloads(marker) {
         `\r\n` +                  // but CL says body is 4 bytes of "0\r\n\r\n"
         `GET /${marker} HTTP/1.1\r\n` +
         `Host: ${hostline}\r\n` +
-        `X-Stavros: ${marker}\r\n` +
+        `X-Cyboros: ${marker}\r\n` +
         `\r\n`,
       detect: (res) => {
         // if desync, the follow-up request on the same socket either gets the smuggled
@@ -70,7 +70,7 @@ function buildPayloads(marker) {
         `\r\n` +
         `GET /${marker} HTTP/1.1\r\n` +
         `Host: ${hostline}\r\n` +
-        `X-Stavros: ${marker}\r\n` +
+        `X-Cyboros: ${marker}\r\n` +
         `\r\n`,
       detect: (res) => {
         const f = res && res.follow;
@@ -114,7 +114,7 @@ function rawSocket(url, reqText, timeoutMs) {
 // Send a clean control GET to the SAME socket to observe whether the connection still works.
 function cleanCounterRequest(url, marker, timeoutMs) {
   return rawSocket(url,
-    `GET / HTTP/1.1\r\nHost: {{HOST}}\r\nX-Stavros: ${marker}\r\nConnection: close\r\n\r\n`,
+    `GET / HTTP/1.1\r\nHost: {{HOST}}\r\nX-Cyboros: ${marker}\r\nConnection: close\r\n\r\n`,
     timeoutMs);
 }
 

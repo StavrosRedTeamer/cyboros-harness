@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Install the Stavros Command Center desktop launcher (WP2/WP9).
+# Install the Cyboros Command Center desktop launcher (WP2/WP9).
 # Idempotent: re-running overwrites the generated files with the current workspace path.
 #   ./install-scc-launcher.sh            # install
 #   ./install-scc-launcher.sh --uninstall
@@ -29,9 +29,9 @@ ln -sf "$WS/stavros-cc" "$BIN_DIR/stavros-cc"
 cat > "$DESKTOP" <<EOF
 [Desktop Entry]
 Type=Application
-Name=Stavros Command Center
+Name=Cyboros Command Center
 GenericName=Red team console
-Comment=Desktop console for StavrosRedTeamer (campaign → mission → approval → execution → report)
+Comment=Desktop console for Cyboros Harness (campaign → mission → approval → execution → report)
 Exec=$WS/stavros-cc %U
 TryExec=$WS/stavros-cc
 Icon=$ICON

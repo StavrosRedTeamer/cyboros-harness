@@ -1,17 +1,17 @@
 #!/usr/bin/env node
-// eval-juice-shop.js — grade Stavros against a local OWASP Juice Shop.
+// eval-juice-shop.js — grade Cyboros against a local OWASP Juice Shop.
 //
 // Juice Shop only flips a challenge to `solved` when the actual exploit fires, so this
 // harness measures TWO things separately:
 //   1. EXPLOITATION — challenges the score board marks solved (ground truth, from /api/Challenges/).
-//   2. DETECTION    — vulnerabilities Stavros documented in reports/findings.jsonl, mapped to
+//   2. DETECTION    — vulnerabilities Cyboros documented in reports/findings.jsonl, mapped to
 //                     Juice Shop challenge keys via a curated signature table.
 //
 // Detection mapping is heuristic (free-text findings -> challenge keys); the solved count is
 // the ground truth. A coarse "technique classes" view is also reported so detection breadth
 // is visible even when a finding is not specific enough to pin a single challenge.
 //
-// Usage (from the StavrosRedTeamer folder):
+// Usage (from the Cyboros Harness folder):
 //   node tools/eval-juice-shop.js snapshot [--base http://localhost:3000] [--out file]
 //   node tools/eval-juice-shop.js diff <before.json> <after.json>
 //   node tools/eval-juice-shop.js coverage [--findings reports/findings.jsonl] [--offline] [--all]
@@ -186,7 +186,7 @@ const CLASSES = [
 
 // Challenges no web-pentest tool is expected to DETECT (trivia / meta / web3 / LLM /
 // steganography / code-only). They don't count against the detection score, but they
-// still count on the solved board if Stavros happens to trigger them.
+// still count on the solved board if Cyboros happens to trigger them.
 const META = new Set([
   'scoreBoardChallenge', 'privacyPolicyChallenge', 'privacyPolicyProofChallenge',
   'securityPolicyChallenge', 'closeNotificationsChallenge', 'csafChallenge',
@@ -398,7 +398,7 @@ function cmdReport(args) {
     const o = (s) => console.log(s);
     o('Juice Shop evaluation — ' + new Date().toISOString());
     o('=============================================================');
-    o('DETECTION (Stavros found it)');
+    o('DETECTION (Cyboros found it)');
     o('  findings recorded   : ' + findings.length);
     o('  technique classes   : ' + (classes.length ? classes.join(', ') : '(none)'));
     o('  challenges detected : ' + detectedKeys.size + ' / ' + scorable.length + ' scorable (' + Math.round(detectedKeys.size / scorable.length * 100) + '%)');

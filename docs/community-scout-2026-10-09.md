@@ -366,7 +366,7 @@ letteratura di posizionamento.
 
 ---
 
-## 8. Priorità per Stavros
+## 8. Priorità per Cyboros
 
 Ordinate per valore/costo, dentro i vincoli (zero-dipendenze npm, Node ≥ 22, registry dei binari,
 egress disciplinato). Gli item dello scout #1 restano validi: qui solo ciò che cambia.

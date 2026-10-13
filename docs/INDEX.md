@@ -15,8 +15,8 @@
 - [**Contributing**](CONTRIBUTING.md) — This repository is a penetration-testing harness built around one claim: a finding is only a · 4,5 KB
 - [**Cyboros Harness**](README.md) — A penetration-testing harness where a finding is only a finding if code can prove it — · 11,8 KB
 - [**Security Policy**](SECURITY.md) — Cyboros Harness is offensive-security tooling. It executes reconnaissance and · 4,1 KB
-- [**Prompt di sessione — benchmark gen-bench**](bench-session-prompt.md) — Sei Stavros. Questa sessione è una run di benchmark, non un engagement. · 5,1 KB
-- [**Stavros — Web Red Team Methodology & Rules of Engagement**](knowledge.md) — Shared brain for every Stavros agent — read before acting. Detail lives in docs/ (map at bottom); · 14,8 KB
+- [**Prompt di sessione — benchmark gen-bench**](bench-session-prompt.md) — Sei Cyboros. Questa sessione è una run di benchmark, non un engagement. · 5,1 KB
+- [**Cyboros — Web Red Team Methodology & Rules of Engagement**](knowledge.md) — Shared brain for every Cyboros agent — read before acting. Detail lives in docs/ (map at bottom); · 14,8 KB
 - [**Piano di ottimizzazione workspace Stavros (Red Teamer harness)**](piano-ottimizzazione-stavros.md) — Data: 10 settembre 2026 · Repo: stavrosredteamer (Freebuff) · Branch: `command-center-redesign` · 11,4 KB
 - [**Handoff — sessione con AUTOPILOT attivo (opt-in)**](session-prompt-autostavros.md) — Sei Stavros, orchestratore red-team. In questa sessione l'operatore richiede ESPLICITAMENTE la · 2,0 KB
 
@@ -31,7 +31,7 @@
 - [**Threat model: attacking Cyboros Harness itself**](docs/THREAT-MODEL.md) — Not the target. The target is supposed to be attacked — that is the job. What is · 12,6 KB
 - [**Alternative-tools audit — what the harness should adopt, borrow, or leave alone**](docs/TOOL-ALTERNATIVES-AUDIT.md) — Three concrete gaps, in priority order: · 26,1 KB
 - [**What the published benchmarks measure, and what they leave out**](docs/TOOL-LANDSCAPE.md) — As of mid-2026 there is real, serious work here, and none of it is · 6,3 KB
-- [**Stavros Command Center — Desktop Edition (piano e work package)**](docs/command-center-desktop.md) — Obiettivo. Portare il Command Center da dashboard web a programma desktop (`stavros-cc`) · 25,4 KB
+- [**Cyboros Command Center — Desktop Edition (piano e work package)**](docs/command-center-desktop.md) — Obiettivo. Portare il Command Center da dashboard web a programma desktop (`stavros-cc`) · 25,4 KB
 - [**Community scout #2 — web, HN e community, 2026-10-04 → 2026-10-09**](docs/community-scout-2026-10-09.md) — OpenAPI/GraphQL SDL/WSDL/.proto. Pipeline a due stadi — cattura una volta, genera (anche · 30,1 KB
 - [**Community scout — Reddit pentest/redteam, ottobre 2026**](docs/community-scout-2026-10.md) — *supervised*, guardia obbligatoria al confine di esecuzione, finding legati a ricevute · 23,1 KB
 - [**Egress gateway & anonymized egress (red-team OPSEC)**](docs/egress-opsec.md) — To force third-party HTTP(S) binaries through the scope allowlist, start the proxy first: · 2,4 KB

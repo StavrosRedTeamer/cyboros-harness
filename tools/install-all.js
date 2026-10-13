@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// One-shot bootstrap: install everything Stavros needs that is still missing on this device.
+// One-shot bootstrap: install everything Cyboros needs that is still missing on this device.
 //
 //   node tools/install-all.js          # plan -> doctor --yes (runtime+registry+extras) -> ./install-tools.sh
 //   node tools/install-all.js --plan    # read-only: print what would be installed, change nothing
@@ -49,7 +49,7 @@ function plan() {
   const total = rt.length + reg.length + extra.length + ven.length;
   line('');
   line('  missing total: ' + total);
-  if (!total) line('  nothing to install — everything Stavros needs is already present.');
+  if (!total) line('  nothing to install — everything Cyboros needs is already present.');
   return { total, core_broken: !!s.core_broken };
 }
 
@@ -76,7 +76,7 @@ function finalCheck() {
 }
 
 function main() {
-  line('Stavros — install everything missing · ' + new Date().toISOString());
+  line('Cyboros — install everything missing · ' + new Date().toISOString());
   line('root: ' + ROOT);
   const p = plan();
   if (PLAN_ONLY) { line(''); line('--plan: nothing was changed.'); return 0; }

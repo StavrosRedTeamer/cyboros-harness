@@ -1,4 +1,4 @@
-/* Stavros Console — engagement views (Campaign, Mission, Approvals, Ledger).
+/* Cyboros Console — engagement views (Campaign, Mission, Approvals, Ledger).
  * Loaded as a separate zero-build script before app.js; only declares functions, which
  * resolve the shared helpers (el/api/esc/toast/...) from app.js at call time. */
 'use strict';
