@@ -4,7 +4,7 @@
 > dimensione, avanzamento delle checkbox dei piani). Non si modifica a mano: rigeneralo.
 > `tools/test-repo-invariants.js` fallisce se è rimasto indietro rispetto ai file.
 
-**Superficie viva:** 34 documenti · **piani:** 9 · **archivio:** 3 file superati.
+**Superficie viva:** 35 documenti · **piani:** 9 · **archivio:** 3 file superati.
 
 ## Root del repo
 
@@ -26,6 +26,7 @@
 - [**Glossary**](docs/GLOSSARY.md) — The harness uses a small set of terms with exact meanings. They are load-bearing: · 3,3 KB
 - [**Launch plan**](docs/LAUNCH-PLAN.md) — Most AI pentest agents are built to *find* things. The bottleneck in this field · 13,8 KB
 - [**Measuring whether an AI pentest agent's findings are real**](docs/METHODOLOGY.md) — An agent that reports everything it can think of scores 100% recall and is · 7,3 KB
+- [**L'anello — perché questo harness si chiama Cyboros**](docs/OUROBOROS.md) — Cyboros = cyber + ouroboros. La metafora è vera qui perché è già nel codice: l'harness · 2,5 KB
 - [**Recording the demo**](docs/RECORDING.md) — $ DEMO_FAST=1 DEMO_PACE=3 ./tools/demo.sh · 5,0 KB
 - [**`refs/` — provenance, licensing, and why it is not in this repository**](docs/REFS-PROVENANCE.md) — The corpus is not wholly first-party. Its own `refs/README.md` states that · 5,0 KB
 - [**Threat model: attacking Cyboros Harness itself**](docs/THREAT-MODEL.md) — Not the target. The target is supposed to be attacked — that is the job. What is · 12,6 KB
