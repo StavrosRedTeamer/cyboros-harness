@@ -39,6 +39,8 @@ scripts/record-*-findings.js
 # Dump di sessione/engagement grezzi (tracciato di un device reale, id installazione,
 # chiavi di sessione). I tool generici stanno in tools/.
 freebuff-blocchi-*.txt
+# Cattura di terminale lasciata in radice (ANSI escape, output di un tool): scratch, non sorgente.
+o.txt
 
 # Tool vendored (binari grandi, obscura/frida) e mirror: mai nel repo
 vendor/
