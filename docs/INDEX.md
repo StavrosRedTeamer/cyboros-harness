@@ -13,7 +13,7 @@
 - [**Changelog**](CHANGELOG.md) — All notable changes to this project are documented here. Dates are commit dates. · 44,5 KB
 - [**Contributor Covenant Code of Conduct**](CODE_OF_CONDUCT.md) — We as members, contributors, and leaders pledge to make participation in our community a · 5,8 KB
 - [**Contributing**](CONTRIBUTING.md) — This repository is a penetration-testing harness built around one claim: a finding is only a · 4,5 KB
-- [**Cyboros Harness**](README.md) — A penetration-testing harness where a finding is only a finding if code can prove it — · 11,8 KB
+- [**Cyboros Harness**](README.md) — A penetration-testing harness where a finding is only a finding if code can prove it — · 12,1 KB
 - [**Security Policy**](SECURITY.md) — Cyboros Harness is offensive-security tooling. It executes reconnaissance and · 4,1 KB
 - [**Prompt di sessione — benchmark gen-bench**](bench-session-prompt.md) — Sei Cyboros. Questa sessione è una run di benchmark, non un engagement. · 5,1 KB
 - [**Cyboros — Web Red Team Methodology & Rules of Engagement**](knowledge.md) — Shared brain for every Cyboros agent — read before acting. Detail lives in docs/ (map at bottom); · 14,8 KB

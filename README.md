@@ -3,9 +3,13 @@
 # Cyboros Harness
 
 **A penetration-testing harness where a finding is only a finding if code can prove it —
-and where the agent cannot violate scope, because the enforcement is beneath it.**
+and where the lesson of one engagement changes the next.**
 
 [Apache-2.0](LICENSE) · zero dependencies · offline-capable · 114 tests, hermetic and parallel
+
+[Cyboros](docs/OUROBOROS.md): cyber + ouroboros. The loop is not marketing — every claim on
+that page names the file that proves it. The agent still cannot violate scope, because the
+enforcement is beneath it.
 
 ![Command Center overview](docs/assets/command-center-overview.png)
 
@@ -189,6 +193,7 @@ yourself; going through the proxy is the supported path.
 
 ## Documentation
 
+- [`docs/OUROBOROS.md`](docs/OUROBOROS.md) — the loop, and the artifact behind every claim
 - [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — guard → model → tool, and why
 - [`docs/METHODOLOGY.md`](docs/METHODOLOGY.md) — how this is measured: three metrics, contamination, the severity ceiling (written to apply to any harness)
 - [`BENCHMARK.md`](BENCHMARK.md) — the contamination-proof benchmark, and why recall alone is not a claim
