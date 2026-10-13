@@ -4,7 +4,7 @@
 > dimensione, avanzamento delle checkbox dei piani). Non si modifica a mano: rigeneralo.
 > `tools/test-repo-invariants.js` fallisce se è rimasto indietro rispetto ai file.
 
-**Superficie viva:** 31 documenti · **piani:** 7 · **archivio:** 3 file superati.
+**Superficie viva:** 32 documenti · **piani:** 7 · **archivio:** 3 file superati.
 
 ## Root del repo
 
@@ -13,6 +13,7 @@
 - [**Changelog**](CHANGELOG.md) — All notable changes to this project are documented here. Dates are commit dates. · 42,8 KB
 - [**StavrosRedTeamer**](README.md) — A penetration-testing harness where a finding is only a finding if code can prove it — · 11,4 KB
 - [**Security Policy**](SECURITY.md) — StavrosRedTeamer is offensive-security tooling. It executes reconnaissance and · 4,1 KB
+- [**Prompt di sessione — benchmark gen-bench**](bench-session-prompt.md) — Sei Stavros. Questa sessione è una run di benchmark, non un engagement. · 5,1 KB
 - [**Stavros — Web Red Team Methodology & Rules of Engagement**](knowledge.md) — Shared brain for every Stavros agent — read before acting. Detail lives in docs/ (map at bottom); · 14,8 KB
 - [**Piano di ottimizzazione workspace Stavros (Red Teamer harness)**](piano-ottimizzazione-stavros.md) — Data: 10 settembre 2026 · Repo: stavrosredteamer (Freebuff) · Branch: `command-center-redesign` · 11,4 KB
 - [**Handoff — sessione con AUTOPILOT attivo (opt-in)**](session-prompt-autostavros.md) — Sei Stavros, orchestratore red-team. In questa sessione l'operatore richiede ESPLICITAMENTE la · 2,0 KB
