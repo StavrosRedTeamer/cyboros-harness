@@ -12,7 +12,12 @@
 //      senza nessuna riga di documentazione (ratchet: la baseline può solo accorciarsi);
 //   4. flotta agenti (local/fleet + .agents): id unici, campi essenziali, modelli a forma di
 //      slug, spawnableAgents che risolvono a un agente esistente;
-//   5. leak: nessun host di `allowed_hosts` di scope.json dentro un file TRACCIATO da git.
+//   5. leak: nessun host di `allowed_hosts` di scope.json dentro un file TRACCIATO da git;
+//   6. worktree = clone: ogni conteggio dichiarato (test, pipeline, agenti) torna anche contando
+//      SOLO i file tracciati, e ogni `tools/*.js` citato da un documento esiste ED è tracciato —
+//      un file che vive solo sul tuo disco non esiste per chi clona;
+//   7. l'indice committato è riproducibile da un export di HEAD, non solo dal worktree: è la
+//      differenza fra un verde locale e un rosso per chi clona, e master è stato rosso così.
 //
 // Tutto offline, zero dipendenze, nessuna rete: come il resto della suite.
 'use strict';
@@ -32,13 +37,27 @@ const read = (p) => fs.readFileSync(path.join(WS, p), 'utf8');
 
 // ---- realtà del repo ---------------------------------------------------------
 // Test eseguiti dal gate = offline + loopback (gli e2e richiedono rete e restano fuori).
-function runnerTotals() {
+// Il runner scopre i test dal DISCO (`fs.readdirSync`), non dall'indice: è esattamente per questo
+// che un test non tracciato gonfia il conteggio qui e non in un clone. Serve anche l'elenco dei
+// NOMI, non solo il totale, per poter nominare il file che esiste solo sul disco di chi scrive.
+function runnerList() {
   const r = spawnSync(process.execPath, [path.join(WS, 'tools', 'run-tests.js'), '--list', '--json'],
     { cwd: WS, encoding: 'utf8', timeout: 60000 });
   assert.strictEqual(r.status, 0, 'run-tests --list --json: ' + String(r.stderr || '').slice(0, 200));
-  const by = JSON.parse(r.stdout);
+  return JSON.parse(r.stdout);
+}
+
+function runnerTotals() {
+  const by = runnerList();
   const all = Object.values(by).flat();
-  return { total: all.length, runnable: all.length - by.e2e.length, e2e: by.e2e.length };
+  return { total: all.length, runnable: all.length - by.e2e.length, e2e: by.e2e.length, names: all };
+}
+
+// La superficie che un clone vede davvero: l'indice di git, non il disco.
+function tracked(pathspec) {
+  const r = spawnSync('git', ['ls-files', '--', pathspec], { cwd: WS, encoding: 'utf8' });
+  assert.strictEqual(r.status, 0, 'git ls-files -- ' + pathspec + ': ' + String(r.stderr || '').slice(0, 120));
+  return String(r.stdout).split('\n').filter(Boolean);
 }
 
 function walk(dir, acc) {
@@ -154,6 +173,48 @@ ok('AGENTS.md: contratto dentro il budget del prompt', () => {
     `prompt assemblato ${total} caratteri (tetto ${PROMPT_BUDGET}): AGENTS.md ${n} + ~/.AGENTS.md ${total - n}`);
 });
 
+// La classe di difetto che ha tenuto master rosso: un file vive su disco e non nell'indice. Allora
+// il worktree dice il vero e un clone no, e i due metà del README raccontano due repository
+// diversi — i test si contano dal DISCO, i moduli da git. Un numero è credibile solo se torna anche
+// contando i soli file tracciati: questa è la differenza fra "funziona sul mio portatile" e
+// "funziona per chi clona". (I moduli non sono in questa lista perché `toolsModules()` conta già da
+// `git ls-files`: il suo numero è per costruzione quello di un clone.)
+ok('ogni conteggio torna anche contando SOLO i file tracciati (worktree = clone)', () => {
+  const drift = [];
+  const notTracked = (onDisk, inIndex) => onDisk.filter((p) => !inIndex.has(p));
+
+  // test — il runner li scopre dal disco
+  const t = runnerTotals();
+  const trackedTests = new Set(tracked('tools/test-*.js'));
+  const ghostTests = t.names.map((n) => `tools/${n}.js`).filter((p) => !trackedTests.has(p));
+  if (ghostTests.length) {
+    drift.push(`test: il runner ne esegue ${t.runnable}, git ne conosce ${t.runnable - ghostTests.length} ` +
+      `— solo su disco: ${ghostTests.join(', ')}`);
+  }
+
+  // pipeline — `workflowCount()` legge la cartella
+  const pipelines = fs.readdirSync(path.join(WS, 'workflows'))
+    .filter((f) => /\.ya?ml$/.test(f)).map((f) => `workflows/${f}`);
+  const ghostPipelines = notTracked(pipelines, new Set(tracked('workflows')));
+  if (ghostPipelines.length) {
+    drift.push(`pipeline: ${pipelines.length} su disco, ${pipelines.length - ghostPipelines.length} tracciate ` +
+      `— solo su disco: ${ghostPipelines.join(', ')}`);
+  }
+
+  // agenti — `fs.readdirSync('local/fleet')`
+  const agents = fs.readdirSync(path.join(WS, 'local', 'fleet'))
+    .filter((f) => f.endsWith('.ts')).map((f) => `local/fleet/${f}`);
+  const ghostAgents = notTracked(agents, new Set(tracked('local/fleet')));
+  if (ghostAgents.length) {
+    drift.push(`agenti: ${agents.length} su disco, ${agents.length - ghostAgents.length} tracciati ` +
+      `— solo su disco: ${ghostAgents.join(', ')}`);
+  }
+
+  assert.deepStrictEqual(drift, [],
+    'questi numeri valgono solo sul tuo disco: un clone ne vedrebbe meno. Committa i file (o togli ' +
+    'il riferimento) e i conteggi tornano — ' + drift.join(' | '));
+});
+
 // L'indice della documentazione è GENERATO: se i file cambiano e lui no, mente. Qui si rigenera
 // in memoria (--check non scrive) invece di fidarsi di averlo fatto a mano.
 ok('docs/INDEX.md è aggiornato (indice generato dai file reali)', () => {
@@ -161,6 +222,57 @@ ok('docs/INDEX.md è aggiornato (indice generato dai file reali)', () => {
     { cwd: WS, encoding: 'utf8', timeout: 30000 });
   assert.strictEqual(r.status, 0,
     'indice non aggiornato: ' + String(r.stderr || r.stdout || '').split('\n')[0]);
+});
+
+// Il check qui sopra guarda il WORKTREE, e il worktree non è ciò che si clona. Se l'indice viene
+// rigenerato su file non committati e poi COMMITTATO mentre quelli restano a HEAD, il verde è
+// locale e il rosso è per chi clona: la prima stesura della riparazione di master aveva esattamente
+// questo difetto (l'indice registrava `AGENTS.md` a 7,4 KB mentre a HEAD era 5,9 KB). Materializzare
+// HEAD con `git archive` in una cartella senza `.git` riproduce il clone: lì `docs-index.js` ricade
+// sulla lettura del disco, e l'export contiene solo file tracciati.
+ok('docs/INDEX.md committato è riproducibile da HEAD, non solo dal worktree', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'head-export-'));
+  try {
+    const archive = spawnSync('git', ['archive', 'HEAD'], { cwd: WS, maxBuffer: 512 * 1024 * 1024 });
+    if (archive.status !== 0) {
+      console.log('    SKIP git archive non disponibile: lo stato committato non è ispezionabile qui');
+      return;
+    }
+    const extract = spawnSync('tar', ['-x', '-C', dir],
+      { input: archive.stdout, stdio: ['pipe', 'ignore', 'inherit'] });
+    if (extract.status !== 0) {
+      console.log('    SKIP tar non disponibile: export di HEAD non materializzabile');
+      return;
+    }
+    // Rigenero l'indice DENTRO l'export (modalità scrittura) e lo confronto col committato: così il
+    // messaggio dice quale riga diverge, cioè quale file l'indice elenca e un clone non ha. `--check`
+    // darebbe lo stesso verdetto, ma in una cartella senza `.git` il `git ls-files` di docs-index
+    // lascia il suo "fatal: not a git repository" su stderr ereditato, e quella riga coprirebbe il
+    // motivo vero (`docs-index: non è aggiornato`).
+    const committed = read('docs/INDEX.md');
+    const r = spawnSync(process.execPath, [path.join(dir, 'tools', 'docs-index.js')],
+      { cwd: dir, encoding: 'utf8', timeout: 60000 });
+    assert.strictEqual(r.status, 0,
+      'indice non rigenerabile in un clone: ' + String(r.stderr || r.stdout || '').split('\n')[0]);
+    const fresh = fs.readFileSync(path.join(dir, 'docs', 'INDEX.md'), 'utf8');
+    const a = committed.split('\n');
+    const b = fresh.split('\n');
+    // Non la PRIMA riga diversa — quella è il conteggio in testa (es. «35 documenti» vs «34»), che
+    // dice che i due indici divergono ma non QUALE file è di troppo. La voce con un link `](` sì.
+    let i = -1;
+    for (let k = 0; k < Math.max(a.length, b.length); k++) {
+      if (a[k] === b[k]) continue;
+      const entry = (a[k] || '').includes('](') || (b[k] || '').includes('](');
+      if (entry || i < 0) i = k;
+      if (entry) break;
+    }
+    const shown = (s) => (s === undefined ? '(riga assente)' : s.trim().slice(0, 120));
+    assert.strictEqual(committed, fresh,
+      'in un clone di HEAD l\'indice non torna (il verde era solo nel worktree) — riga ' +
+      `${i + 1}: committato «${shown(a[i])}» vs clone «${shown(b[i])}»`);
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
 });
 
 // Il bootstrap del F3 gira in proot, dove non esiste un PID1 systemd: i postinst di
@@ -195,14 +307,20 @@ ok('CHANGELOG: nessuna voce "`X` → `X`"', () => {
   assert.deepStrictEqual(bad, [], 'righe in cui la sostituzione è a vuoto: ' + bad.join(' | ').slice(0, 200));
 });
 
-ok('docs: nessun riferimento a un tools/*.js inesistente', () => {
+ok('docs: nessun riferimento a un tools/*.js inesistente o non tracciato', () => {
   const dead = [];
+  const ghosts = [];
+  const trackedTools = new Set(tracked('tools'));
   for (const d of docCorpus()) {
     for (const m of read(d).matchAll(/tools\/[A-Za-z0-9_.-]+\.js\b/g)) {
       if (!fs.existsSync(path.join(WS, m[0]))) dead.push(`${d}: ${m[0]}`);
+      // Esiste, ma solo qui: in un clone quel riferimento è morto quanto uno a un file mai scritto.
+      else if (!trackedTools.has(m[0])) ghosts.push(`${d}: ${m[0]}`);
     }
   }
   assert.deepStrictEqual(dead, [], 'riferimenti morti: ' + dead.join(', '));
+  assert.deepStrictEqual(ghosts, [],
+    'riferimenti a file che esistono solo sul tuo disco (in un clone sono morti): ' + ghosts.join(', '));
 });
 
 ok('tools/: nessun modulo non documentato fuori dalla baseline', () => {
