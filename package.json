@@ -1,8 +1,8 @@
 {
-  "name": "stavrosredteamer",
+  "name": "cyboros-harness",
   "version": "0.1.0",
   "private": true,
-  "description": "A penetration-testing harness where a finding is only a finding if code can prove it: policy enforced in the runtime, severity capped by evidence. Zero dependencies, offline-capable.",
+  "description": "A penetration-testing harness where a finding is only a finding if code can prove it: policy enforced in the runtime, severity capped by evidence, and the lesson of one engagement carried into the next. Zero dependencies, offline-capable.",
   "engines": {
     "node": ">=22"
   },
@@ -18,12 +18,12 @@
   "license": "Apache-2.0",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/CSI-entitymorton/stavrosredteamer.git"
+    "url": "git+https://github.com/CSI-entitymorton/cyboros-harness.git"
   },
   "bugs": {
-    "url": "https://github.com/CSI-entitymorton/stavrosredteamer/issues"
+    "url": "https://github.com/CSI-entitymorton/cyboros-harness/issues"
   },
-  "homepage": "https://github.com/CSI-entitymorton/stavrosredteamer#readme",
+  "homepage": "https://github.com/CSI-entitymorton/cyboros-harness#readme",
   "bin": {
     "stavros": "tools/stavros.js",
     "stavros-doctor": "tools/doctor.js",
