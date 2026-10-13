@@ -1,0 +1,179 @@
+# evo-x2-lab — stack worker PC2 + gateway + sandbox tool
+#
+# Uso:
+#   PC2:  docker compose up -d worker-coder worker-toolcaller worker-parser \
+#                    worker-cyber worker-triage rag
+#   PC1:  docker compose up -d gateway        # (o spostare il gateway su PC2)
+#
+# Profili:
+#   core     → coder, toolcaller, parser, rag (sempre attivi)
+#   cyber    → specialista cyber (slot bake-off; caricare on-demand se serve memoria)
+#   triage   → triage difensivo (opzionale)
+#   gateway  → nginx con routing per "model"
+#   tools    → sandbox Kali per i tool offensivi (nmap, nuclei, sqlmap, ...)
+#
+# Nota GPU: l'immagine deve essere una build llama.cpp+ROCm (gfx1151).
+#   Usare il Dockerfile ROCm di llama.cpp (Dockerfile/rocm) oppure un'immagine
+#   locale `llama.cpp:rocm-local` costruita dalla build validata in ~/llama.cpp
+#   (vedi scripts/validate-llamacpp-build.sh: promuovere solo build validate).
+#   In alternativa, eseguire llama-server sull'host (systemd, vedi setup-evo-x2.md)
+#   e tenere questo file per la sola parte gateway/tools.
+
+services:
+
+  # ---------- WORKER POOL (PC2) ----------
+  worker-coder:
+    image: llama.cpp:rocm-local
+    profiles: [core]
+    container_name: evo-coder
+    network_mode: host          # porte dirette su 10.0.0.2, nessuna traduzione
+    devices:
+      - /dev/kfd
+      - /dev/dri
+    group_add: ["render", "video"]
+    environment:
+      - LD_LIBRARY_PATH=/opt/rocm-7.2.4/lib
+    volumes:
+      - ~/models:/models:ro
+    command: >
+      llama-server -m /models/qwen3-coder-next/Qwen3-Coder-Next-Q4_K_M.gguf
+      --host 0.0.0.0 --port 8101
+      -ngl 99 -fa 1 --no-mmap
+      --ctx-size 65536 --parallel 3
+    restart: unless-stopped
+
+  worker-toolcaller:
+    image: llama.cpp:rocm-local
+    profiles: [core]
+    container_name: evo-toolcaller
+    network_mode: host
+    devices:
+      - /dev/kfd
+      - /dev/dri
+    group_add: ["render", "video"]
+    environment:
+      - LD_LIBRARY_PATH=/opt/rocm-7.2.4/lib
+    volumes:
+      - ~/models:/models:ro
+    command: >
+      llama-server -m /models/gpt-oss-20b/gpt-oss-20b-MXFP4.gguf
+      --host 0.0.0.0 --port 8102
+      -ngl 99 -fa 1 --no-mmap
+      --ctx-size 32768 --parallel 4
+    restart: unless-stopped
+
+  worker-parser:
+    image: llama.cpp:rocm-local
+    profiles: [core]
+    container_name: evo-parser
+    network_mode: host
+    devices:
+      - /dev/kfd
+      - /dev/dri
+    group_add: ["render", "video"]
+    environment:
+      - LD_LIBRARY_PATH=/opt/rocm-7.2.4/lib
+    volumes:
+      - ~/models:/models:ro
+    command: >
+      llama-server -m /models/qwen3.5-9b/Qwen3.5-9B-Q4_K_M.gguf
+      --host 0.0.0.0 --port 8103
+      -ngl 99 -fa 1 --no-mmap
+      --ctx-size 32768 --parallel 4
+    restart: unless-stopped
+
+  worker-cyber:
+    image: llama.cpp:rocm-local
+    profiles: [cyber]
+    container_name: evo-cyber
+    network_mode: host
+    devices:
+      - /dev/kfd
+      - /dev/dri
+    group_add: ["render", "video"]
+    environment:
+      - LD_LIBRARY_PATH=/opt/rocm-7.2.4/lib
+    volumes:
+      - ~/models:/models:ro
+    command: >
+      llama-server -m /models/deep-hat-v2/DeepHatV2-30B-Q4_K_M.gguf
+      --host 0.0.0.0 --port 8104
+      -ngl 99 -fa 1 --no-mmap
+      --ctx-size 65536 --parallel 2
+    restart: unless-stopped
+
+  worker-triage:
+    image: llama.cpp:rocm-local
+    profiles: [triage]
+    container_name: evo-triage
+    network_mode: host
+    devices:
+      - /dev/kfd
+      - /dev/dri
+    group_add: ["render", "video"]
+    environment:
+      - LD_LIBRARY_PATH=/opt/rocm-7.2.4/lib
+    volumes:
+      - ~/models:/models:ro
+    command: >
+      llama-server -m /models/cybersecqwen-4b/CyberSecQwen-4B-Q4_K_M.gguf
+      --host 0.0.0.0 --port 8105
+      -ngl 99 -fa 1 --no-mmap
+      --ctx-size 16384 --parallel 4
+    restart: unless-stopped
+
+  rag:
+    image: ghcr.io/huggingface/text-embeddings-inference:cpu-latest
+    profiles: [core]
+    container_name: evo-rag
+    network_mode: host
+    environment:
+      - HF_MODEL_ID=BAAI/bge-m3
+      - RERANK_MODEL_ID=Qwen/Qwen3-Reranker
+      - PORT=8106
+    volumes:
+      - ~/models/hf-cache:/data
+    restart: unless-stopped
+
+  # ---------- GATEWAY (PC1, porta 8080 verso la LAN operativa) ----------
+  gateway:
+    image: nginx:latest
+    profiles: [gateway]
+    container_name: evo-gateway
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./nginx-gateway.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/router.js:/etc/nginx/njs/router.js:ro
+      - ./audit-logs:/var/log/nginx
+    depends_on: []
+    restart: unless-stopped
+
+  # ---------- SANDBOX TOOL (Kali + tool offensivi) ----------
+  # Isolamento PentAGI-style: nessun privilegio, solo rete verso i target
+  # autorizzati. L'audit trail di ogni comando è obbligatorio (pattern Nebula).
+  tools:
+    image: kalilinux/kali-rolling
+    profiles: [tools]
+    container_name: evo-tools
+    hostname: evo-tools
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    volumes:
+      - ./sandbox/workspace:/workspace
+      - ./sandbox/audit:/audit
+    environment:
+      - AUDIT_DIR=/audit
+    command: >
+      bash -c "apt-get update &&
+               apt-get install -y --no-install-recommends
+               nmap masscan sqlmap nikto gobuster metasploit-framework
+               python3 python3-pip curl jq &&
+               sleep infinity"
+    restart: unless-stopped
+    networks:
+      lab:
+
+networks:
+  lab:
+    driver: bridge

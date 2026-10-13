@@ -1,0 +1,206 @@
+# evo-x2-lab — matrice modelli
+# Regola hardware: APU bandwidth-bound (~256 GB/s) → MoE con pochi parametri
+# attivi > dense. Un dense 27B è risultato 4x più lento di un MoE qui.
+# Le porte dei server sono esposte solo sulla rete lab 10.0.0.0/24;
+# il gateway (8080) è l'unico ingresso per gli agenti.
+#
+# "peso_gb" è la dimensione indicativa del file quantizzato + overhead;
+# verificare sempre con il file effettivamente scaricato e pinnare l'hash.
+
+version: 1
+
+cluster:
+  pc1:
+    ip: 10.0.0.1
+    ruolo: brain
+    hostname: evo-x2-brain
+  pc2:
+    ip: 10.0.0.2
+    ruolo: worker-pool
+    hostname: evo-x2-workers
+  gateway:
+    ip: 10.0.0.1        # gira sul brain; spostare su PC2 se il brain deve
+    porta: 8080          # dedicare tutta la memoria al modello
+
+# Flag obbligatori su Strix Halo: --no-mmap -ngl 99 -fa 1
+flag_obbligatori: ["--no-mmap", "-ngl", "99", "-fa", "1"]
+
+modelli:
+
+  # ---------- PC1: BRAIN ----------
+  - id: brain
+    nodo: pc1
+    porta: 8081
+    ruolo: [planner, judge, arbitro, auto-prompter]
+    modello: Qwen3.8-Flash-Next (build Heretic/abliterated, metodo HERETIC)
+    architettura: MoE 177B totali / ~6B attivi, 262K ctx, vision + tool-calling
+    quant: dynamic GGUF (Unsloth o Atomic) — Q8~120GB / consigliato ~85GB / minimo 75GB
+    peso_gb: 85
+    fonte: unsloth/Qwen3.8-Flash-Next-GGUF | atomic.chat | orcarouter (Uncensored)
+    parametri:
+      ctx_size: 131072        # il modello arriva a 262K: alzare solo dopo aver misurato il KV cache
+      parallel: 2
+      mtp: true               # speculative decoding dove supportato: verificare con benchmark.sh
+    note: >
+      Build abliterated pronta, nessun training. I rifiuti si gestiscono a
+      livello di agent design; i guardrail servono per i clienti
+      istituzionali (vedi slot guard in fondo).
+    hash: null               # da pinnare in models.lock dopo il download
+
+  # ---------- PC2: WORKER POOL ----------
+  - id: coder
+    nodo: pc2
+    porta: 8101
+    ruolo: [generator, exploit-coder]
+    modello: Qwen3-Coder-Next
+    architettura: MoE 80B totali / 3B attivi, 256K ctx
+    quant: Q4_K_M GGUF (ufficiale Qwen o Unsloth)
+    peso_gb: 48
+    fonte: Qwen/Qwen3-Coder-Next-GGUF | unsloth/Qwen3-Coder-Next-GGUF
+    parametri:
+      ctx_size: 65536
+      parallel: 3
+    note: >
+      Il lavoro pesante: PoC, exploit script, payload, chaining. Performance
+      da modello 10-20x più grande a velocità quasi da 3B attivi.
+    hash: null
+
+  - id: toolcaller
+    nodo: pc2
+    porta: 8102
+    ruolo: [executor, tool-caller]
+    modello: gpt-oss-20B
+    architettura: MoE 21B totali / 3.6B attivi
+    quant: MXFP4 GGUF (ufficiale openai)
+    peso_gb: 13
+    fonte: openai/gpt-oss-20b
+    parametri:
+      ctx_size: 32768
+      parallel: 4
+    note: >
+      Function calling eccellente per i tool MCP (nmap, nuclei, sqlmap, burp).
+      Già in produzione su altre EVO-X2 (repo di riferimento).
+    hash: null
+
+  - id: parser
+    nodo: pc2
+    porta: 8103
+    ruolo: [parser, summarizer, triage]
+    modello: Qwen3.5-9B
+    architettura: dense 9B
+    quant: Q4_K_M GGUF
+    peso_gb: 6
+    fonte: Qwen/Qwen3.5-9B (GGUF Unsloth)
+    parametri:
+      ctx_size: 32768
+      parallel: 4
+    note: >
+      Pattern PentestGPT "parsing module": riassume output grezzo di
+      nmap/masscan/burp, estrae finding, fa il triage. Nessun modello
+      più grande serve qui.
+    hash: null
+
+  - id: cyber
+    nodo: pc2
+    porta: 8104
+    ruolo: [critic, cyber-specialist]
+    modello: Deep Hat V2 30B       # CANDIDATO N.1 — da confermare nel bake-off (Fase 4)
+    alternative_bakeoff:
+      - Qwen-3.5-27B (Q4_K_M)      # base migliore per fine-tune futuro (Novee: 55→82% exploit rate con LoRA)
+      - OpenMythos                 # baseline: fine-tune cyber da hackathon
+      - CyberSecQwen-4B            # solo per triage difensivo, non per critic
+    architettura: dense 30B (lineaggio WhiteRabbitNeo/Kindo, "nato cyber")
+    quant: Q4_K_M GGUF (verificare licenza per uso commerciale)
+    peso_gb: 18
+    fonte: Kindo/Deep Hat (deephat.ai)
+    parametri:
+      ctx_size: 65536
+      parallel: 2
+    note: >
+      Doppio ruolo: critic (deve essere di FAMIGLIA DIVERSA dal generator —
+      Deep Hat critica Qwen3-Coder-Next e viceversa) e knowledge cyber.
+      Vendor dichiara > GPT-OSS-120B su CTF professionali: da validare.
+    hash: null
+
+  - id: triage
+    nodo: pc2
+    porta: 8105
+    ruolo: [defensive-triage]
+    modello: CyberSecQwen-4B
+    architettura: dense 4B (fine-tune difensivo su Qwen3-4B-Instruct)
+    quant: Q4_K_M GGUF
+    peso_gb: 3
+    fonte: athena129/CyberSecQwen-4B
+    parametri:
+      ctx_size: 16384
+      parallel: 4
+    opzionale: true
+    note: >
+      Unico caso "cyber-ready" utile subito: classificazione finding,
+      sev-triage, bozze di sezione difensiva nei report.
+    hash: null
+
+  - id: embed
+    nodo: pc2
+    porta: 8106
+    ruolo: [rag-embedding]
+    modello: BGE-M3
+    architettura: embedding (dense + sparse + ColBERT)
+    quant: fp16
+    peso_gb: 2.2
+    fonte: BAAI/bge-m3
+    parametri:
+      ctx_size: 8192
+    note: >
+      Knowledge base: writeup, CVE (NVD/advisories), tecniche MITRE ATT&CK,
+      report passati. Grounding anti-allucinazione CVE.
+    hash: null
+
+  - id: rerank
+    nodo: pc2
+    porta: 8107
+    ruolo: [rag-reranker]
+    modello: Qwen3-Reranker (0.6B o 4B)
+    architettura: reranker
+    quant: fp16
+    peso_gb: 2.5
+    fonte: Qwen/Qwen3-Reranker
+    parametri:
+      ctx_size: 8192
+    hash: null
+
+  # ---------- SLOTS FUTURI (non caricare ora) ----------
+  - id: guard
+    nodo: pc2
+    porta: 8108
+    ruolo: [output-guard]
+    modello: Llama Guard o ShieldGemma
+    quant: Q4_K_M GGUF
+    peso_gb: 3
+    opzionale: true
+    attivo: false
+    note: >
+      Per clienti istituzionali / compliance. Controlla gli output prima
+      che finiscano nei report. Attivare quando servirà.
+
+  - id: fine-tune-proprietario
+    nodo: pc2
+    porta: 8109
+    ruolo: [generator, critic, cyber-specialist]
+    modello: LoRA proprietario su Qwen-3.5-27B / Qwen3.5-9B
+    attivo: false
+    note: >
+      Fase 5 — il vero modello cyber: addestrato sulle tracce delle
+      engagement (distillation con rejection sampling, ~2000 esempi).
+      Sostituisce gli slot coder/cyber quando pronto. È il fosso
+      competitivo della startup.
+
+budget_memoria_pc2:
+  caricati_default_gb: 88    # coder 48 + toolcaller 13 + parser 6 + cyber 18 + embed/rerank 5
+  kv_cache_e_os_gb: 30
+  nota: >
+    Se serve margine per contesti lunghi o fan-out best-of-k, caricare lo
+    slot cyber on-demand (il brain fa da critic di fallback).
+
+# Valutazione: vedi docs/evaluation-plan.md per il bake-off (generalisti vs
+# cyber) e l'A/B dell'ensemble (solo worker vs generator→critic vs best-of-k).
