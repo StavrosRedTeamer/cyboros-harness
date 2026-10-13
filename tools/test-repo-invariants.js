@@ -495,5 +495,93 @@ ok('leak: nessun host di scope.json dentro un file tracciato', () => {
     'host di engagement in file tracciati (togli l\'host o smetti di tracciare il file): ' + hits.slice(0, 5).join(', '));
 });
 
+// ---- rebrand: nessun nome vecchio fuori dalla storia -------------------------------------
+// Il confine è il TEMPO, non il tipo di file: una run registrata, una ricevuta, una nota datata
+// nominano il progetto come si chiamava allora, e riscriverle falsificherebbe l'evidenza su cui
+// poggia il repo. Tutto il resto è superficie viva — un percorso eseguito, un'etichetta mostrata,
+// un formato consumato — e va rinominato a qualunque data lo si sia scritto.
+const REBRAND_LEGACY = /stavros/i;
+
+// Cosa NON è il nome vecchio, anche se la stringa combacia. Si toglie PRIMA di cercare: il gate
+// cerca il progetto, e queste sono rispettivamente una persona, una compatibilità e un percorso
+// che esiste sulla macchina.
+const REBRAND_IGNORE = [
+  [/\/home\/stavros\b/g, "il nome utente dell'operatore: una persona, non il progetto"],
+  // Le chiavi in deprecazione (F4): `properties.stavros` / `stavrosFindingId` escono ancora per una
+  // release. La forma con cui compaiono nel codice non è solo `properties.stavros` — c'è anche
+  // l'accesso `r.stavros`, il campo dell'oggetto `stavros: inv,` e l'header legacy nel test che
+  // verifica la finestra. Si tolgono tutte: è la compatibilità, non un residuo.
+  [/properties\.stavros\b|\bstavrosFindingId\b|\bstavros\b(?=\s*[[:,)`*])|x-stavros-token\b/gi,
+    'chiavi accettate o emesse in via deprecata per una release (F4): è la compatibilità, non un residuo'],
+];
+
+// File che possono nominare il nome vecchio, ognuno con il suo motivo. Deciso con l'operatore il
+// 2026-10-13: le famiglie con un consumatore FUORI dal repo non si rinominano qui, perché
+// rinominarle romperebbe il telefono, la macchina o l'evidenza di engagement già chiusi.
+const REBRAND_ALLOWLIST = [
+  ['CHANGELOG.md', 'voci antecedenti al 2026-10-13'],
+  ['docs/archive/', 'documenti superati, conservati con la data'],
+  ['docs/superpowers/plans/', 'piani datati: descrivono un momento, non lo stato di oggi'],
+  ['docs/superpowers/specs/', 'spec datate, la spec del rebrand compresa'],
+  ['docs/INDEX.md', 'generato: indicizza anche i documenti datati, e ha già il suo gate'],
+  ['docs/project-map.html', 'generato: ha già il suo --check'],
+  ['legal/', 'testi con data'],
+  ['piano-ottimizzazione-stavros.md', 'piano datato, tenuto in superficie viva per la sua Fase B'],
+  ['tools/env.js', 'legge il prefisso STAVROS_* come fallback di deprecazione'],
+  ['tools/test-env.js', 'verifica la finestra di deprecazione: deve scrivere il prefisso vecchio'],
+  ['tools/cyboros.js', 'accetta un nome legacy `STAVROS_…` in resolveOperatorTool'],
+  // Decisione 2: device e macchina restano come sono. La root vendor è dello stesso tipo: una
+  // cartella da 291 MB già popolata su questa macchina (`~/.local/share/stavros/vendor`), e
+  // rinominarla nel repo disallineare i binari che ci sono già dentro.
+  ['tools/f3-client-setup.sh', 'canale F3: fork hermes-stavros, chiave f3-stavros e i path del workspace sul device'],
+  ['tools/f3-client-parrot.sh', 'la chiave f3-stavros è già in authorized_keys sui device'],
+  ['docs/f3-client-runbook.md', 'procedura sul device: nomina la cartella hermes-stavros'],
+  ['tools/cap-manifest.json', 'il drop-in 99-stavros-… sta già in /etc/sysctl.d/ della macchina'],
+  ['tools/vendor-dir.js', 'risolve la root vendor della macchina: il default è una cartella già popolata'],
+  ['tools/test-vendor-dir.js', 'test della root vendor della macchina: verifica il path che esiste davvero'],
+  ['tools/doctor.js', 'nomina la root vendor della macchina nel commento del default'],
+  ['tools/obscura.js', 'nomina la root vendor della macchina nel commento del PATH'],
+  ['install-tools.sh', 'installa nella root vendor della macchina: rinominarla la disallinea dai binari presenti'],
+  ['install-tools.ps1', 'stesso contratto di install-tools.sh, edizione Windows'],
+  ['docs/toolbox.md', 'documenta la root vendor della macchina e il fallback STAVROS_* in deprecazione'],
+  // Decisione 1 e 3: la fotografia di un prompt, la nota di compatibilità, i marcatori storici.
+  ['docs/system-prompt-dump.md', 'dump di un prompt assemblato: fotografia, come una ricevuta'],
+  ['tools/payloads/', 'nota di compatibilità: nomina il marker storico per riconoscerlo'],
+  ['tools/test-repo-invariants.js', 'questo gate: deve nominare il nome vecchio per poterlo cercare'],
+];
+
+// Il gate cerca il PROGETTO, non la stringa: si tolgono prima le occorrenze che non lo sono.
+function rebrandScan(text) {
+  let t = text;
+  for (const [re] of REBRAND_IGNORE) t = t.replace(re, '');
+  return REBRAND_LEGACY.test(t);
+}
+// Si scansiona OGNI file tracciato tranne i binari, non una lista di estensioni: il launcher
+// `cyboros-cc` non ha estensione ed è superficie viva quanto un modulo — una allowlist di
+// estensioni lo salterebbe, che è il modo in cui un rename si crede completo e non lo è.
+const REBRAND_BINARY = /\.(png|jpe?g|gif|ico|webp|pdf|zip|gz|tgz|woff2?|ttf|eot|so|node|wasm|db|sqlite3?)$/i;
+ok('rebrand: il nome vecchio non è rimasto in superficie viva', () => {
+  const victims = [];
+  for (const rel of tracked('.')) {
+    if (REBRAND_BINARY.test(rel)) continue;
+    if (REBRAND_ALLOWLIST.some(([p]) => rel === p || rel.startsWith(p))) continue;
+    let buf; try { buf = fs.readFileSync(path.join(WS, rel)); } catch { continue; }
+    if (buf.includes(0)) continue;                 // binario con estensione non dichiarata
+    if (buf.length > 4 * 1024 * 1024) continue;    // troppo grande per essere prosa o codice
+    if (rebrandScan(buf.toString('utf8'))) victims.push(rel);
+  }
+  assert.deepStrictEqual(victims, [],
+    'il nome vecchio è rimasto in superficie viva (migra il file, o aggiungilo a REBRAND_ALLOWLIST ' +
+    'con il motivo accanto): ' + victims.join(', '));
+});
+
+ok('rebrand: nessun file tracciato porta il nome vecchio nel nome', () => {
+  const victims = tracked('.').filter((rel) => /stavros/i.test(rel));
+  const allowed = ['docs/superpowers/plans/2026-09-08-stavros-radar.md',
+    'docs/superpowers/specs/2026-09-08-stavros-radar-design.md', 'piano-ottimizzazione-stavros.md'];
+  assert.deepStrictEqual(victims.filter((v) => !allowed.includes(v)), [],
+    'file con il nome vecchio nel nome (git mv, o allowlist con il motivo): ' + victims.join(', '));
+});
+
 console.log(`\nrepo-invariants: ${pass} pass, ${fail} fail`);
 process.exit(fail ? 1 : 0);
