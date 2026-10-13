@@ -147,3 +147,27 @@ jobs:
 
       - name: Nessun materiale di engagement o corpus nella storia
         run: node tools/test-repo-history.js
+
+  pr-title:
+    name: conventional commit (titolo PR)
+    # Perché esiste: con lo squash il titolo della PR diventa il messaggio del commit su master,
+    # quindi è lì che si decide la leggibilità della storia. La convenzione è quella che il repo
+    # già usa (feat|fix|docs|test|chore), ma la va documentata in CONTRIBUTING.md e qui diventa
+    # eseguibile — un consiglio non verificato viene dimenticato.
+    # Solo sui pull_request: un push non ha un titolo di PR, e il job risulta skipped (non rosso).
+    # Nessun `uses:`: questo job non fa checkout, quindi non c'è nessuna action da pinnare.
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Il titolo della PR è un Conventional Commit
+        env:
+          TITLE: ${{ github.event.pull_request.title }}
+        run: |
+          set -e
+          pattern='^(feat|fix|docs|test|chore|refactor|perf|build|ci|style)(\([a-z0-9._-]+\))?!?: .+'
+          if ! printf '%s' "$TITLE" | grep -qE "$pattern"; then
+            echo "::error::il titolo della PR non è un Conventional Commit: $TITLE"
+            echo "atteso: <tipo>[(scope)][!]: <descrizione>, con tipo in feat|fix|docs|test|chore|refactor|perf|build|ci|style"
+            exit 1
+          fi
+          echo "titolo conforme: $TITLE"
