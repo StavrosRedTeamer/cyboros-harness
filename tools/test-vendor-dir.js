@@ -21,21 +21,21 @@ function withEnv(over, fn) {
   }
 }
 
-ok('$STAVROS_VENDOR_DIR vince su tutto', () => {
-  withEnv({ STAVROS_VENDOR_DIR: EXT, XDG_DATA_HOME: path.join(DIR, 'xdg') }, () => {
+ok('$CYBOROS_VENDOR_DIR vince su tutto', () => {
+  withEnv({ CYBOROS_VENDOR_DIR: EXT, XDG_DATA_HOME: path.join(DIR, 'xdg') }, () => {
     assert.strictEqual(vd.vendorRoot(), path.resolve(EXT));
   });
 });
 
 ok('senza override vale $XDG_DATA_HOME/stavros/vendor', () => {
   const xdg = path.join(DIR, 'xdg');
-  withEnv({ STAVROS_VENDOR_DIR: undefined, XDG_DATA_HOME: xdg }, () => {
+  withEnv({ CYBOROS_VENDOR_DIR: undefined, XDG_DATA_HOME: xdg }, () => {
     assert.strictEqual(vd.vendorRoot(), path.join(xdg, 'stavros', 'vendor'));
   });
 });
 
 ok('senza né override né XDG si torna a ~/.local/share/stavros/vendor', () => {
-  withEnv({ STAVROS_VENDOR_DIR: undefined, XDG_DATA_HOME: undefined }, () => {
+  withEnv({ CYBOROS_VENDOR_DIR: undefined, XDG_DATA_HOME: undefined }, () => {
     assert.ok(/\.local[\\/]share[\\/]stavros[\\/]vendor$/.test(vd.vendorRoot()), vd.vendorRoot());
   });
 });
@@ -44,7 +44,7 @@ ok('resolveVendor trova un file nella root esterna', () => {
   const bin = path.join(EXT, 'tools', 'demo', 'demo-bin');
   fs.mkdirSync(path.dirname(bin), { recursive: true });
   fs.writeFileSync(bin, '#!/bin/sh\n');
-  withEnv({ STAVROS_VENDOR_DIR: EXT }, () => {
+  withEnv({ CYBOROS_VENDOR_DIR: EXT }, () => {
     assert.strictEqual(vd.resolveVendor('tools/demo/demo-bin'), bin);
     // gli slash iniziali sono normalizzati, non rifiutati (i chiamanti passano path relativi)
     assert.strictEqual(vd.resolveVendor('/tools/demo/demo-bin'), bin);
@@ -54,7 +54,7 @@ ok('resolveVendor trova un file nella root esterna', () => {
 });
 
 ok('un file assente risolve a null (mai un path inventato)', () => {
-  withEnv({ STAVROS_VENDOR_DIR: EXT }, () => {
+  withEnv({ CYBOROS_VENDOR_DIR: EXT }, () => {
     assert.strictEqual(vd.resolveVendor('tools/nope/nope-bin'), null);
     assert.strictEqual(vd.resolveVendor('tools/nope/nope-bin', { noLegacy: true }), null);
     assert.strictEqual(vd.resolveVendor(''), null);
@@ -63,7 +63,7 @@ ok('un file assente risolve a null (mai un path inventato)', () => {
 });
 
 ok('traversal e NUL sono rifiutati (questo helper sceglie il binario da eseguire)', () => {
-  withEnv({ STAVROS_VENDOR_DIR: EXT }, () => {
+  withEnv({ CYBOROS_VENDOR_DIR: EXT }, () => {
     assert.strictEqual(vd.resolveVendor('../../../etc/passwd'), null);
     assert.strictEqual(vd.resolveVendor('tools/../../outside'), null);
     assert.strictEqual(vd.resolveVendor('tools/demo/../demo/demo-bin'), null, 'anche un traversal che torna dentro è rifiutato: il percorso non si interpreta');
@@ -72,7 +72,7 @@ ok('traversal e NUL sono rifiutati (questo helper sceglie il binario da eseguire
 });
 
 ok('la CLI stampa la root risolta', () => {
-  const r = runCli([TOOL], { env: Object.assign({}, process.env, { STAVROS_VENDOR_DIR: EXT }) });
+  const r = runCli([TOOL], { env: Object.assign({}, process.env, { CYBOROS_VENDOR_DIR: EXT }) });
   assert.strictEqual(r.status, 0, r.stderr);
   assert.strictEqual(r.stdout.trim(), path.resolve(EXT));
 });

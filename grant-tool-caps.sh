@@ -55,8 +55,8 @@ plan() {
 # SUDO_USER non basta: con l'elevazione via GUI (polkit) la variabile non viene popolata e
 # il fallback a $HOME dava /root. Cerchiamo allora l'utente non-root che ha davvero una home
 # da operatore — cioe' con dentro ~/go/bin o ~/.local/bin — e, in assenza, il primo membro non
-# root del gruppo sudo. STAVROS_OPERATOR_HOME ha la precedenza esplicita (box multi-utente,
-# stessa convenzione di STAVROS_VENDOR_DIR).
+# root del gruppo sudo. CYBOROS_OPERATOR_HOME ha la precedenza esplicita (box multi-utente,
+# stessa convenzione di CYBOROS_VENDOR_DIR).
 #
 # I membri del gruppo stanno nel QUARTO campo di getent group (`sudo:x:27:utente1,utente2`),
 # separati da virgole: si prende `cut -d: -f4` e poi si splitta sulle virgole. Splittando
@@ -65,8 +65,8 @@ plan() {
 # esattamente il guasto che questo script aveva, e che da utente era invisibile perche' il
 # fallback dava per caso la risposta giusta.
 operator_home() {
-  if [ -n "${STAVROS_OPERATOR_HOME:-}" ] && [ -d "$STAVROS_OPERATOR_HOME" ]; then
-    printf '%s' "$STAVROS_OPERATOR_HOME"; return
+  if [ -n "${CYBOROS_OPERATOR_HOME:-}" ] && [ -d "$CYBOROS_OPERATOR_HOME" ]; then
+    printf '%s' "$CYBOROS_OPERATOR_HOME"; return
   fi
   local u h first=""
   for u in "${SUDO_USER:-}" $(getent group sudo 2>/dev/null | cut -d: -f4 | tr ',' ' '); do

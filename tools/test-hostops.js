@@ -19,7 +19,7 @@ const SESSIONS = path.join(TMP, 'sessions.json');
 const PRIVESC_DIR = path.join(TMP, 'privesc');
 process.env.HOSTOPS_AUDIT = AUDIT;
 process.env.SESSIONS_JSON = SESSIONS;
-process.env.STAVROS_PRIVESC_DIR = PRIVESC_DIR;
+process.env.CYBOROS_PRIVESC_DIR = PRIVESC_DIR;
 
 const SCOPE = {
   allowed_hosts: [], allowed_url_prefixes: [], allowed_ips: ['10.0.0.0/24'],

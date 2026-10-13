@@ -27,7 +27,7 @@ Senza `-l/--script`, l'hook è scelto dallo static già fatto (`reports/mobile/<
 | `pairipcore` / `com/pairip` | `tools/frida/unpin.js` + **hint repack** (`tools/mobile-pairip-repack.sh`, sempre confirm) |
 | nessun segnale | `tools/frida/unpin.js` (objection-style) |
 
-Precedenza: `-l/--script` > env `STAVROS_FRIDA_SCRIPT` > default framework. Il tier resta confirm.
+Precedenza: `-l/--script` > env `CYBOROS_FRIDA_SCRIPT` > default framework. Il tier resta confirm.
 
 ## M.2 — Rinnovo APK autorizzato (`fetch-apk`)
 

@@ -12,6 +12,7 @@
 //   node tools/cap-plan.js --json       # stesso contenuto come array JSON
 //   require('./cap-plan')               // { loadManifest, plan, validateManifest }
 'use strict';
+const { env } = require('./env');
 const fs = require('fs');
 const path = require('path');
 
@@ -57,7 +58,7 @@ function validateManifest(m, src) {
 }
 
 function loadManifest(file) {
-  const f = file || process.env.STAVROS_CAP_MANIFEST || DEFAULT_MANIFEST;
+  const f = file || env('CAP_MANIFEST') || DEFAULT_MANIFEST;
   const raw = fs.readFileSync(f, 'utf8');
   let parsed;
   try { parsed = JSON.parse(raw); }

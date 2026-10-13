@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Offline self-check per tools/distiller.js. Hermetico: temp STAVROS_MEMORY_DIR + SCOPE_JSON
+// Offline self-check per tools/distiller.js. Hermetico: temp CYBOROS_MEMORY_DIR + SCOPE_JSON
 // fixture + findings.jsonl fixture, nessuna rete, nessun memory/ o reports/ reale toccato.
 // Verifica il contratto centrale: FAIL-CLOSED (i dati di engagement non entrano mai negli store).
 // Run: node tools/test-distiller.js
@@ -12,7 +12,7 @@ const { spawnSync } = require('child_process');
 
 const ROOT = path.resolve(__dirname, '..');
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'distiller-test-'));
-process.env.STAVROS_MEMORY_DIR = dir;
+process.env.CYBOROS_MEMORY_DIR = dir;
 const scopeFile = path.join(dir, 'scope.json');
 fs.writeFileSync(scopeFile, JSON.stringify({ allowed_hosts: ['acme-scope.test'], allowed_ips: [] }));
 process.env.SCOPE_JSON = scopeFile; // fixture sanitizer: 'acme-scope.test' e' un host in-scope da rifiutare
@@ -131,7 +131,7 @@ assert.strictEqual(mem.readJsonl(path.join(dir, mem.LESSONS_FILE)).length, 3, 's
 assert.strictEqual(mem.readJsonl(path.join(dir, rag.STORE_FILE)).length, 1, 'store RAG invariato');
 
 // ---------- 9) CLI E2E: shim dry-run + apply + --json ----------
-const env = { ...process.env, STAVROS_MEMORY_DIR: dir, SCOPE_JSON: scopeFile };
+const env = { ...process.env, CYBOROS_MEMORY_DIR: dir, SCOPE_JSON: scopeFile };
 const cli = spawnSync(process.execPath,
   [path.join(ROOT, 'tools', 'distiller.js'), '--file', findingsFile, '--json'],
   { cwd: ROOT, env, encoding: 'utf8', timeout: 20000 });

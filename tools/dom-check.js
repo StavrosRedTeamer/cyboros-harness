@@ -207,7 +207,7 @@ async function main() {
   if (backend === 'obscura') {
     const bin = obscura.resolveBin();
     if (!bin) {
-      console.error(JSON.stringify({ error: 'obscura binary not found (--backend obscura)', hint: 'run ./install-tools.sh or set STAVROS_OBSCURA_BIN' }));
+      console.error(JSON.stringify({ error: 'obscura binary not found (--backend obscura)', hint: 'run ./install-tools.sh or set CYBOROS_OBSCURA_BIN' }));
       process.exit(1);
     }
     let version = null;

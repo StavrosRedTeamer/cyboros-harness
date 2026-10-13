@@ -34,6 +34,7 @@
 //     authz alone (9) BECAUSE the amplifying class is already found; models the hand-built
 //     OTP-redirect/GraphQL-BOLA chains (chain.js) being discovered deterministically.
 'use strict';
+const { env } = require('./env');
 const fs = require('fs');
 const path = require('path');
 
@@ -499,7 +500,7 @@ function main() {
   const args = process.argv.slice(2);
   const cmd = args[0];
   if (cmd === 'solve' && args[1] && args[2]) { cmdSolve(args[1], args[2]); }
-  else if (cmd === 'demo' && args[1]) { cmdDemo(args[1], process.env.STAVROS_REPORTS); }
+  else if (cmd === 'demo' && args[1]) { cmdDemo(args[1], env('REPORTS')); }
   else {
     console.error('usage: node tools/planner.js solve <domainfile.json> <initfile.json>');
     console.error('       node tools/planner.js demo <host>');

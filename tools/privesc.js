@@ -14,6 +14,7 @@
 // ponytail: regex detectors, not a real parser. Vectors can be missed or stale
 // (patch levels change). Every hit is a LEAD: verify on the box, then record
 // findings honestly per the verify_level discipline in knowledge.md.
+const { env } = require('./env');
 const fs = require('fs');
 const path = require('path');
 const G = require('./c2-guard');
@@ -24,7 +25,7 @@ function auditFile(file) {
   return file || process.env.HOSTOPS_AUDIT || path.join(__dirname, '..', 'reports', 'tmp', 'hostops-audit.jsonl');
 }
 function outDir(dir) {
-  return dir || process.env.STAVROS_PRIVESC_DIR || path.join(__dirname, '..', 'reports', 'privesc');
+  return dir || env('PRIVESC_DIR') || path.join(__dirname, '..', 'reports', 'privesc');
 }
 function audit(entry, file) {
   const p = auditFile(file);

@@ -14,17 +14,18 @@
 // A class is never silently dropped: classes without a mapping are listed explicitly, and the
 // exit code is 0 while planning is complete (the report gate checks the artifact, not the mode).
 //
-// Env overrides (tests / out-of-tree runs): STAVROS_TEST_REGISTRY, STAVROS_FINDINGS_FILE
-// (FINDINGS_JSONL is honored too, matching record-finding.js), STAVROS_ATTACK_MATRIX.
+// Env overrides (tests / out-of-tree runs): CYBOROS_TEST_REGISTRY, CYBOROS_FINDINGS_FILE
+// (FINDINGS_JSONL is honored too, matching record-finding.js), CYBOROS_ATTACK_MATRIX.
 
 'use strict';
+const { env } = require('./env');
 const fs = require('fs');
 const path = require('path');
 
 const ROOT = path.join(__dirname, '..');
-const REGISTRY_FILE = () => process.env.STAVROS_TEST_REGISTRY || path.join(__dirname, 'test-registry.json');
-const FINDINGS_FILE = () => process.env.STAVROS_FINDINGS_FILE || process.env.FINDINGS_JSONL || path.join(ROOT, 'reports', 'findings.jsonl');
-const OUT_FILE = () => process.env.STAVROS_ATTACK_MATRIX || path.join(ROOT, 'reports', 'attack-matrix.md');
+const REGISTRY_FILE = () => env('TEST_REGISTRY') || path.join(__dirname, 'test-registry.json');
+const FINDINGS_FILE = () => env('FINDINGS_FILE') || process.env.FINDINGS_JSONL || path.join(ROOT, 'reports', 'findings.jsonl');
+const OUT_FILE = () => env('ATTACK_MATRIX') || path.join(ROOT, 'reports', 'attack-matrix.md');
 
 // ATT&CK Enterprise tactic order — the matrix Y ordering.
 const TACTIC_ORDER = [

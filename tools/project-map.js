@@ -207,7 +207,7 @@ const AREAS = [
   {
     id: 'hygiene', name: 'Igiene del repository', accent: '#a8b0c0',
     blurb: 'I controlli che tengono onesto il repo: salute dell\'installazione, capability, indice e mappa rigenerati, la suite.',
-    modules: ['doctor', 'install-all', 'capcheck', 'cap-plan', 'docs-index', 'project-map', 'run-tests'],
+    modules: ['env', 'doctor', 'install-all', 'capcheck', 'cap-plan', 'docs-index', 'project-map', 'run-tests'],
     files: ['CONTRIBUTING.md', 'SECURITY.md', 'docs/INDEX.md', 'docs/project-map.html'],
   },
 ];

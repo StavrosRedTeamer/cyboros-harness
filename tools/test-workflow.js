@@ -33,7 +33,7 @@ function tmpCtx() {
     EVIDENCE_INDEX_FILE: path.join(dir, 'evidence-index.md'),
     COVERAGE_WORKFLOW_FILE: path.join(dir, 'coverage-workflow.json'),
   });
-  delete env.STAVROS_PRIVACY;
+  env.CYBOROS_PRIVACY = ''; // OFF (stringa vuota maschera il fallback legacy)
   return { dir, scopeFile, env };
 }
 

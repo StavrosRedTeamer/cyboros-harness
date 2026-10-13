@@ -1,16 +1,17 @@
 #!/usr/bin/env node
 // Privacy tokenization at tool boundaries: free hosted models never see DISCOVERED PII
 // (internal IPs, emails, secrets/hashes). Typed deterministic placeholders HOST_/IP_/EMAIL_/SECRET_.
-// tokenize is gated by STAVROS_PRIVACY=1 (default off -> no-op). rehydrate is always active
+// tokenize is gated by CYBOROS_PRIVACY=1 (default off -> no-op). rehydrate is always active
 // (local report-time restore is authorized). Map persists at reports/tmp/token-map.json (gitignored).
 //
 // ponytail: detection is seed(scope)+regex, best-effort, fail-OPEN on the unrecognized (spec limit).
 // Placeholder counter is padStart(3) -> up to 999 per type; widen if a run exceeds it.
+const { env } = require('./env');
 const fs = require('fs');
 const path = require('path');
 
 const MAP_FILE = () => process.env.TOKEN_MAP || path.join(__dirname, '..', 'reports', 'tmp', 'token-map.json');
-const ENABLED = () => process.env.STAVROS_PRIVACY === '1';
+const ENABLED = () => env('PRIVACY') === '1';
 
 function loadMap() {
   try { return JSON.parse(fs.readFileSync(MAP_FILE(), 'utf8')); } catch { return { forward: {}, counters: {} }; }

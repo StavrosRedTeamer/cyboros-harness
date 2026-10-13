@@ -52,10 +52,10 @@ Write-Host "nmap: installalo a mano da https://nmap.org/download.html se ti serv
 
 # Obscura (headless browser CDP-compatibile, backend opzionale per dom-check.js).
 # Su Windows l'archivio va scaricato ed estratto a mano (nessun package manager).
-# I binari grossi vivono FUORI dal repo (root vendor esterna): %STAVROS_VENDOR_DIR% se
+# I binari grossi vivono FUORI dal repo (root vendor esterna): %CYBOROS_VENDOR_DIR% se
 # impostata, altrimenti ~/.local/share/stavros/vendor (tools/vendor-dir.js) — copiare la
 # workspace non trascina i binari.
-$VendorRoot = if ($env:STAVROS_VENDOR_DIR) { $env:STAVROS_VENDOR_DIR }
+$VendorRoot = if ($env:CYBOROS_VENDOR_DIR) { $env:CYBOROS_VENDOR_DIR }
              elseif ($env:XDG_DATA_HOME) { Join-Path $env:XDG_DATA_HOME "stavros\vendor" }
              else { Join-Path $HOME ".local\share\stavros\vendor" }
 $ObscuraDir = Join-Path $VendorRoot "tools\obscura"

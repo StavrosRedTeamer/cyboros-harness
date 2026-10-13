@@ -135,10 +135,10 @@ function makeLiveMeter() {
 (function wireEmbeddings() {
   const e = CFG.embeddings;
   if (!e || !e.enabled || !e.url) return;
-  process.env.STAVROS_EMBED_URL = e.url;
-  if (e.model) process.env.STAVROS_EMBED_MODEL = e.model;
-  if (e.api_key) process.env.STAVROS_EMBED_KEY = e.api_key;
-  if (e.alpha != null) process.env.STAVROS_RAG_ALPHA = String(e.alpha);
+  process.env.CYBOROS_EMBED_URL = e.url;
+  if (e.model) process.env.CYBOROS_EMBED_MODEL = e.model;
+  if (e.api_key) process.env.CYBOROS_EMBED_KEY = e.api_key;
+  if (e.alpha != null) process.env.CYBOROS_RAG_ALPHA = String(e.alpha);
 })();
 
 function parseArgs(argv) {

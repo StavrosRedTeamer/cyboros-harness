@@ -21,12 +21,12 @@
 //   node tools/mobile.js shell <serial> <package> -- <adb args...>   read-only adb shell (auto)
 //   node tools/mobile.js frida <serial> <package> [-l hook.js] [--framework flutter|pairip] [--confirm "reason"]  (confirm)
 //     M.1: without -l, the hook is chosen from the static pass (flutter → disable-flutter-tls.js,
-//     PairIP → hint to repack, else unpin.js). STAVROS_FRIDA_SCRIPT still overrides.
+//     PairIP → hint to repack, else unpin.js). CYBOROS_FRIDA_SCRIPT still overrides.
 //   node tools/mobile.js frida-server up|down|status [serial] [--port N] [--confirm "reason"]  (confirm)
 //     P1: gestisce frida-server SUL DEVICE (root, /data/local/tmp), versione allineata a `frida --version`
 //     locale. up scarica il binario dal device (via Tor: GlobalProxyApplication già instrada le app;
 //     il binario va scaricato UNA volta, es. con il downloader del telefono) e lo avvia su
-//     127.0.0.1:STAVROS_FRIDA_PORT (default 4747, porta NON standard), poi adb forward tcp:4747.
+//     127.0.0.1:CYBOROS_FRIDA_PORT (default 4747, porta NON standard), poi adb forward tcp:4747.
 //     down = pkill (la superficie resta chiusa quando non serve). status = pid + forward.
 //   node tools/mobile.js intercept <serial> [--write <dir>] [--confirm "reason"]     mitmproxy dump (write=confirm)
 //   node tools/mobile.js ca-install <serial> [--confirm "reason"]  push mitmproxy CA as system cert (confirm)
@@ -37,6 +37,7 @@
 // (frida/unpin/repack/intercept_write/reset) is refused without --confirm "<reason>",
 // mirroring c2-guard.js and wifi.js. Static analysis (apktool/jadx) and read-only adb
 // shell/pm dumps are auto-tier. repack (apktool b + apksigner) is ALWAYS confirm.
+const { env } = require('./env');
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
@@ -118,10 +119,10 @@ function auditMobile(entry) {
 }
 
 // ---- pure command builders (no exec; tested offline) ----
-// Default adb target. ReDroid loopback historically; override with STAVROS_ADB_SERIAL to
+// Default adb target. ReDroid loopback historically; override with CYBOROS_ADB_SERIAL to
 // point at a physically-attached authorized device (e.g. Poco F3 USB serial "R5CT30XXXXX").
 // The serial is still scope-checked by mobile-guard.js regardless of this default.
-const DEFAULT_SERIAL = process.env.STAVROS_ADB_SERIAL || '127.0.0.1:5555';
+const DEFAULT_SERIAL = env('ADB_SERIAL') || '127.0.0.1:5555';
 
 function staticCommands(apk, opts) {
   opts = opts || {};
@@ -216,12 +217,12 @@ function hookScriptFor(det) {
 }
 
 // fridaCommands is the default FRAMEWORK-AWARE hook (M.1). Precedence: explicit -l/--script
-// (opts.script) > STAVROS_FRIDA_SCRIPT env (back-compat override) > framework default > unpin.js.
+// (opts.script) > CYBOROS_FRIDA_SCRIPT env (back-compat override) > framework default > unpin.js.
 function fridaCommands(pkg, opts) {
   opts = opts || {};
   const serial = opts.serial || DEFAULT_SERIAL;
   const a = ['-U', '-n', pkg];
-  let script = opts.script || process.env.STAVROS_FRIDA_SCRIPT;
+  let script = opts.script || env('FRIDA_SCRIPT');
   if (!script) script = hookScriptFor(detectFramework(pkg, opts));
   a.push('-l', script);
   if (opts.extra) a.push(...opts.extra);
@@ -255,7 +256,7 @@ function fridaHint(pkg, opts) {
 // con adb forward. down lo uccide: quando non serve, la superficie e' chiusa (P7).
 // La versione e' quella del frida LOCALE (frida --version): client e server devono coincidere.
 const FRIDA_DEVICE_PATH = '/data/local/tmp/frida-server';
-const FRIDA_PORT_DEFAULT = process.env.STAVROS_FRIDA_PORT || '4747';
+const FRIDA_PORT_DEFAULT = env('FRIDA_PORT') || '4747';
 
 function fridaPort(opts) {
   const p = (opts && opts.port) || FRIDA_PORT_DEFAULT;
@@ -326,7 +327,7 @@ async function fridaServer(action, opts) {
       const f = fridaServerCommands('forward', opts)[0];
       const rf = await runMobile(f.bin, f.args, Object.assign({ sub: 'frida-server', serial: opts.serial }, opts));
       out.forward = `tcp:${out.port} -> device 127.0.0.1:${out.port} (status ${rf && rf.status})`;
-      out.connect = `frida -H 127.0.0.1:${out.port} ...  (o STAVROS_ADB_SERIAL per -U)`;
+      out.connect = `frida -H 127.0.0.1:${out.port} ...  (o CYBOROS_ADB_SERIAL per -U)`;
     } else {
       out.hint = `binario mancante o non avviato: scaricalo UNA volta sul device ` +
         `(es. f3bot/frida-server-fetch.sh via Tor) con la versione $(frida --version) = ` +
@@ -645,7 +646,7 @@ async function firebaseAudit(pkg, opts) {
     }
   }
   const report = { pkg, generated_at: new Date().toISOString(), config: redactConfig(cfg), probes: results, findings };
-  const outDir = opts.reportsDir || process.env.STAVROS_REPORTS_DIR || path.join(__dirname, '..', 'reports');
+  const outDir = opts.reportsDir || env('REPORTS_DIR') || path.join(__dirname, '..', 'reports');
   try {
     fs.mkdirSync(outDir, { recursive: true });
     const f = path.join(outDir, `mobile-firebase-${pkg}.json`);
@@ -749,7 +750,7 @@ function manifestMapEntries(pkg, manifest) {
   return entries;
 }
 
-// Write the manifest surface into reports/<pkg>-map.json (via map.js; STAVROS_MAP_DIR override).
+// Write the manifest surface into reports/<pkg>-map.json (via map.js; CYBOROS_MAP_DIR override).
 function writeMobileMap(pkg, manifest) {
   const mapLib = require('./map');
   let added = 0; const errors = [];
@@ -758,7 +759,7 @@ function writeMobileMap(pkg, manifest) {
     if (r.ok) added++;
     else errors.push(r.error);
   }
-  const file = path.join(process.env.STAVROS_MAP_DIR || path.join(__dirname, '..', 'reports'), `${pkg}-map.json`);
+  const file = path.join(env('MAP_DIR') || path.join(__dirname, '..', 'reports'), `${pkg}-map.json`);
   return { added: added, file: file, errors: errors };
 }
 

@@ -11,9 +11,9 @@
 // hashing N-gram cattura l'overlap lessicale stack/tecnica ("spring boot waf union" ≈
 // "springboot waf union select"). ZERO dipendenze runtime.
 //
-// Embedding DENSE SEMANTICO (opzionale, IBRIDO): se STAVROS_EMBED_URL è impostato
+// Embedding DENSE SEMANTICO (opzionale, IBRIDO): se CYBOROS_EMBED_URL è impostato
 // (tools/embeddings.js → un modello locale servito su /v1/embeddings, es. bge-m3), ogni record
-// porta anche `dvec` e il recall FONDE dense+lessicale (peso STAVROS_RAG_ALPHA, default 0.6).
+// porta anche `dvec` e il recall FONDE dense+lessicale (peso CYBOROS_RAG_ALPHA, default 0.6).
 // Così matcha per SIGNIFICATO (parafrasi, sinonimi, IT/EN/ZH), non solo per parole comuni.
 // A prova di fallimento: se il backend è giù/assente, si ricade sul lessicale (nessuna regressione).
 // Backfill dei record esistenti: `node tools/memory-rag.js reembed`.
@@ -37,13 +37,14 @@
 // Self-test: node tools/test-memory-rag.js
 'use strict';
 
+const { env } = require('./env');
 const fs = require('fs');
 const path = require('path');
 const mem = require('./memory'); // riuso il sanitizer e i parser jsonl (fonte unica delle garanzie)
 const emb = require('./embeddings'); // backend dense SEMANTICO opzionale (fallback lessicale)
 
 const ROOT = path.resolve(__dirname, '..');
-const MEMORY_DIR = process.env.STAVROS_MEMORY_DIR || path.join(ROOT, 'memory');
+const MEMORY_DIR = env('MEMORY_DIR') || path.join(ROOT, 'memory');
 const STORE_FILE = 'rag-store.jsonl';
 const INDEX_FILE = 'RAG-INDEX.md';
 
@@ -51,8 +52,8 @@ const DIM = 512;
 const DEFAULT_LIMIT = 3;          // il plan: top-3 risultati
 const MIN_SCORE = 0.05;           // sotto questa similarità il hit è rumore: non restituito
 // Peso del segnale DENSE nella fusione ibrida (dense semantico vs lessicale). 0=solo lessicale,
-// 1=solo dense. Configurabile via STAVROS_RAG_ALPHA. Usato solo quando il dense è disponibile.
-const DENSE_ALPHA = Math.min(1, Math.max(0, parseFloat(process.env.STAVROS_RAG_ALPHA || '0.6')));
+// 1=solo dense. Configurabile via CYBOROS_RAG_ALPHA. Usato solo quando il dense è disponibile.
+const DENSE_ALPHA = Math.min(1, Math.max(0, parseFloat(env('RAG_ALPHA') || '0.6')));
 
 // Testo compatto da dare all'embedder dense: ripete stack/classe (le chiavi del recall) e
 // aggiunge ostacolo+soluzione (il contenuto). Un'unica stringa per record e per query.
@@ -240,7 +241,7 @@ async function recallHybrid(dir, query, opts = {}) {
 // Async: (ri)calcola il dense per i record dello store. Backfill dopo aver attivato il backend,
 // o dopo aver cambiato modello. force=true ricalcola tutti; altrimenti solo quelli senza dvec.
 async function reembedAll(dir, { force = false } = {}) {
-  if (!emb.isEnabled()) throw new Error('backend dense non configurato (STAVROS_EMBED_URL). Niente da fare.');
+  if (!emb.isEnabled()) throw new Error('backend dense non configurato (CYBOROS_EMBED_URL). Niente da fare.');
   const file = memPath(dir, STORE_FILE);
   const store = mem.readJsonl(file);
   const targets = store.filter((r) => force || !Array.isArray(r.dvec) || !r.dvec.length);
@@ -400,7 +401,7 @@ async function main() {
           '  node tools/memory-rag.js reembed [--force]   # (ri)calcola i vettori dense semantici',
           '  node tools/memory-rag.js stats | index',
           '',
-          'Dense semantico (opzionale): imposta STAVROS_EMBED_URL (es. http://127.0.0.1:8081/v1/embeddings)',
+          'Dense semantico (opzionale): imposta CYBOROS_EMBED_URL (es. http://127.0.0.1:8081/v1/embeddings)',
           'per attivare il recall IBRIDO. Senza, il RAG resta lessicale (nessuna regressione).',
         ].join('\n'));
         process.exit(cmd ? 1 : 0);

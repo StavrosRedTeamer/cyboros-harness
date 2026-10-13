@@ -27,6 +27,7 @@ const { collectHosts, isCidr, runBinary } = require('./run');
 const pace = require('./pace');
 const parsers = require('./parsers');
 const { resolveVendor } = require('./vendor-dir');
+const { env } = require('./env');
 
 const PHASES = ['recon', 'scan', 'enumerate'];
 
@@ -82,7 +83,7 @@ function baseUrl(host) {
 }
 
 function defaultTmpDir() {
-  return process.env.STAVROS_TMP || path.join(os.tmpdir(), 'stavros');
+  return env('TMP') || path.join(os.tmpdir(), 'stavros');
 }
 
 // Extract a hostname from one recon-tool output line (subfinder/dnsx emit bare hosts,
@@ -244,7 +245,10 @@ function fileExists(p) {
 // Env override wins; then the external vendor root (tools/vendor-dir.js); then legacy
 // vendor/tools/<rel>. Returns the absolute path or null.
 function resolveOperatorTool(envVar, relPath, opts) {
-  const envPath = process.env[envVar];
+  // `envVar` is the full name ('CYBOROS_…'); a legacy 'STAVROS_…' or a bare base name is accepted
+  // too, so the helper stays callable either way. env() owns the deprecation fallback.
+  const base = String(envVar).replace(/^(?:CYBOROS_|STAVROS_)/, '');
+  const envPath = env(base);
   if (fileExists(envPath)) return path.resolve(envPath);
   const external = resolveVendor(path.join('tools', relPath), { noLegacy: true });
   if (external) return external;
@@ -435,12 +439,12 @@ async function enumerate(db, host, opts) {
       if (params.length) state.upsertEndpoint(db, targetId, 'GET', base, { params });
     }
     // unauthenticated-surface probe (repo-vet plan QW5): noauth_finder when the operator has it
-    // installed (env STAVROS_NOAUTH_FINDER or vendor/tools/noauth_finder/). Best-effort: absent
+    // installed (env CYBOROS_NOAUTH_FINDER or vendor/tools/noauth_finder/). Best-effort: absent
     // or failing tool never fails the phase. Every URL it surfaces lands in endpoints.
     const out = { target, endpoints: hits.length };
-    const noauthScript = opts.noauthScript != null ? opts.noauthScript : resolveOperatorTool('STAVROS_NOAUTH_FINDER', 'noauth_finder/noauth_finder.py');
+    const noauthScript = opts.noauthScript != null ? opts.noauthScript : resolveOperatorTool('CYBOROS_NOAUTH_FINDER', 'noauth_finder/noauth_finder.py');
     if (!noauthScript) {
-      out.noauth = { skipped: 'not installed (STAVROS_NOAUTH_FINDER / vendor/tools/noauth_finder/)' };
+      out.noauth = { skipped: 'not installed (CYBOROS_NOAUTH_FINDER / vendor/tools/noauth_finder/)' };
     } else {
       try {
         const auditDir = path.join(__dirname, '..', 'reports', 'tmp');
@@ -461,7 +465,7 @@ async function enumerate(db, host, opts) {
 }
 
 // Optional post-SCAN phase (repo-vet plan QW6): fuzz network services with APT++ when the
-// operator has it installed (env STAVROS_APTPP or vendor/tools/aptpp/apt++.py). NOT part of
+// operator has it installed (env CYBOROS_APTPP or vendor/tools/aptpp/apt++.py). NOT part of
 // the auto-resume PHASES list — an operator runs `fuzz` deliberately after `scan`. Targets come
 // from state.db (scan results) unless --ports overrides. Always via runBin (scope-checked).
 async function fuzz(db, target, opts) {
@@ -470,9 +474,9 @@ async function fuzz(db, target, opts) {
   const t = String(target);
   const runId = opts.runId || ensureRun(db, t, 'fuzz ' + t);
   return runPhase(db, runId, 'fuzz', async () => {
-    const script = opts.script != null ? opts.script : resolveOperatorTool('STAVROS_APTPP', 'aptpp/apt++.py');
+    const script = opts.script != null ? opts.script : resolveOperatorTool('CYBOROS_APTPP', 'aptpp/apt++.py');
     if (!script) {
-      return { target: t, skipped: 'APT++ not installed (STAVROS_APTPP / vendor/tools/aptpp/apt++.py)' };
+      return { target: t, skipped: 'APT++ not installed (CYBOROS_APTPP / vendor/tools/aptpp/apt++.py)' };
     }
     // service inventory: explicit --ports wins, else everything scan found for this target
     let jobs;
@@ -513,7 +517,7 @@ async function fuzz(db, target, opts) {
 }
 
 function fuzzOutRoot(target) {
-  return process.env.STAVROS_FUZZ_OUT || path.join(__dirname, '..', 'reports', 'tmp', 'fuzz-' + sanitize(target));
+  return env('FUZZ_OUT') || path.join(__dirname, '..', 'reports', 'tmp', 'fuzz-' + sanitize(target));
 }
 
 // ---- status / resume / report ----

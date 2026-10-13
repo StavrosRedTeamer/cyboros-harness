@@ -10,7 +10,7 @@ const path = require('path');
 
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'crack-test-'));
 process.env.LOOT_JSONL = path.join(tmp, 'loot.jsonl');
-process.env.STAVROS_CRACK_DIR = path.join(tmp, 'crack');
+process.env.CYBOROS_CRACK_DIR = path.join(tmp, 'crack');
 process.env.RUN_AUDIT_FILE = path.join(tmp, 'audit.jsonl');
 
 const crack = require('./crack');

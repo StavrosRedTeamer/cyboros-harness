@@ -4,7 +4,7 @@ const assert = require('assert');
 const fs = require('fs'), os = require('os'), path = require('path');
 const mapFile = path.join(os.tmpdir(), 'tokmap-' + process.pid + '.json');
 process.env.TOKEN_MAP = mapFile;
-process.env.STAVROS_PRIVACY = '1';
+process.env.CYBOROS_PRIVACY = '1';
 const { tokenize, rehydrate, seedFromScope, loadMap } = require('./privacy');
 
 // seed from scope populates HOST/IP
@@ -40,9 +40,9 @@ fs.rmSync(mapFile2, { force: true });
 process.env.TOKEN_MAP = mapFile;
 
 // disabled -> passthrough
-process.env.STAVROS_PRIVACY = '0';
+process.env.CYBOROS_PRIVACY = '0';
 assert.strictEqual(tokenize('admin@corp.io'), 'admin@corp.io', 'disabled -> no tokenization');
-process.env.STAVROS_PRIVACY = '1';
+process.env.CYBOROS_PRIVACY = '1';
 
 fs.rmSync(mapFile, { force: true });
 console.log('privacy: all tests passed');

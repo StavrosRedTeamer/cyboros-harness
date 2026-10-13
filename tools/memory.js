@@ -21,11 +21,12 @@
 // Zero-dep. Self-test: node tools/test-memory.js
 'use strict';
 
+const { env } = require('./env');
 const fs = require('fs');
 const path = require('path');
 
 const ROOT = path.resolve(__dirname, '..');
-const MEMORY_DIR = process.env.STAVROS_MEMORY_DIR || path.join(ROOT, 'memory');
+const MEMORY_DIR = env('MEMORY_DIR') || path.join(ROOT, 'memory');
 const LESSONS_FILE = 'lessons.jsonl';
 const ENV_FILE = 'env-profiles.jsonl';
 const INDEX_FILE = 'INDEX.md';

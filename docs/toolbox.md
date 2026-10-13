@@ -4,6 +4,12 @@
 > è il "come" — leggilo su richiesta o cercalo con `node tools/kb-search.js "<query>"`.
 > Tutti i tool girano via `run_terminal_command`; ogni binario di terze parti passa da run.js.
 
+- **Variabili d'ambiente (`tools/env.js`):** i moduli leggono la configurazione da un solo posto —
+  `env('TMP')` cerca `CYBOROS_TMP`, poi `STAVROS_TMP` (deprecato), poi il default. Il prefisso
+  corrente è `CYBOROS_*`; `STAVROS_*` resta letto per una release, e una stringa vuota vale come
+  assente. Un modulo nuovo che leggesse `process.env` direttamente resterebbe fuori da questa
+  finestra: passa da `tools/env.js`.
+
 - **Scope-safe binary runner:** run every third-party network tool via `node tools/run.js <bin> [args]`
   (it refuses out-of-scope hosts; supports `-l -`/`--stdin` AND a piped stdin for target lists; every
   invocation is audited to `reports/tmp/run-audit.jsonl`). `--dry-run` prints the hosts + verdict
@@ -106,7 +112,7 @@
   Alternative backend senza Chrome: `--backend obscura` (auto-avvia un server CDP effimero, vedi sotto).
 - **Obscura headless browser (antidetect, opzionale):** wrapper scope-gated `node tools/obscura.js`.
   Engine Rust CDP-compatibile (Apache-2.0, github.com/h4ckf0r0day/obscura) installato version-pinnato
-  nella root vendor ESTERNA (tools/vendor-dir.js: $STAVROS_VENDOR_DIR → ~/.local/share/stavros/vendor
+  nella root vendor ESTERNA (tools/vendor-dir.js: $CYBOROS_VENDOR_DIR → ~/.local/share/stavros/vendor
   → legacy workspace vendor/) da `install-tools.sh`; stato: `node tools/obscura.js status`. Comandi:
   `fetch <url> [--stealth] [--dump html|text|links|markdown] [--eval js] [--screenshot f]` (una pagina,
   scope-checked), `scrape <url...> --concurrency n` (parallelo, concurrency clampata: pace.js NON vede

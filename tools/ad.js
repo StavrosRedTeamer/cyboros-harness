@@ -33,6 +33,7 @@
 // best-effort regex extractors, not a stable machine format. Every hit is a LEAD — verify on the
 // box and record honestly per the verify_level discipline. No exploit code lives in this repo.
 'use strict';
+const { env } = require('./env');
 const fs = require('fs');
 const path = require('path');
 const { spawnSync } = require('child_process');
@@ -47,7 +48,7 @@ function commandExists(bin) {
 const AUDIT_FILE = () =>
   process.env.RUN_AUDIT_FILE || path.join(__dirname, '..', 'reports', 'tmp', 'run-audit.jsonl');
 const OUT_DIR = () =>
-  process.env.STAVROS_AD_DIR || path.join(__dirname, '..', 'reports', 'ad');
+  env('AD_DIR') || path.join(__dirname, '..', 'reports', 'ad');
 const SCOPE_PATH = () =>
   process.env.SCOPE_JSON || path.join(__dirname, '..', 'scope.json');
 

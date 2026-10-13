@@ -12,6 +12,7 @@
 //                "params":["id"], "auth_required":true, "notes":"...",
 //                "candidates": { "sqli":["id"], "xss":[], "idor":["id"], "ssrf":[], "other":[] } }
 // Stored at reports/<host>-map.json. candidates keys are validated against the known classes.
+const { env } = require('./env');
 const fs = require('fs');
 const path = require('path');
 
@@ -49,9 +50,9 @@ function refsFor(cls) {
   return { class: cls, wstg: r.wstg || [], asvs: r.asvs || [], cwe: r.cwe || [], owasp_api: r.owasp_api || [], owasp_llm: r.owasp_llm || [], owasp_agentic: r.owasp_agentic || [] };
 }
 
-// STAVROS_MAP_DIR lets tests (and out-of-tree runs) avoid the live reports/ dir.
+// CYBOROS_MAP_DIR lets tests (and out-of-tree runs) avoid the live reports/ dir.
 function mapFile(host) {
-  return path.join(process.env.STAVROS_MAP_DIR || path.join(__dirname, '..', 'reports'), host + '-map.json');
+  return path.join(env('MAP_DIR') || path.join(__dirname, '..', 'reports'), host + '-map.json');
 }
 
 function load(host) {

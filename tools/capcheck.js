@@ -15,7 +15,7 @@
 //   node tools/capcheck.js --mode network  # solo le capability di una modalita' (network|wireless|host)
 //   node tools/capcheck.js --require network  # preflight: exit!=0 se la modalita' non e' operativa
 //   node tools/capcheck.js --quiet         # solo il riepilogo, una riga
-// Env: STAVROS_CAP_MANIFEST (default tools/cap-manifest.json), CAPCHECK_OUT (default reports/tmp/cap-state.json)
+// Env: CYBOROS_CAP_MANIFEST (default tools/cap-manifest.json), CAPCHECK_OUT (default reports/tmp/cap-state.json)
 //
 // Contratto di uscita: 0 = tutto dichiarato e' concesso; 1 = qualcosa manca; 2 = manifest
 // illeggibile o rotto. "Non installato" NON e' un fallimento: e' un tool-plane, e la

@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Offline self-check for the RAG memory layer (tools/memory-rag.js + shims memory-store.js /
-// memory-recall.js). Hermetic: temp STAVROS_MEMORY_DIR + SCOPE_JSON fixture, no network,
+// memory-recall.js). Hermetic: temp CYBOROS_MEMORY_DIR + SCOPE_JSON fixture, no network,
 // no real memory/ touched. Run: node tools/test-memory-rag.js
 'use strict';
 const assert = require('assert');
@@ -11,7 +11,7 @@ const { spawnSync } = require('child_process');
 
 const ROOT = path.resolve(__dirname, '..');
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'memory-rag-test-'));
-process.env.STAVROS_MEMORY_DIR = dir; // shims spawnate sotto ereditano questo dir
+process.env.CYBOROS_MEMORY_DIR = dir; // shims spawnate sotto ereditano questo dir
 const scopeFile = path.join(dir, 'scope.json');
 fs.writeFileSync(scopeFile, JSON.stringify({ allowed_hosts: ['inspiriratest.com'], allowed_ips: [] }));
 process.env.SCOPE_JSON = scopeFile; // sanitizer fixture: host in-scope da rifiutare
@@ -100,7 +100,7 @@ assert.strictEqual(st.retired, 1);
 assert.strictEqual(st.with_poc, 1);
 
 // --- 9) shim E2E: memory-store.js / memory-recall.js (stesso dir via env) ---
-const env = { ...process.env, STAVROS_MEMORY_DIR: dir, SCOPE_JSON: scopeFile };
+const env = { ...process.env, CYBOROS_MEMORY_DIR: dir, SCOPE_JSON: scopeFile };
 const storeRun = spawnSync(process.execPath, [path.join(ROOT, 'tools', 'memory-store.js'), '--stdin'], {
   cwd: ROOT, env, encoding: 'utf8', timeout: 20000,
   input: JSON.stringify({

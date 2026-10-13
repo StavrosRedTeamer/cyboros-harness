@@ -10,8 +10,8 @@ const { ok, summary, fixture } = require('./testkit');
 
 const WS = fixture('daily-maint-ws');
 const ARCH = fixture('daily-maint-archive');
-process.env.STAVROS_ARCHIVE_DIR = ARCH;
-process.env.STAVROS_TEMP_ROTATE_DAYS = '7';
+process.env.CYBOROS_ARCHIVE_DIR = ARCH;
+process.env.CYBOROS_TEMP_ROTATE_DAYS = '7';
 
 // Il require avveniva DOPO il guard `require.main === module`: prima di quel guard questa riga
 // avrebbe avviato una manutenzione completa (KEV + mirror + reindex) come effetto dell'import.

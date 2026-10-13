@@ -12,7 +12,7 @@
 // non torna, l'operazione viene annullata e la sorgente resta intatta. Un archivio incompleto non
 // deve mai costare i dati.
 //
-// Dove va: $STAVROS_ARCHIVE_DIR → $XDG_DATA_HOME/stavros/archive → ~/.local/share/stavros/archive
+// Dove va: $CYBOROS_ARCHIVE_DIR → $XDG_DATA_HOME/stavros/archive → ~/.local/share/stavros/archive
 // (stesso criterio di risoluzione di tools/vendor-dir.js). La destinazione deve stare FUORI dal
 // workspace: dentro finirebbe nell'albero e quindi in un commit, come `refs/` prima del 2026-09-28.
 // Sotto la root, un anno per sottocartella (`<root>/<anno>/<nome>`), l'anno dell'ultima scrittura.
@@ -27,6 +27,7 @@
 //
 // Exit: 0 ok; 1 I/O o verifica fallita; 2 uso errato o rifiuto di sicurezza.
 'use strict';
+const { env } = require('./env');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
@@ -42,7 +43,7 @@ const SPACE_DIRS = ['temp', 'reports', 'artifacts', 'vendor', 'refs', '.git'];
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 function archiveRoot() {
-  if (process.env.STAVROS_ARCHIVE_DIR) return path.resolve(process.env.STAVROS_ARCHIVE_DIR);
+  if (env('ARCHIVE_DIR')) return path.resolve(env('ARCHIVE_DIR'));
   const base = process.env.XDG_DATA_HOME
     ? process.env.XDG_DATA_HOME
     : path.join(os.homedir(), '.local', 'share');
@@ -209,7 +210,7 @@ function archive(ws, rootName, name, opts) {
   const root = archiveRoot();
   const rel = path.relative(ws, root);
   if (rel === '' || (!rel.startsWith('..') && !path.isAbsolute(rel))) {
-    const e = new Error(`la destinazione è dentro il workspace (${root}): finirebbe nell'albero e in un commit — usa $STAVROS_ARCHIVE_DIR fuori dal repo`); e.usage = true; throw e;
+    const e = new Error(`la destinazione è dentro il workspace (${root}): finirebbe nell'albero e in un commit — usa $CYBOROS_ARCHIVE_DIR fuori dal repo`); e.usage = true; throw e;
   }
 
   const size = st.isDirectory() ? walkSize(src) : { bytes: st.size, disk: diskBytes(st), files: 1, newest: st.mtimeMs };

@@ -40,7 +40,7 @@
     "model": "bge-m3",
     "api_key": "sk-local",
     "alpha": 0.6,
-    "_note": "RAG semantico IBRIDO. enabled=true -> run-local esporta STAVROS_EMBED_URL/MODEL/KEY e STAVROS_RAG_ALPHA ai tool (memory-rag). Servi un modello di embedding con un secondo llama-server: llama-server -m bge-m3-Q8_0.gguf --embeddings --host 127.0.0.1 --port 8081. alpha = peso del dense nella fusione (0=lessicale, 1=dense). Dopo l'attivazione: node tools/memory-rag.js reembed. Se il backend e' giu', il RAG torna lessicale da solo."
+    "_note": "RAG semantico IBRIDO. enabled=true -> run-local esporta CYBOROS_EMBED_URL/MODEL/KEY e CYBOROS_RAG_ALPHA ai tool (memory-rag). Servi un modello di embedding con un secondo llama-server: llama-server -m bge-m3-Q8_0.gguf --embeddings --host 127.0.0.1 --port 8081. alpha = peso del dense nella fusione (0=lessicale, 1=dense). Dopo l'attivazione: node tools/memory-rag.js reembed. Se il backend e' giu', il RAG torna lessicale da solo."
   },
   "route": {
     "_comment": "mappa classe/subagent_id originale -> agente di FASE consolidato (edizione locale).",

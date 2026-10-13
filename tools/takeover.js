@@ -20,12 +20,13 @@
 // attempt per NS, one fingerprint GET per candidate. Takeover findings go through record-finding.js
 // (severity ceiling respected: suspected → Low max at the registry, provider severity kept as info).
 'use strict';
+const { env } = require('./env');
 const fs = require('fs');
 const path = require('path');
 const dns = require('dns').promises;
 
 const WS = path.join(__dirname, '..');
-const TMP_DIR = () => process.env.STAVROS_TMP_DIR || path.join(WS, 'reports', 'tmp');
+const TMP_DIR = () => env('TMP_DIR') || path.join(WS, 'reports', 'tmp');
 
 // ---- takeover fingerprints (provider → body marker / CNAME shape) -------------
 // Pure data + pure matchers: fully unit-testable offline. Sources: can-i-take-over-xyz public
@@ -292,7 +293,7 @@ async function scan(domain, opts) {
     sources: opts.subsFile ? [opts.subsFile] : defaultSubsFiles(domain).map((p) => path.basename(p)),
     findings, hygiene: { dmarc: h.dmarc, spf: h.spf, spf_lax: h.spf_lax, axfr: h.axfr, wildcard: wild },
   };
-  const outDir = process.env.STAVROS_REPORTS_DIR || path.join(WS, 'reports');
+  const outDir = env('REPORTS_DIR') || path.join(WS, 'reports');
   try {
     fs.mkdirSync(outDir, { recursive: true });
     const f = path.join(outDir, `takeover-${sanitizeHost(domain)}.json`);

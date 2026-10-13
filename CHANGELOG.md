@@ -7,6 +7,17 @@ grouped by milestone, and `v0.1.0` (2026-09-28) is the first tagged release.
 
 ## [Unreleased]
 
+### Changed
+
+- **Il progetto si chiama Cyboros Harness** — repo, package npm, i cinque `bin`, le etichette
+  mostrate e il motore deterministico (`tools/cyboros.js`). Il rebrand non tocca la storia:
+  `CHANGELOG.md`, le run registrate e i piani datati restano come erano. Design e mappatura in
+  [`docs/superpowers/specs/2026-10-13-cyboros-rebrand-design.md`](docs/superpowers/specs/2026-10-13-cyboros-rebrand-design.md).
+- **Le variabili d'ambiente passano a `CYBOROS_*`** da un solo modulo, `tools/env.js`: `env('TMP')`
+  cerca `CYBOROS_TMP`, poi `STAVROS_TMP`, poi il default. Il prefisso vecchio resta letto per una
+  release — un env var caduto non produce un errore visibile, produce report scritti altrove, quindi
+  la finestra è esplicita invece che silenziosa. Una stringa vuota vale come assente.
+
 ### Added
 
 - **Credential testing con Brutus e secrets scan con Titus**, dalla scansione community di

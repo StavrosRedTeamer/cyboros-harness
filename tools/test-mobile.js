@@ -9,6 +9,7 @@ const os = require('os');
 const path = require('path');
 const mg = require('./mobile-guard');
 const mobile = require('./mobile');
+const { env } = require('./env');
 
 const PKG = 'com.lab.vulnapp';
 const SERIAL = '127.0.0.1:5555';
@@ -69,7 +70,7 @@ fs.mkdirSync(path.join(flutterDir, 'lib', 'arm64-v8a'), { recursive: true });
 fs.writeFileSync(path.join(flutterDir, 'lib', 'arm64-v8a', 'libflutter.so'), 'x');
 const pairipDir = path.join(fwDir, 'pairip-apktool');
 fs.mkdirSync(path.join(pairipDir, 'com', 'pairip'), { recursive: true });
-delete process.env.STAVROS_FRIDA_SCRIPT;
+delete process.env.CYBOROS_FRIDA_SCRIPT;
 assert.strictEqual(mobile.detectFramework(PKG, { framework: 'flutter' }).framework, 'flutter', 'explicit framework short-circuits');
 assert.strictEqual(mobile.detectFramework(PKG, { staticDirs: [flutterDir] }).framework, 'flutter', 'libflutter.so → flutter');
 assert.strictEqual(mobile.detectFramework(PKG, { staticDirs: [pairipDir] }).framework, 'pairip', 'com/pairip → pairip');
@@ -80,9 +81,9 @@ const fallbackArgs = mobile.fridaCommands(PKG, { serial: SERIAL, staticDirs: [pa
 assert.ok(fallbackArgs.includes('unpin.js'), 'no framework → unpin.js');
 assert.ok(mobile.fridaHint(PKG, { staticDirs: [pairipDir] }).repack_suggested, 'pairip → repack hint');
 assert.strictEqual(mobile.fridaHint(PKG, { staticDirs: [flutterDir] }), null, 'flutter → no repack hint');
-process.env.STAVROS_FRIDA_SCRIPT = '/tmp/custom-hook.js';
-assert.ok(mobile.fridaCommands(PKG, { serial: SERIAL, staticDirs: [flutterDir] })[0].args.join(' ').includes('/tmp/custom-hook.js'), 'STAVROS_FRIDA_SCRIPT wins over framework default');
-delete process.env.STAVROS_FRIDA_SCRIPT;
+process.env.CYBOROS_FRIDA_SCRIPT = '/tmp/custom-hook.js';
+assert.ok(mobile.fridaCommands(PKG, { serial: SERIAL, staticDirs: [flutterDir] })[0].args.join(' ').includes('/tmp/custom-hook.js'), 'CYBOROS_FRIDA_SCRIPT wins over framework default');
+delete process.env.CYBOROS_FRIDA_SCRIPT;
 
 // ---- P3: extended framework detection + hookScriptFor ----
 const rnDir = path.join(fwDir, 'rn-jadx');
@@ -291,8 +292,8 @@ const fakeExec = () => ({ status: 0, stdout: '', stderr: '' });
   assert.strictEqual(mobile.parseAndroidManifest('<not-a-manifest/>'), null);
   const mapDir = path.join(tmpDir, 'map');
   fs.mkdirSync(mapDir, { recursive: true });
-  const prevMapDir = process.env.STAVROS_MAP_DIR;
-  process.env.STAVROS_MAP_DIR = mapDir;
+  const prevMapDir = env('MAP_DIR');
+  process.env.CYBOROS_MAP_DIR = mapDir;
   const surf = mobile.mobileSurface(PKG, { manifest: man, reportsDir: tmpDir });
   assert.strictEqual(surf.exported, 2);
   assert.strictEqual(surf.deeplinks, 1);
@@ -302,8 +303,8 @@ const fakeExec = () => ({ status: 0, stdout: '', stderr: '' });
   assert.ok(mapWritten.endpoints.some((e) => e.candidates && Array.isArray(e.candidates.mobile) && e.candidates.mobile.length), 'mobile candidate rows');
   assert.ok(surf.coverage && surf.coverage.row && surf.coverage.row.class === 'mobile', 'mobile coverage row present');
   assert.strictEqual(surf.coverage.row.status, 'missed', 'untested mobile surface is a gap (never silently covered)');
-  if (prevMapDir === undefined) delete process.env.STAVROS_MAP_DIR;
-  else process.env.STAVROS_MAP_DIR = prevMapDir;
+  if (prevMapDir === undefined) delete process.env.CYBOROS_MAP_DIR;
+  else process.env.CYBOROS_MAP_DIR = prevMapDir;
 
   delete process.env.MOBILE_SCOPE_JSON;
   delete process.env.MOBILE_AUDIT_JSONL;

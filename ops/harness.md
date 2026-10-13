@@ -142,7 +142,7 @@ progetto.
   su entrambi va nel router di home, che da lì rimanda a questa sezione.
 - **Verificare, non iterare a tentativi.** `tools/vet-agents-vs-freebuff.js` (preflight
   fail-closed: modelli, tool, schema agente, `freebuffModel`; gira dentro `launch-freebuff.sh`,
-  `STAVROS_SKIP_VET=1` per saltarlo) e `tools/check-identity.js` (post-flight: legge l'ultimo
+  `CYBOROS_SKIP_VET=1` per saltarlo) e `tools/check-identity.js` (post-flight: legge l'ultimo
   run-state **con dentro** e verifica il wiring dell'opt-in; `… eni` per il ramo ENI, che
   fallisce se il contratto non è nel prompt o se il router è ancora lì). Le chat senza
   `run-state.json` sono sessioni mai usate: il tool risale all'ultima che ce l'ha.
@@ -202,7 +202,7 @@ dimensione apparente) e cosa è archiviabile, per voce e per età. Non scrive ni
 - `node tools/workspace-gc.js archive <nome-di-temp>` — **sposta, non cancella**: sha256 dell'albero
 prima e dopo, e l'originale viene rimosso solo a verifica riuscita (o solo dopo una copia
 verificata, se la destinazione è su un altro filesystem). Destinazione
-`$STAVROS_ARCHIVE_DIR` → `$XDG_DATA_HOME/stavros/archive` → `~/.local/share/stavros/archive`, un
+`$CYBOROS_ARCHIVE_DIR` → `$XDG_DATA_HOME/stavros/archive` → `~/.local/share/stavros/archive`, un
 anno per sottocartella; **deve stare fuori dal workspace**, altrimenti finirebbe in un commit.
 - `node tools/doctor.js` la riporta come sezione 8, e `doctor --json` la espone in `space`.
 

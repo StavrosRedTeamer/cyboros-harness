@@ -23,10 +23,11 @@
 // (niente host/IP/credenziali — il sanitizer rifiuta e il recall è cross-engagement).
 'use strict';
 
+const { env } = require('./env');
 const path = require('path');
 const rag = require(path.join(__dirname, 'memory-rag.js'));
 
-const MEMORY_DIR = process.env.STAVROS_MEMORY_DIR || path.resolve(__dirname, '..', 'memory');
+const MEMORY_DIR = env('MEMORY_DIR') || path.resolve(__dirname, '..', 'memory');
 
 function readInputJson(argv) {
   const fs = require('fs');

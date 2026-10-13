@@ -10,33 +10,35 @@
 // ritorna null e il RAG resta lessicale (nessuna regressione). Zero dipendenze npm (fetch nativo).
 //
 // Config (env):
-//   STAVROS_EMBED_URL     endpoint, es. http://127.0.0.1:8081/v1/embeddings  (abilita il dense)
-//   STAVROS_EMBED_MODEL   nome modello (default: "bge-m3")
-//   STAVROS_EMBED_KEY     api key (llama.cpp la ignora; default "sk-local")
-//   STAVROS_EMBED_ALLOW_REMOTE=1   consenti un URL non-locale (default: solo 127.0.0.1/localhost)
-//   STAVROS_EMBED_TIMEOUT_MS       (default 60000)
+//   CYBOROS_EMBED_URL     endpoint, es. http://127.0.0.1:8081/v1/embeddings  (abilita il dense)
+//   CYBOROS_EMBED_MODEL   nome modello (default: "bge-m3")
+//   CYBOROS_EMBED_KEY     api key (llama.cpp la ignora; default "sk-local")
+//   CYBOROS_EMBED_ALLOW_REMOTE=1   consenti un URL non-locale (default: solo 127.0.0.1/localhost)
+//   CYBOROS_EMBED_TIMEOUT_MS       (default 60000)
 'use strict';
+
+const { env } = require('./env');
 
 function cfg() {
   return {
-    url: process.env.STAVROS_EMBED_URL || '',
-    model: process.env.STAVROS_EMBED_MODEL || 'bge-m3',
-    key: process.env.STAVROS_EMBED_KEY || 'sk-local',
-    allowRemote: process.env.STAVROS_EMBED_ALLOW_REMOTE === '1',
-    timeout: parseInt(process.env.STAVROS_EMBED_TIMEOUT_MS || '60000', 10),
+    url: env('EMBED_URL') || '',
+    model: env('EMBED_MODEL') || 'bge-m3',
+    key: env('EMBED_KEY') || 'sk-local',
+    allowRemote: env('EMBED_ALLOW_REMOTE') === '1',
+    timeout: parseInt(env('EMBED_TIMEOUT_MS') || '60000', 10),
   };
 }
 
 function isEnabled() { return !!cfg().url; }
 
 // Difesa OPSEC: la memoria non deve uscire verso un endpoint remoto per sbaglio. Di default
-// accetta solo host locali; per un endpoint remoto serve STAVROS_EMBED_ALLOW_REMOTE=1.
+// accetta solo host locali; per un endpoint remoto serve CYBOROS_EMBED_ALLOW_REMOTE=1.
 function assertLocalOrAllowed(url, allowRemote) {
   let host;
-  try { host = new URL(url).hostname; } catch { throw new Error(`STAVROS_EMBED_URL non valido: ${url}`); }
+  try { host = new URL(url).hostname; } catch { throw new Error(`CYBOROS_EMBED_URL non valido: ${url}`); }
   const local = host === '127.0.0.1' || host === 'localhost' || host === '::1';
   if (!local && !allowRemote) {
-    throw new Error(`STAVROS_EMBED_URL è remoto (${host}). La memoria RAG resterebbe esposta a un servizio esterno. Imposta STAVROS_EMBED_ALLOW_REMOTE=1 solo se è ciò che vuoi.`);
+    throw new Error(`CYBOROS_EMBED_URL è remoto (${host}). La memoria RAG resterebbe esposta a un servizio esterno. Imposta CYBOROS_EMBED_ALLOW_REMOTE=1 solo se è ciò che vuoi.`);
   }
 }
 
@@ -96,7 +98,7 @@ module.exports = { isEnabled, embedTexts, embedOne, denseCosine, l2normalize, cf
 if (require.main === module) {
   (async () => {
     const c = cfg();
-    if (!c.url) { console.log('dense DISABILITATO (STAVROS_EMBED_URL non impostato). RAG resta lessicale.'); return; }
+    if (!c.url) { console.log('dense DISABILITATO (CYBOROS_EMBED_URL non impostato). RAG resta lessicale.'); return; }
     console.log(`endpoint: ${c.url}  model: ${c.model}`);
     const v = await embedOne(process.argv[2] || 'spring boot waf union select bypass');
     if (!v) { console.log('embedding fallito (vedi stderr). RAG userà il fallback lessicale.'); process.exit(1); }

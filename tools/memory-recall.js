@@ -15,11 +15,12 @@
 // blocked"), nello stile del campo target_stack/obstacle con cui le voci sono state cristallizzate.
 'use strict';
 
+const { env } = require('./env');
 const path = require('path');
 const fs = require('fs');
 const rag = require(path.join(__dirname, 'memory-rag.js'));
 
-const MEMORY_DIR = process.env.STAVROS_MEMORY_DIR || path.resolve(__dirname, '..', 'memory');
+const MEMORY_DIR = env('MEMORY_DIR') || path.resolve(__dirname, '..', 'memory');
 
 function optValue(argv, flag, dflt) {
   const i = argv.indexOf(flag);

@@ -244,7 +244,7 @@ ok('check: un caveat dichiarato viene riportato, cosi\' "tutto verde" non mente'
 // --- contratto di uscita della CLI ---------------------------------------------------------
 ok('CLI capcheck: --require con una modalita\' inesistente esce 2 (uso sbagliato)', () => {
   const r = runCli([path.join(__dirname, 'capcheck.js'), '--require', 'volante'], {
-    env: Object.assign({}, process.env, { STAVROS_CAP_MANIFEST: CAP }),
+    env: Object.assign({}, process.env, { CYBOROS_CAP_MANIFEST: CAP }),
   });
   assert.equal(r.status, 2, r.stdout + r.stderr);
 });
@@ -252,7 +252,7 @@ ok('CLI capcheck: --require con una modalita\' inesistente esce 2 (uso sbagliato
 ok('CLI capcheck: --json produce JSON valido con le voci attese', () => {
   const out = path.join(dir, 'state.json');
   const r = runCli([path.join(__dirname, 'capcheck.js'), '--json'], {
-    env: Object.assign({}, process.env, { STAVROS_CAP_MANIFEST: CAP, CAPCHECK_OUT: out }),
+    env: Object.assign({}, process.env, { CYBOROS_CAP_MANIFEST: CAP, CAPCHECK_OUT: out }),
   });
   const parsed = JSON.parse(r.stdout);
   assert.ok(Array.isArray(parsed.entries));
@@ -266,7 +266,7 @@ ok('CLI capcheck: --json produce JSON valido con le voci attese', () => {
 ok('CLI capcheck: manifest rotto esce 2 e non stampa uno stato falso', () => {
   const bad = writeManifest({ version: 1, bins: { x: { caps: ['non-esiste'], why: '' } } });
   const r = runCli([path.join(__dirname, 'capcheck.js'), '--json'], {
-    env: Object.assign({}, process.env, { STAVROS_CAP_MANIFEST: bad }),
+    env: Object.assign({}, process.env, { CYBOROS_CAP_MANIFEST: bad }),
   });
   assert.equal(r.status, 2, r.stdout + r.stderr);
   assert.equal(r.stdout.trim(), '', 'nessuno stato parziale su un manifest rotto');

@@ -21,7 +21,7 @@
 # viene su dal canale USB quando il telefono e' collegato, o via tcp adbd sul wifi).
 #
 # Uso:  tools/mobile-physical-setup.sh [serial] [proxy_port] [--ca-remove]
-#       STAVROS_ADB_SERIAL=<serial> tools/mobile-physical-setup.sh
+#       CYBOROS_ADB_SERIAL=<serial> tools/mobile-physical-setup.sh
 #       Il serial NON ha default: questo script non indovina quale device e' quello in scope.
 #       --ca-remove: rimuove proxy globale e bind-mount CA (teardown fine engagement, P7)
 set -euo pipefail
@@ -37,9 +37,9 @@ for a in "$@"; do
     *) [ -z "$SERIAL" ] && SERIAL="$a" ;;
   esac
 done
-SERIAL="${SERIAL:-${STAVROS_ADB_SERIAL:-}}"
+SERIAL="${SERIAL:-${CYBOROS_ADB_SERIAL:-}}"
 if [ -z "$SERIAL" ]; then
-  echo "[!] serve il serial del device: tools/mobile-physical-setup.sh <serial> (o STAVROS_ADB_SERIAL=<serial>)"
+  echo "[!] serve il serial del device: tools/mobile-physical-setup.sh <serial> (o CYBOROS_ADB_SERIAL=<serial>)"
   exit 2
 fi
 CA_INSTALL="${ANDROID_CA_INSTALL:-$HOME/bin/android-ca-install}"

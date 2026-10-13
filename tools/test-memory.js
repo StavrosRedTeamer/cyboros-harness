@@ -7,7 +7,7 @@ const path = require('path');
 const mem = require('./memory');
 
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'memory-test-'));
-process.env.STAVROS_MEMORY_DIR = dir; // CLI parity if spawned later
+process.env.CYBOROS_MEMORY_DIR = dir; // CLI parity if spawned later
 // Sanitizer fixture: the sanitizer fingerprints engagement hosts/IPs from <ws>/scope.json
 // (SCOPE_JSON override — hermetic, never reads a real engagement file). The 'in-scope host'
 // case below must be denied because inspiraracademy.com is in this fixture.

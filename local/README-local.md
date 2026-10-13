@@ -212,7 +212,7 @@ tutto **in locale**.
      --host 127.0.0.1 --port 8081
    ```
 2. In `config.local.json` metti `embeddings.enabled: true` (url/model già puntati a `:8081`).
-   `run-local.js` esporta da solo `STAVROS_EMBED_URL/MODEL/KEY` e `STAVROS_RAG_ALPHA` ai tool.
+   `run-local.js` esporta da solo `CYBOROS_EMBED_URL/MODEL/KEY` e `CYBOROS_RAG_ALPHA` ai tool.
 3. Ricalcola i vettori delle voci già in memoria (una tantum):
    ```bash
    node tools/memory-rag.js reembed          # backfill dei record senza dense
@@ -223,7 +223,7 @@ tutto **in locale**.
 A prova di fallimento: se il server di embedding è **spento o assente**, il RAG torna
 automaticamente al lessicale — nessun crash, nessuna regressione. `alpha` (0–1) regola il peso
 del dense nella fusione (default 0.6). Difesa OPSEC: l'endpoint deve essere **locale**; per uno
-remoto serve `STAVROS_EMBED_ALLOW_REMOTE=1` (così la memoria non esce per sbaglio).
+remoto serve `CYBOROS_EMBED_ALLOW_REMOTE=1` (così la memoria non esce per sbaglio).
 
 ## Sicurezza — invariata
 
@@ -337,7 +337,7 @@ scartato in silenzio e si ripiega sul default, che può cambiare a ogni auto-agg
 dello schema agente (id non collidingi col registry, `spawn_agents` presente se
 `spawnableAgents` non è vuoto, ogni id referenziato definito in `.agents/`, i tre prompt
 presenti). Così un prossimo auto-aggiornamento che cambia le regole si vede all'avvio invece
-di manifestarsi come TUI muta. `STAVROS_SKIP_VET=1` salta il controllo.
+di manifestarsi come TUI muta. `CYBOROS_SKIP_VET=1` salta il controllo.
 
 ### L'identità del main agent NON viene da `.agents/` (2026-09-26)
 

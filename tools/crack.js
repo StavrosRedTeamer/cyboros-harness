@@ -18,14 +18,15 @@
 // best-effort. Mode auto-detect covers the common red-team formats (krb5tgs/krb5asrep/NetNTLMv2/
 // NTLM/bcrypt/sha) — an unknown hash needs an explicit --mode.
 'use strict';
+const { env } = require('./env');
 const fs = require('fs');
 const path = require('path');
 const run = require('./run');
 
 const LOOT = () => process.env.LOOT_JSONL || path.join(__dirname, '..', 'reports', 'loot.jsonl');
-const OUT_DIR = () => process.env.STAVROS_CRACK_DIR || path.join(__dirname, '..', 'reports', 'crack');
+const OUT_DIR = () => env('CRACK_DIR') || path.join(__dirname, '..', 'reports', 'crack');
 const AUDIT_FILE = () => process.env.RUN_AUDIT_FILE || path.join(__dirname, '..', 'reports', 'tmp', 'run-audit.jsonl');
-const DEFAULT_WORDLIST = () => process.env.STAVROS_WORDLIST || '/usr/share/wordlists/rockyou.txt';
+const DEFAULT_WORDLIST = () => env('WORDLIST') || '/usr/share/wordlists/rockyou.txt';
 
 function audit(entry) {
   try {

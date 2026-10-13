@@ -174,7 +174,7 @@ await okA('findingsFromScan: full assembly (takeover + email-auth, no dupes)', a
 });
 
 await okA('scan: end-to-end on fake resolver + injected probes (record:false, no network)', async () => {
-  process.env.STAVROS_REPORTS_DIR = path.join(tmp, 'reports');
+  process.env.CYBOROS_REPORTS_DIR = path.join(tmp, 'reports');
   const httpProbed = [];
   // app.herokuapp.com RESOLVES in this fixture: the sub is a body-fingerprint candidate.
   const res = await tk.scan('acme.test', {

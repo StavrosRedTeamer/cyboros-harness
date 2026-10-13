@@ -71,10 +71,10 @@ say "Pre-flight OK (scope: ${SCOPE_OK} entry autorizzate)."
 # un .agents/*.ts perfettamente valido con la 0.0.198 puo far bloccare l'invio dei
 # messaggi con la 0.0.203 (log: "[send-message] Validation failed"). Il controllo
 # qui replica le regole note dello schema agente, cosi' il guasto si vede all'avvio
-# invece di manifestarsi come TUI muta. STAVROS_SKIP_VET=1 per saltarlo.
-if [[ "${STAVROS_SKIP_VET:-0}" != "1" ]]; then
+# invece di manifestarsi come TUI muta. CYBOROS_SKIP_VET=1 per saltarlo.
+if [[ "${CYBOROS_SKIP_VET:-0}" != "1" ]]; then
   if ! node "$EDITION/tools/vet-agents-vs-freebuff.js"; then
-    die "Schema degli agenti non compatibile con Freebuff $(cat "$HOME/.config/manicode/freebuff-metadata.json" 2>/dev/null | grep -o '"version"[^,]*' || echo '?') — vedi sopra. (STAVROS_SKIP_VET=1 per forzare)"
+    die "Schema degli agenti non compatibile con Freebuff $(cat "$HOME/.config/manicode/freebuff-metadata.json" 2>/dev/null | grep -o '"version"[^,]*' || echo '?') — vedi sopra. (CYBOROS_SKIP_VET=1 per forzare)"
   fi
 fi
 

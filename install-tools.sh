@@ -21,10 +21,10 @@ ok()   { printf '%sOK: %s%s\n' "$GREEN" "$*" "$NC"; }
 have() { command -v "$1" >/dev/null 2>&1; }
 
 # Root vendor ESTERNA per i binari grossi (obscura, frida-server) — fuori dal repo, cosi
-# copiare/spostare la workspace non trascina 290 MB. Ordine: $STAVROS_VENDOR_DIR → XDG →
+# copiare/spostare la workspace non trascina 290 MB. Ordine: $CYBOROS_VENDOR_DIR → XDG →
 # ~/.local/share/stavros/vendor. Layout identico al workspace vendor/ (tools/<name>, mirror, ...).
 vendor_root() {
-  if [ -n "${STAVROS_VENDOR_DIR:-}" ]; then printf '%s' "$STAVROS_VENDOR_DIR"; return; fi
+  if [ -n "${CYBOROS_VENDOR_DIR:-}" ]; then printf '%s' "$CYBOROS_VENDOR_DIR"; return; fi
   if [ -n "${XDG_DATA_HOME:-}" ]; then printf '%s' "$XDG_DATA_HOME/stavros/vendor"; return; fi
   printf '%s' "$HOME/.local/share/stavros/vendor"
 }
@@ -206,7 +206,7 @@ fi
 # Engine Rust CDP-compatibile (Apache-2.0, https://github.com/h4ckf0r0day/obscura). Versione
 # PINNATA: il progetto e giovane e la CLI puo cambiare tra release. Il tarball estrae obscura +
 # obscura-worker in $OBSCURA_DIR (root vendor esterna, vedi vendor_root(); risolto da
-# tools/obscura.js; override con STAVROS_OBSCURA_BIN). Se imposti OBSCURA_SHA256=<sha256>
+# tools/obscura.js; override con CYBOROS_OBSCURA_BIN). Se imposti OBSCURA_SHA256=<sha256>
 # l'archivio viene verificato.
 info "Fase 4b/6: Obscura (headless browser antidetect, backend CDP opzionale)"
 OBSCURA_VERSION="${OBSCURA_VERSION:-v0.2.0}"

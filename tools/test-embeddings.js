@@ -10,14 +10,15 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 
-// Assicura che il dense sia OFF per questo test (nessun endpoint).
-delete process.env.STAVROS_EMBED_URL;
+// Assicura che il dense sia OFF per questo test (nessun endpoint). Stringa vuota = assente, e
+// maschera anche un eventuale fallback legacy ancora esportato nella shell dell'operatore.
+process.env.CYBOROS_EMBED_URL = '';
 
 const emb = require('./embeddings');
 const rag = require('./memory-rag');
 
 // --- embeddings.js: disabilitato senza URL, coseno denso, guardia OPSEC ---
-assert.strictEqual(emb.isEnabled(), false, 'dense disabilitato senza STAVROS_EMBED_URL');
+assert.strictEqual(emb.isEnabled(), false, 'dense disabilitato senza CYBOROS_EMBED_URL');
 
 (async () => {
   const none = await emb.embedTexts(['x']);

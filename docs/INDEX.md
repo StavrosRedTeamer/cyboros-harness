@@ -10,7 +10,7 @@
 
 - [**AGENTS.md — StavrosRedTeamer**](AGENTS.md) — Operatore AI per operazioni di pentest autorizzate (web/host, wireless, mobile). · 5,9 KB
 - [**Benchmark**](BENCHMARK.md) — Public security benchmarks are in the model's training data. "Solved" on OWASP Juice · 15,6 KB
-- [**Changelog**](CHANGELOG.md) — All notable changes to this project are documented here. Dates are commit dates. · 42,8 KB
+- [**Changelog**](CHANGELOG.md) — All notable changes to this project are documented here. Dates are commit dates. · 43,6 KB
 - [**Contributor Covenant Code of Conduct**](CODE_OF_CONDUCT.md) — We as members, contributors, and leaders pledge to make participation in our community a · 5,8 KB
 - [**Contributing**](CONTRIBUTING.md) — This repository is a penetration-testing harness built around one claim: a finding is only a · 4,5 KB
 - [**Cyboros Harness**](README.md) — A penetration-testing harness where a finding is only a finding if code can prove it — · 11,8 KB
@@ -42,7 +42,7 @@
 - [**Testing by class — dettaglio metodologico**](docs/methodology-classes.md) — Class names for `record-finding.js` are the canonical keys of `tools/test-registry.json` — · 5,1 KB
 - [**Mobile (Android) — methodology & tool detail**](docs/mobile.md) — (`127.0.0.1`, `localhost`) o un serial USB esplicitamente in allowlist (device fisico autorizzato). · 4,9 KB
 - [**System Prompt Dump — StavrosRedTeamer**](docs/system-prompt-dump.md) — Nessun dato di target, credenziale o output di engagement lascia la macchina. Vedi `docs/egress-opsec.md`. · 6,1 KB
-- [**Toolbox — dettaglio per-tool (knowledge.md tiene la tabella compatta)**](docs/toolbox.md) — (it refuses out-of-scope hosts; supports `-l -`/`--stdin` AND a piped stdin for target lists; every · 26,8 KB
+- [**Toolbox — dettaglio per-tool (knowledge.md tiene la tabella compatta)**](docs/toolbox.md) — (it refuses out-of-scope hosts; supports `-l -`/`--stdin` AND a piped stdin for target lists; every · 27,2 KB
 - [**Wireless (modalità separata)**](docs/wireless.md) — WiFi is a SEPARATE mode from the web/network pipeline: targets are BSSIDs/ESSIDs/stations/channels, · 6,1 KB
 
 ## `ops/` — regole della harness

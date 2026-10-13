@@ -20,7 +20,8 @@
 //      giornaliera non deve spostare dati di engagement senza una decisione. L'archiviazione
 //      usa `workspace-gc.js`, che copia e verifica sha256 PRIMA di toccare la sorgente e annulla
 //      se la verifica non torna (nessuna cancellazione, e un errore costa una copia, non i dati).
-//      Soglia: --rotate-days N (default 7, oppure $STAVROS_TEMP_ROTATE_DAYS).
+//      Soglia: --rotate-days N (default 7, oppure $CYBOROS_TEMP_ROTATE_DAYS).
+const { env } = require('./env');
 const fs = require('fs');
 const path = require('path');
 const TI = require('./threatintel');
@@ -130,7 +131,7 @@ async function main() {
   process.exit(allFailed ? 1 : 0);
 }
 
-const ROTATE_DAYS = () => Number(process.env.STAVROS_TEMP_ROTATE_DAYS || 7);
+const ROTATE_DAYS = () => Number(env('TEMP_ROTATE_DAYS') || 7);
 
 // Rotazione di `temp/`: riporta le voci stantie, e le archivia solo su richiesta.
 // `stale` è deciso da workspace-gc (mtime del file più recente dentro la voce, non della

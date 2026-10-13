@@ -74,7 +74,7 @@ function makeWorkspace(tag) {
   return ws;
 }
 function env(archiveDir) {
-  return Object.assign({}, process.env, { STAVROS_ARCHIVE_DIR: archiveDir });
+  return Object.assign({}, process.env, { CYBOROS_ARCHIVE_DIR: archiveDir });
 }
 function gc(ws, archiveDir, args) {
   return runCli([TOOL, ...args, '--workspace', ws], { env: env(archiveDir) });
@@ -105,7 +105,7 @@ ok('report: misura le directory e non scrive una riga', () => {
   // quindi si verifica l'ordinamento, non chi sta in cima.
   const sizes = j.candidates.map((c) => c.disk_bytes);
   assert.deepStrictEqual(sizes, [...sizes].sort((a, b) => b - a), 'i candidati sono ordinati per spazio occupato');
-  assert.strictEqual(j.archive_root, arch, 'archive_root segue STAVROS_ARCHIVE_DIR');
+  assert.strictEqual(j.archive_root, arch, 'archive_root segue CYBOROS_ARCHIVE_DIR');
 
   assert.deepStrictEqual(snapshot(ws), before, 'report non deve scrivere: l\'albero è cambiato');
 });

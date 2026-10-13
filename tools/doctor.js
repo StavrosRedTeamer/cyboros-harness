@@ -264,7 +264,7 @@ function checkBins(list) {
 
 // ---- 5. vendor -----------------------------------------------------------------------
 // I binari grossi (obscura, frida-server) vivono nella root ESTERNA (tools/vendor-dir.js:
-// $STAVROS_VENDOR_DIR → ~/.local/share/stavros/vendor → legacy workspace vendor/); script
+// $CYBOROS_VENDOR_DIR → ~/.local/share/stavros/vendor → legacy workspace vendor/); script
 // vetted e mirror restano in workspace (gitignored).
 const { vendorRoot } = require('./vendor-dir');
 const VENDOR = [

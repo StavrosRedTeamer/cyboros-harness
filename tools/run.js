@@ -26,6 +26,7 @@
 // A tool that reads targets only from an exotic flag or config file can still slip a host
 // past. Upgrade path: an allowlisting egress proxy that all tools are forced through
 // (tools/egress-proxy.js does exactly this for HTTP(S)-aware binaries).
+const { env } = require('./env');
 const { spawn, spawnSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');
@@ -556,7 +557,7 @@ async function main() {
         Object.assign(entry, { exit: hit.exit, ok: hit.exit === 0 });
         audit(entry);
         process.stderr.write(`[cache-hit] ${file}\n`);
-        const tok = process.env.STAVROS_PRIVACY === '1';
+        const tok = env('PRIVACY') === '1';
         process.stdout.write(tok ? privacy.tokenize(hit.stdout || '') : (hit.stdout || ''));
         process.stderr.write(tok ? privacy.tokenize(hit.stderr || '') : (hit.stderr || ''));
         errReportLine({ bin, error_class: null, recovery: null, detail: `cache-hit ${key} (age ${(Date.now() - Date.parse(hit.ts)) / 1000 | 0}s <= ttl ${effectiveTtl}s)` });
@@ -580,7 +581,7 @@ async function main() {
 
   // Capture when privacy mode is on, when caching (need the payload), or when an error
   // report was requested (--error-report implies classification over captured output).
-  const capture = process.env.STAVROS_PRIVACY === '1' || !!cacheState || errorReport;
+  const capture = env('PRIVACY') === '1' || !!cacheState || errorReport;
   const r = await runBinary(bin, args, {
     stdio: capture ? ['pipe', 'pipe', 'pipe'] : ['pipe', 'inherit', 'inherit'],
     input: stdinText || undefined,

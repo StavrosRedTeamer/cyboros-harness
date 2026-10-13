@@ -1,17 +1,18 @@
 #!/usr/bin/env node
 // Single helper for the external vendor root (heavy binaries live OUTSIDE the repo).
-// Zero dependencies. Resolution order: $STAVROS_VENDOR_DIR → ~/.local/share/stavros/vendor
+// Zero dependencies. Resolution order: $CYBOROS_VENDOR_DIR → ~/.local/share/stavros/vendor
 // (XDG) → workspace vendor/ (legacy fallback). The external root mirrors the workspace layout:
 // <root>/tools/<name>/, <root>/mirror/, <root>/poc-archive/.
 //
 //   node tools/vendor-dir.js            # prints the resolved vendor root
 //   require('./vendor-dir')             # { vendorRoot, resolveVendor }
 const fs = require('fs');
+const { env } = require('./env');
 const os = require('os');
 const path = require('path');
 
 function vendorRoot() {
-  if (process.env.STAVROS_VENDOR_DIR) return path.resolve(process.env.STAVROS_VENDOR_DIR);
+  if (env('VENDOR_DIR')) return path.resolve(env('VENDOR_DIR'));
   const base = process.env.XDG_DATA_HOME
     ? process.env.XDG_DATA_HOME
     : path.join(os.homedir(), '.local', 'share');

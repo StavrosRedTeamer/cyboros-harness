@@ -14,7 +14,7 @@ const scopeFile = path.join(tmp, 'scope.json');
 fs.writeFileSync(scopeFile, JSON.stringify({ allowed_hosts: ['corp.local', 'dc01.corp.local'], allowed_ips: ['10.0.0.0/24'], max_requests_per_second: 5 }));
 process.env.SCOPE_JSON = scopeFile;
 process.env.RUN_AUDIT_FILE = path.join(tmp, 'audit.jsonl');
-process.env.STAVROS_AD_DIR = path.join(tmp, 'ad');
+process.env.CYBOROS_AD_DIR = path.join(tmp, 'ad');
 
 const ad = require('./ad');
 let pass = 0, fail = 0;

@@ -5,6 +5,7 @@
 // helpers, test-registry wiring, kb-search FTS5 retrieval.
 // Run: node tools/test-repo-vet.js   (fully offline: fetch + paths injectable)
 const assert = require('assert');
+const { env } = require('./env');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
@@ -197,11 +198,11 @@ const tmpFile = (...names) => path.join(TMP, ...names);
 
   // ---------- QW5/QW6: stavros helpers ----------
   {
-    process.env.STAVROS_NOAUTH_FINDER = tmpFile('nf.py');
-    fs.writeFileSync(process.env.STAVROS_NOAUTH_FINDER, '#!/usr/bin/env python3\n');
+    process.env.CYBOROS_NOAUTH_FINDER = tmpFile('nf.py');
+    fs.writeFileSync(env('NOAUTH_FINDER'), '#!/usr/bin/env python3\n');
     const S = require('./cyboros');
-    assert.strictEqual(S.resolveOperatorTool('STAVROS_NOAUTH_FINDER', 'noauth_finder/x.py'), tmpFile('nf.py'));
-    assert.strictEqual(S.resolveOperatorTool('STAVROS_MISSING_ENV', 'missing/x.py', { noVendorDefaults: true }), null);
+    assert.strictEqual(S.resolveOperatorTool('CYBOROS_NOAUTH_FINDER', 'noauth_finder/x.py'), tmpFile('nf.py'));
+    assert.strictEqual(S.resolveOperatorTool('CYBOROS_MISSING_ENV', 'missing/x.py', { noVendorDefaults: true }), null);
     const cmd = S.noauthCommand('/opt/nf.py', '10.1.2.3');
     assert.deepStrictEqual(cmd.args, ['/opt/nf.py', '10.1.2.3', '--allow-public']);
     const urls = S.parseDiscoveredUrls('see http://h.local:9000/a, http://h.local:9000/b.');

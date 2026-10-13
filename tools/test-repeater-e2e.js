@@ -158,7 +158,7 @@ async function main() {
   assert.strictEqual(blocked.code, 1, 'out-of-scope target exits 1');
   assert.ok(blocked.out.includes('blocked'), 'blocked message printed');
 
-  // 8) STAVROS_PRIVACY=1: the --data body must be rehydrated to the REAL value before it
+  // 8) CYBOROS_PRIVACY=1: the --data body must be rehydrated to the REAL value before it
   // ever hits the wire, not sent as a raw placeholder. Env is scoped to this one spawn only.
   // Asserted server-side (lastEchoBody) since the tokenize()-wrapped stdout would re-mask
   // the real value on the way out and give a false pass either way.
@@ -168,7 +168,7 @@ async function main() {
   fs.writeFileSync(tokenMapPath, JSON.stringify({ forward: { [REAL]: TOKEN }, counters: { SECRET: 1 } }));
   const [echoed] = await runRepeater(
     ['--url', `${base}/echo`, '--method', 'POST', '--data', JSON.stringify({ x: TOKEN })],
-    { STAVROS_PRIVACY: '1', TOKEN_MAP: tokenMapPath }
+    { CYBOROS_PRIVACY: '1', TOKEN_MAP: tokenMapPath }
   );
   assert.strictEqual(echoed.status, 200, 'echo request succeeded');
   assert.ok(lastEchoBody.includes(REAL), 'wire body rehydrated to the real secret before send, got ' + lastEchoBody);

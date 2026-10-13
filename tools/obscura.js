@@ -21,13 +21,14 @@
 //     invisible to pace.js, so concurrency is clamped hard (default 2, max 8) — raise only via
 //     OBSCURA_MAX_CONCURRENCY and keep max_requests_per_second honest.
 //
-// Binary resolution: $STAVROS_OBSCURA_BIN > external vendor root (tools/vendor-dir.js:
-// $STAVROS_VENDOR_DIR → ~/.local/share/stavros/vendor → legacy workspace vendor/) > $PATH
+// Binary resolution: $CYBOROS_OBSCURA_BIN > external vendor root (tools/vendor-dir.js:
+// $CYBOROS_VENDOR_DIR → ~/.local/share/stavros/vendor → legacy workspace vendor/) > $PATH
 // (install: ./install-tools.sh downloads a version-pinned release into the external root).
 //
 // ponytail: obscura is a YOUNG project (v0.2.x) — flags may shift between releases; this wrapper
 // pins behavior against v0.2.0 CLI. The engine is NOT Chromium: DOM/CSS edge cases differ from a
 // real browser, so use it to EXPLORE surface and CONFIRM DOM-XSS findings on real Chrome.
+const { env } = require('./env');
 const fs = require('fs');
 const path = require('path');
 const { spawnSync } = require('child_process');
@@ -54,8 +55,8 @@ function maxConcurrency() {
 
 // ---- binary resolution ------------------------------------------------------
 function resolveBin() {
-  if (process.env.STAVROS_OBSCURA_BIN && fs.existsSync(process.env.STAVROS_OBSCURA_BIN))
-    return { bin: process.env.STAVROS_OBSCURA_BIN, source: 'env' };
+  if (env('OBSCURA_BIN') && fs.existsSync(env('OBSCURA_BIN')))
+    return { bin: env('OBSCURA_BIN'), source: 'env' };
   if (fs.existsSync(VENDOR_BIN())) return { bin: VENDOR_BIN(), source: 'vendor' };
   if (spawnSync('which', ['obscura'], { stdio: 'ignore' }).status === 0)
     return { bin: 'obscura', source: 'path' };
@@ -213,7 +214,7 @@ function audit(entry) {
 async function runObscura(bin, argv, opts) {
   const o = opts || {};
   pace.wait(o.rps || 2);
-  const capture = process.env.STAVROS_PRIVACY === '1';
+  const capture = env('PRIVACY') === '1';
   const r = await runBinary(bin, argv, {
     stdio: capture ? ['pipe', 'pipe', 'pipe'] : ['pipe', 'inherit', 'inherit'],
     capture,
@@ -276,7 +277,7 @@ async function main() {
       binary: bin ? { path: bin.bin, source: bin.source, version } : null,
       server: server ? { up: true, port, product: server.Browser || server['User-Agent'] || null } : { up: false, port },
       egress_gateway: eg ? { running: true, port: eg.port, socks5: eg.socks5 } : { running: false },
-      hint: bin ? null : 'not installed — run ./install-tools.sh or set STAVROS_OBSCURA_BIN',
+      hint: bin ? null : 'not installed — run ./install-tools.sh or set CYBOROS_OBSCURA_BIN',
     }, null, 2));
     return;
   }
@@ -291,7 +292,7 @@ async function main() {
     }
     const bin = resolveBin();
     if (!bin) {
-      console.error(JSON.stringify({ error: 'obscura binary not found', hint: './install-tools.sh, or download from https://github.com/h4ckf0r0day/obscura/releases and set STAVROS_OBSCURA_BIN' }));
+      console.error(JSON.stringify({ error: 'obscura binary not found', hint: './install-tools.sh, or download from https://github.com/h4ckf0r0day/obscura/releases and set CYBOROS_OBSCURA_BIN' }));
       process.exit(1);
     }
     const proxy = effectiveProxy({});
@@ -322,7 +323,7 @@ async function main() {
   }
   const bin = resolveBin();
   if (!bin) {
-    console.error(JSON.stringify({ error: 'obscura binary not found', hint: './install-tools.sh, or set STAVROS_OBSCURA_BIN' }));
+    console.error(JSON.stringify({ error: 'obscura binary not found', hint: './install-tools.sh, or set CYBOROS_OBSCURA_BIN' }));
     process.exit(1);
   }
   const { flags } = parseArgs(rest);

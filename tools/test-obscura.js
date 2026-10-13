@@ -100,13 +100,13 @@ assert.strictEqual(ob.clampConcurrency(null), 2, 'missing defaults to 2');
 assert.strictEqual(ob.effectiveProxy({ proxy: 'x' }), 'x', 'explicit beats gateway');
 assert.strictEqual(ob.effectiveProxy({}), 'http://127.0.0.1:9098', 'gateway when nothing explicit');
 
-// ---- resolveBin honors STAVROS_OBSCURA_BIN ----
+// ---- resolveBin honors CYBOROS_OBSCURA_BIN ----
 const fakeBin = path.join(tmpDir, 'fake-obscura');
 fs.writeFileSync(fakeBin, '#!/bin/sh\n');
 fs.chmodSync(fakeBin, 0o755);
-process.env.STAVROS_OBSCURA_BIN = fakeBin;
+process.env.CYBOROS_OBSCURA_BIN = fakeBin;
 assert.deepStrictEqual(ob.resolveBin(), { bin: fakeBin, source: 'env' }, 'env override resolves');
-delete process.env.STAVROS_OBSCURA_BIN;
+delete process.env.CYBOROS_OBSCURA_BIN;
 
 // ---- dom-check ensurePageTarget against a mock CDP HTTP endpoint ----
 async function mockCdp(withExistingPage) {

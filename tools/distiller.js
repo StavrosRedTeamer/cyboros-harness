@@ -32,12 +32,13 @@
 // Self-test: node tools/test-distiller.js
 'use strict';
 
+const { env } = require('./env');
 const fs = require('fs');
 const path = require('path');
 const mem = require('./memory'); // fonte unica di sanitizer, addLesson, readJsonl
 
 const ROOT = path.resolve(__dirname, '..');
-const MEMORY_DIR = process.env.STAVROS_MEMORY_DIR || path.join(ROOT, 'memory');
+const MEMORY_DIR = env('MEMORY_DIR') || path.join(ROOT, 'memory');
 const DEFAULT_FINDINGS = path.join(ROOT, 'reports', 'findings.jsonl');
 const REVIEW_FILE = 'distill-review.md';
 const MAX_POC = 400; // i poc_snippet lunghi sono rumore per l'embedding: cap

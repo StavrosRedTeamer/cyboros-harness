@@ -86,7 +86,7 @@ node tools/cyboros.js status [<host>]     # riepilogo state.db
 node tools/cyboros.js resume / report     # riparte dall'ultima run / consolida state.db + findings
 ```
 
-`*` = opzionali operator-vetted (env `STAVROS_NOAUTH_FINDER`/`STAVROS_APTPP` o `vendor/tools/<name>/`):
+`*` = opzionali operator-vetted (env `CYBOROS_NOAUTH_FINDER`/`CYBOROS_APTPP` o `vendor/tools/<name>/`):
 noauth_finder = triage non-auth, apt++.py = fuzz servizi. Mancano? Salta. Ogni
 binario terzo gira SOLO via runBin (scope-check+audit+pacing); mirato = `run.js <bin> ...`.
 
@@ -110,7 +110,7 @@ solo allora diventa "verified" (più forte di "confirmed").
 
 ## Placeholders (privacy mode)
 
-Con STAVROS_PRIVACY=1 l'output sostituisce i valori sensibili SCOPERTI con placeholder tipizzati
+Con CYBOROS_PRIVACY=1 l'output sostituisce i valori sensibili SCOPERTI con placeholder tipizzati
 (HOST_NNN, IP_NNN, EMAIL_NNN, SECRET_NNN) — handle opachi da passare VERBATIM in repeater --url/--data
 e nei finding; i tool li reidratano prima di toccare target o loot vault. Non correggere un
 placeholder; il target primario resta in chiaro.
