@@ -583,5 +583,51 @@ ok('rebrand: nessun file tracciato porta il nome vecchio nel nome', () => {
     'file con il nome vecchio nel nome (git mv, o allowlist con il motivo): ' + victims.join(', '));
 });
 
+// ---- template: i percorsi cablati devono risolvere dentro il checkout ----------------------
+// `.desktop` e `.service` vengono copiati sul sistema con un percorso del checkout
+// (`%h/Desktop/<cartella>/…`, `/home/<utente>/Desktop/<cartella>/…`). Il NOME della cartella cambia
+// col rebrand e non è verificabile da qui; il resto del percorso sì, e si verifica sostituendo il
+// segmento del checkout con la root reale. Finora nessun gate apriva questi file: un `Exec=` che
+// punta a uno script rinominato o mai esistito passava in silenzio, e il sintomo sarebbe stato un
+// doppio click che non fa niente.
+const CHECKOUT_SEG = /\/(?:Desktop|Scrivania)\/[^/]+\/(.+)$/;
+ok('template: ogni percorso cablato in .desktop/.service risolve dentro il checkout', () => {
+  const dead = [];
+  const elsewhere = [];
+  let checked = 0;
+  for (const rel of tracked('.').filter((f) => /\.(desktop|service)$/.test(f))) {
+    for (const line of read(rel).split('\n')) {
+      const m = line.match(/^(Exec|TryExec|ExecStart|WorkingDirectory|Documentation)\s*=\s*(.*)$/);
+      if (!m) continue;
+      for (const tok of m[2].split(/\s+/).filter(Boolean)) {
+        const seg = tok.match(CHECKOUT_SEG);
+        if (seg) {
+          checked++;
+          if (!fs.existsSync(path.join(WS, seg[1]))) dead.push(`${rel}: ${tok} → ${seg[1]}`);
+          continue;
+        }
+        // Nessun segmento di checkout: o è un binario di sistema, o è un percorso RELATIVO alla
+        // WorkingDirectory. Il secondo è nostro e si verifica contro la root del repo.
+        if (!/^[-/%]/.test(tok) && tok.includes('/')) {
+          checked++;
+          if (!fs.existsSync(path.join(WS, tok))) dead.push(`${rel}: ${tok} → ${tok}`);
+        }
+      }
+      // La cartella che CONTIENE il checkout (Desktop/Scrivania) è della macchina, non del repo:
+      // il nome lo decide `xdg-user-dir DESKTOP`. Si segnala invece di fallire, così il gate resta
+      // verde su un clone senza scrivania — ma un `Scrivania` che qui non esiste non passa muto.
+      const dir = (m[2].match(/((?:%h|\/home\/[^/\s]+)\/(?:Desktop|Scrivania))(?=\/|$)/) || [])[1];
+      if (dir) {
+        const local = dir.replace('%h', os.homedir()).replace(/^\/home\/[^/]+/, os.homedir());
+        if (!fs.existsSync(local)) elsewhere.push(`${rel}: ${dir}`);
+      }
+    }
+  }
+  if (elsewhere.length) console.log(`    NOTA cartella desktop assente su questa macchina: ${elsewhere.join(', ')}`);
+  assert.ok(checked >= 3,
+    `nessun percorso del checkout trovato in .desktop/.service (${checked}): il gate non sta guardando niente`);
+  assert.deepStrictEqual(dead, [], 'percorsi cablati che non esistono nel checkout: ' + dead.join(', '));
+});
+
 console.log(`\nrepo-invariants: ${pass} pass, ${fail} fail`);
 process.exit(fail ? 1 : 0);

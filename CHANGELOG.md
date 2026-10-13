@@ -27,6 +27,11 @@ grouped by milestone, and `v0.1.0` (2026-09-28) is the first tagged release.
   target il marker benigno diventa `CYBOROS-MARKER` e lo User-Agent `CyborosReproducer/1.0`; le run
   antecedenti al 2026-10-13 restano attribuibili cercando `STAVROS-MARKER` (nota di compatibilita` in
   [`tools/payloads/upload-bypass/README.md`](tools/payloads/upload-bypass/README.md)).
+- **Il bootstrap F3 non cabla più il nome della cartella del workspace.** `tools/f3-client-setup.sh`
+  risolve il nome interrogando il PC (`cyboros-harness`, o `stavrosredteamer` prima del rebrand) e
+  accetta `--pc-ws-dir` per forzarlo. Un `rsync --delete` verso una cartella inesistente copia zero
+  file ed esce 0: il nome cablato era quindi un guasto silenzioso che sarebbe scattato alla rinomina.
+  La `cwd:` del profilo sul telefono segue lo stesso nome risolto.
 
 ### Added
 
@@ -319,6 +324,15 @@ grouped by milestone, and `v0.1.0` (2026-09-28) is the first tagged release.
   documentazione. `tools/test-verify-tag.js` prova la proprietà che conta — con l'albero di lavoro
   sporco il tag committato resta verde, con lo stesso guasto committato e taggato esce 1 ed è il
   clone conservato a dirlo. La suite passa da 94 a 95 test.
+
+### Fixed
+
+- **`ops/radar.service` puntava a una scrivania che non esiste.** `WorkingDirectory=%h/Scrivania/…`,
+  mentre su questa macchina la scrivania è `%h/Desktop` (lo dice `xdg-user-dir DESKTOP`, ed è il
+  percorso che ogni altro artefatto installabile usa): l'unità non sarebbe partita. Ora punta a
+  `%h/Desktop/cyboros-harness`. A monte, `tools/test-repo-invariants.js` ha un gate nuovo: ogni
+  percorso cablato in un `.desktop`/`.service` deve risolvere dentro il checkout, e le cartelle
+  della macchina che lo contengono (che non sono del repo) vengono segnalate a parte.
 
 ## [0.1.0] — 2026-09-28
 

@@ -5,7 +5,8 @@
 #   - Termux + proot-distro (Kali arm64) = ambiente Linux completo SENZA toccare il ROM.
 #     Il root/TWRP NON serve a questo client: è la rete di sicurezza (nandroid + reflash).
 #     Nessun binario dell'harness viene eseguito come root sul telefono.
-#   - Workspace stavrosredteamer + fork hermes-stavros (già patchato) arrivano via rsync dal PC:
+#   - Il workspace del PC (il nome si risolve sul PC: `cyboros-harness` dopo il rebrand,
+#     `stavrosredteamer` prima) + il fork hermes-stavros (già patchato) arrivano via rsync dal PC:
 #     i 5 patch STAVROS e il trim del payload restano identici al profilo desktop.
 #   - L'inferenza resta remota: llama di casa via tunnel SSH (f3-tunnel) o provider cloud.
 #   - Scope discipline INVARIATA: scope.json / mobile-scope.json / wifi-scope.json viaggiano
@@ -15,6 +16,7 @@
 # Uso (DENTRO Termux, utente normale):
 #   pkg install -y curl git openssh rsync
 #   bash f3-client-setup.sh --pc-user <utente> --pc-host <ip-tailscale-del-pc>
+#   [--pc-ws-dir <nome-cartella>]   # opzionale: senza, si risolve interrogando il PC
 # Idempotente: rilanciabile, salta i passi già fatti.
 #
 # --pc-user e --pc-host sono OBBLIGATORI e non hanno default: questo script non porta con
@@ -22,10 +24,15 @@
 set -euo pipefail
 
 PC_USER=""; PC_HOST=""
+# Cartella del workspace sul PC. Vuota = risolta al passo 4 interrogando il PC: il nome cambia
+# col rebrand (stavrosredteamer → cyboros-harness) e cablarlo qui lo fa invecchiare in silenzio —
+# un rsync verso una cartella inesistente copia zero file ed esce 0.
+PC_WS_DIR="${PC_WS_DIR:-}"
 while [ $# -gt 0 ]; do
   case "$1" in
     --pc-user) PC_USER="$2"; shift 2 ;;
     --pc-host) PC_HOST="$2"; shift 2 ;;
+    --pc-ws-dir) PC_WS_DIR="$2"; shift 2 ;;
     *) echo "opzione ignota: $1" >&2; exit 2 ;;
   esac
 done
@@ -90,14 +97,22 @@ EOF
 chmod +x "$PREFIX/bin/f3-kali"
 ok "launcher $PREFIX/bin/f3-kali"
 
-# ---- 4. rsync workspace stavrosredteamer (PC → telefono) --------------------
-say "4/8 rsync workspace stavrosredteamer"
+# ---- 4. rsync workspace (PC → telefono) -------------------------------------
+if [ -z "$PC_WS_DIR" ]; then
+  for d in cyboros-harness stavrosredteamer; do
+    if ssh -o BatchMode=yes -o ConnectTimeout=8 "$PC_USER@$PC_HOST" "test -d Desktop/$d" 2>/dev/null; then
+      PC_WS_DIR="$d"; break
+    fi
+  done
+fi
+[ -n "$PC_WS_DIR" ] || { warn "nessuna workspace in ~/Desktop sul PC (attese: cyboros-harness, stavrosredteamer) — usa --pc-ws-dir <nome>"; exit 1; }
+say "4/8 rsync workspace $PC_WS_DIR"
 mkdir -p ~/stavros
 rsync -az --delete \
   --exclude '.git/' --exclude 'node_modules/' --exclude 'reports/tmp/' \
   --exclude 'vendor/tools/obscura/' --exclude 'vendor/tools/frida/' \
   --exclude 'mirror/' --exclude 'noauth_results/' --exclude 'temp/' \
-  "$PC_USER@$PC_HOST:Desktop/stavrosredteamer/" ~/stavros/
+  "$PC_USER@$PC_HOST:Desktop/$PC_WS_DIR/" ~/stavros/
 ok "workspace in ~/stavros ($(du -sh ~/stavros | cut -f1))"
 
 # ---- 5. rsync del fork hermes-stavros (PC → telefono, con i 5 patch) --------
@@ -187,7 +202,7 @@ platform_toolsets:
   cli: [web, terminal, file, skills]
 terminal:
   backend: ssh
-  cwd: /home/stavros/Desktop/stavrosredteamer
+  cwd: /home/${PC_USER}/Desktop/${PC_WS_DIR}
   timeout: 240
   ssh_host: ${PC_HOST}
   ssh_user: ${PC_USER}

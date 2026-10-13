@@ -181,7 +181,7 @@ marcate *operatore* o *rimandato* si eseguono in F5, e il loro `--check` è la p
 - Produces: il nome npm `cyboros-harness` e gli URL nuovi, che F4 (SARIF `informationUri`) e F5
   (README, citazione) useranno.
 
-- [ ] **Step 1: Sostituire nome, URL e descrizione in `package.json`**
+- [x] **Step 1: Sostituire nome, URL e descrizione in `package.json`**
 
 `name` → `cyboros-harness`; `repository.url` → `git+https://github.com/CSI-entitymorton/cyboros-harness.git`;
 `bugs.url` → `https://github.com/CSI-entitymorton/cyboros-harness/issues`;
@@ -195,24 +195,24 @@ marcate *operatore* o *rimandato* si eseguono in F5, e il loro `--check` è la p
 `bin` **non si tocca in questo task** (F2): il repo si presenta come Cyboros mentre si invoca ancora
 come `stavros`.
 
-- [ ] **Step 2: Sostituire gli URL nei tre template**
+- [x] **Step 2: Sostituire gli URL nei tre template**
 
 ```bash
 patch_live 'https://github\.com/CSI-entitymorton/stavrosredteamer' 'https://github.com/CSI-entitymorton/cyboros-harness'
 ```
 
-- [ ] **Step 3: Verificare che nessun URL vecchio resti nei template**
+- [x] **Step 3: Verificare che nessun URL vecchio resti nei template**
 
 Run: `grep -rn "stavrosredteamer" .github/ || echo "pulito"`
 Expected: `pulito`
 
-- [ ] **Step 4: Aggiornare il conteggio dei test nel README se è cambiato**
+- [x] **Step 4: Aggiornare il conteggio dei test nel README se è cambiato**
 
 Non cambia (nessun test aggiunto). Verifica comunque:
 Run: `node tools/test-repo-invariants.js`
 Expected: exit 0.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add package.json .github/
@@ -232,7 +232,7 @@ git commit -m "docs(brand): il repository si presenta come Cyboros Harness"
 - Produces: il testo di intestazione (`# Cyboros Harness`) che il Task 15 (invariante) pretenderà
   pulito; la frase-di-tesi che F4 (Task 12) estende all'ouroboros.
 
-- [ ] **Step 1: Sostituire titolo, tagline e URL**
+- [x] **Step 1: Sostituire titolo, tagline e URL**
 
 **Ambito esplicito, non un `patch_live` globale.** Misurato: `StavrosRedTeamer` compare in **57 file
 vivi** (di cui 6 in F1), e una patch senza ambito rinominerebbe `AGENTS.md` (che è di F5), i 28 agenti (F3), i
@@ -260,7 +260,7 @@ persona) ed evita che un testo legale nomini un progetto che non esiste più.
 ricevuta — e il suo titolo nomina il nome vecchio: va in `REBRAND_ALLOWLIST` con il motivo, non
 riscritto, perché un dump riscritto non è più una prova di cosa diceva il prompt.
 
-- [ ] **Step 2: Sostituire i riferimenti all'operatore e alle etichette di prodotto**
+- [x] **Step 2: Sostituire i riferimenti all'operatore e alle etichette di prodotto**
 
 ```bash
 patch_live 'Stavros (Console|Radar|Doctor)' 'Cyboros \1'
@@ -269,13 +269,13 @@ patch_live 'Stavros (Console|Radar|Doctor)' 'Cyboros \1'
 I comandi del README **restano `node tools/stavros.js …`** in questo task: il binario cambia in F2,
 e un README che insegna un comando inesistente è un rosso per chi clona.
 
-- [ ] **Step 3: Verificare che i quattro numeri dichiarati siano ancora veri**
+- [x] **Step 3: Verificare che i quattro numeri dichiarati siano ancora veri**
 
 Run: `node tools/test-repo-invariants.js`
 Expected: exit 0. Se fallisce su `README dichiara N moduli`, il colpevole è un nome di modulo
 cambiato in prosa: correggere la prosa, non il numero.
 
-- [ ] **Step 4: Rigenerare gli artefatti dipendenti e verificare**
+- [x] **Step 4: Rigenerare gli artefatti dipendenti e verificare**
 
 Run:
 ```bash
@@ -284,7 +284,7 @@ node tools/docs-index.js --check && node tools/project-map.js --check
 ```
 Expected: exit 0, nessun output di errore.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add README.md docs/INDEX.md docs/project-map.html
@@ -306,14 +306,14 @@ git commit -m "docs(brand): README e indice sotto il nome Cyboros Harness"
 - Produces: `require('./cyboros')` come unico nome del motore deterministico; il Task 4 ci punterà i
   cinque `bin`.
 
-- [ ] **Step 1: Spostare i due file conservando la storia**
+- [x] **Step 1: Spostare i due file conservando la storia**
 
 ```bash
 git mv tools/stavros.js tools/cyboros.js
 git mv tools/test-stavros.js tools/test-cyboros.js
 ```
 
-- [ ] **Step 2: Aggiornare i require e i riferimenti al path**
+- [x] **Step 2: Aggiornare i require e i riferimenti al path**
 
 ```bash
 git ls-files | xargs -r grep -lnE "require\('\./stavros'\)|tools/stavros\.js|test-stavros\.js" -- \
@@ -325,24 +325,24 @@ Attesi: `tools/test-cyboros.js`, `tools/test-repo-vet.js`, `tools/analyze-bundle
 `tools/mobile.js`, `tools/proc-registry.js`, `tools/testkit.js`, `tools/test-wifi.js`,
 `tools/wifi.js`.
 
-- [ ] **Step 3: Verificare che il test del motore giri sotto il nome nuovo**
+- [x] **Step 3: Verificare che il test del motore giri sotto il nome nuovo**
 
 Run: `node tools/test-cyboros.js`
 Expected: PASS, exit 0.
 
-- [ ] **Step 4: Verificare che nessun require punti a un file non tracciato**
+- [x] **Step 4: Verificare che nessun require punti a un file non tracciato**
 
 Run: `node tools/test-lint.js`
 Expected: exit 0 (è il gate che ha già preso un `require` morto in passato).
 
-- [ ] **Step 5: Aggiornare i numeri se il conteggio dei test è cambiato**
+- [x] **Step 5: Aggiornare i numeri se il conteggio dei test è cambiato**
 
 Run: `npm test`
 Expected: exit 0. Se `test-repo-invariants` nomina un conteggio, il numero non è cambiato (rename,
 non aggiunta) — quindi un fallimento qui significa un file di troppo o in meno: indagare prima di
 toccare il README.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add -A tools/
@@ -364,7 +364,7 @@ git commit -m "refactor(engine): il motore deterministico si chiama cyboros"
 - Produces: `node tools/cyboros.js status` funzionante — è la riga che F5 (§9 della spec) userà come
   prova end-to-end.
 
-- [ ] **Step 1: Rinominare i `bin`**
+- [x] **Step 1: Rinominare i `bin`**
 
 ```json
 "bin": {
@@ -376,7 +376,7 @@ git commit -m "refactor(engine): il motore deterministico si chiama cyboros"
 }
 ```
 
-- [ ] **Step 2: Rinominare le etichette di prodotto e la prosa degli header**
+- [x] **Step 2: Rinominare le etichette di prodotto e la prosa degli header**
 
 ```bash
 patch_live 'Stavros (Console|Radar|Doctor|harness)' 'Cyboros \1'
@@ -392,7 +392,7 @@ git grep -nIE '\bstavros' -- ':!CHANGELOG.md' ':!docs/archive' ':!docs/superpowe
 
 Ogni riga che resta e non è `STAVROS_*` (Task 5) è un residuo da chiudere qui.
 
-- [ ] **Step 3: Verificare che i cinque binari rispondano**
+- [x] **Step 3: Verificare che i cinque binari rispondano**
 
 Run:
 ```bash
@@ -402,12 +402,12 @@ node tools/doctor.js --check >/dev/null; echo "doctor exit $?"
 Expected: `cyboros.js status` exit 0. `doctor` può uscire 1 (binari di terze parti assenti su questa
 macchina) — è atteso e non è un fallimento; **≥ 2** sarebbe un guasto dei cardini.
 
-- [ ] **Step 4: Rigenerare la mappa e verificare**
+- [x] **Step 4: Rigenerare la mappa e verificare**
 
 Run: `node tools/project-map.js && node tools/project-map.js --check && npm test`
 Expected: exit 0.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add package.json tools/ docs/INDEX.md docs/project-map.html
@@ -434,7 +434,7 @@ punto in cui la spec ha detto di non farne.
 - Produces: `const { env } = require('./env')` → `env('TMP', defaultPath)`. Ogni call site diventa
   `env('TMP')`, e il fallback `STAVROS_TMP` resta leggibile per una release.
 
-- [ ] **Step 1: Scrivere il test che fallisce**
+- [x] **Step 1: Scrivere il test che fallisce**
 
 ```js
 #!/usr/bin/env node
@@ -475,12 +475,12 @@ ok('assente del tutto: torna il default, e stringa vuota vale assente', () => {
 summary('test-env');
 ```
 
-- [ ] **Step 2: Eseguirlo e verificare che fallisca**
+- [x] **Step 2: Eseguirlo e verificare che fallisca**
 
 Run: `node tools/test-env.js`
 Expected: FAIL con `Cannot find module './env'`.
 
-- [ ] **Step 3: Scrivere il modulo**
+- [x] **Step 3: Scrivere il modulo**
 
 ```js
 #!/usr/bin/env node
@@ -501,12 +501,12 @@ function env(name, dflt) {
 module.exports = { env };
 ```
 
-- [ ] **Step 4: Eseguirlo e verificare che passi**
+- [x] **Step 4: Eseguirlo e verificare che passi**
 
 Run: `node tools/test-env.js`
 Expected: PASS, exit 0.
 
-- [ ] **Step 5: Migrare i call site**
+- [x] **Step 5: Migrare i call site**
 
 ```bash
 git ls-files | grep '\.js$' | grep -vE '^(CHANGELOG\.md|docs/|reports/|temp/)' \
@@ -526,7 +526,7 @@ restare) e ai siti dentro le stringhe di shell/heredoc in `tools/f3-client-setup
 `STAVROS_X` → `${CYBOROS_X:-${STAVROS_X:-}}` quando il valore è un path opzionale, oppure
 `CYBOROS_X` quando è la nostra unità di sistema che lo esporta (quelle in `ops/`).
 
-- [ ] **Step 6: Verificare che il vecchio prefisso sopravviva solo nel fallback**
+- [x] **Step 6: Verificare che il vecchio prefisso sopravviva solo nel fallback**
 
 Run:
 ```bash
@@ -534,18 +534,18 @@ git grep -nI 'STAVROS_' -- ':!tools/env.js' ':!CHANGELOG.md' ':!docs/archive' ':
 ```
 Expected: nessuna riga. Ogni riga residua è un call site non migrato.
 
-- [ ] **Step 7: Aggiornare i numeri del README e la documentazione dei flag**
+- [x] **Step 7: Aggiornare i numeri del README e la documentazione dei flag**
 
 `tools/env.js` è un modulo nuovo (+1) e `tools/test-env.js` un test nuovo (+1): aggiornare i due
 numeri nel README. Documentare la finestra di deprecazione in `docs/toolbox.md` e in una voce nuova
 di `CHANGELOG.md`.
 
-- [ ] **Step 8: Verificare**
+- [x] **Step 8: Verificare**
 
 Run: `npm test`
 Expected: exit 0, con i due numeri del README aggiornati.
 
-- [ ] **Step 9: Commit**
+- [x] **Step 9: Commit**
 
 ```bash
 git add tools/env.js tools/test-env.js tools/ local/ docs/ README.md CHANGELOG.md
@@ -571,7 +571,7 @@ git commit -m "refactor(env): CYBOROS_* sostituisce STAVROS_*, con il vecchio pr
 - Consumes: §0; il preposto `cyboros-` fissato in F1–F2.
 - Produces: un solo prefisso `cyboros-` per ogni artefatto installabile (`scc` non sopravvive).
 
-- [ ] **Step 1: Rinominare gli artefatti**
+- [x] **Step 1: Rinominare gli artefatti**
 
 ```bash
 git mv stavros-cc cyboros-cc
@@ -582,7 +582,7 @@ git mv tools/app/stavros-cc.service tools/app/cyboros-cc.service
 git mv tools/app/icons/stavros-cc.svg tools/app/icons/cyboros-cc.svg
 ```
 
-- [ ] **Step 2: Aggiornare i riferimenti (incluso `scc`)**
+- [x] **Step 2: Aggiornare i riferimenti (incluso `scc`)**
 
 ```bash
 patch_live '\bscc\b' 'cyboros-cc'
@@ -591,7 +591,7 @@ patch_live 'install-scc-launcher\.sh' 'install-cyboros-cc-launcher.sh'
 git mv install-scc-launcher.sh install-cyboros-cc-launcher.sh
 ```
 
-- [ ] **Step 3: Verificare che il servizio sia coerente con il file spostato**
+- [x] **Step 3: Verificare che il servizio sia coerente con il file spostato**
 
 Run:
 ```bash
@@ -599,12 +599,12 @@ grep -n "ExecStart\|cyboros-cc" tools/app/cyboros-cc.service ops/radar.service
 ```
 Expected: ogni `ExecStart` punta a un file esistente (`test -x` su ciascuno).
 
-- [ ] **Step 4: Verificare**
+- [x] **Step 4: Verificare**
 
 Run: `npm test`
 Expected: exit 0.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add -A .
@@ -631,7 +631,7 @@ delle skill.
 - Consumes: §0.
 - Produces: `name: cyboros-autopilot` come unico nome della skill.
 
-- [ ] **Step 1: Spostare skill e prompt**
+- [x] **Step 1: Spostare skill e prompt**
 
 ```bash
 git mv .agents/skills/autostavros .agents/skills/cyboros-autopilot
@@ -639,14 +639,14 @@ git mv skills/autostavros skills/cyboros-autopilot
 git mv session-prompt-autostavros.md session-prompt-cyboros-autopilot.md
 ```
 
-- [ ] **Step 2: Rinominare l'identificatore della skill e la prosa**
+- [x] **Step 2: Rinominare l'identificatore della skill e la prosa**
 
 ```bash
 patch_live '\bautostavros\b' 'cyboros-autopilot'
 patch_live 'Autopilot Stavros' 'Cyboros Autopilot'
 ```
 
-- [ ] **Step 3: Verificare che nome e percorso combacino**
+- [x] **Step 3: Verificare che nome e percorso combacino**
 
 Run:
 ```bash
@@ -656,18 +656,18 @@ grep -n "cyboros-autopilot" session-prompt-cyboros-autopilot.md
 Expected: entrambe le skill dichiarano `name: cyboros-autopilot`; il prompt la nomina come
 `/skill:cyboros-autopilot`.
 
-- [ ] **Step 4: Notare la duplicazione (non risolverla qui)**
+- [x] **Step 4: Notare la duplicazione (non risolverla qui)**
 
 `piano-ottimizzazione-stavros.md:79` registra che le due copie della skill sono identiche e che va
 deciso quale percorso carica Freebuff (DECISION POINT 1). Il rename le porta entrambe al nome nuovo
 **senza** risolvere la duplicazione: è una decisione dell'operatore, e non appartiene a un rename.
 
-- [ ] **Step 5: Verificare**
+- [x] **Step 5: Verificare**
 
 Run: `npm test`
 Expected: exit 0.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add -A .
@@ -689,7 +689,7 @@ git commit -m "refactor(agents): la skill autopilot si chiama cyboros-autopilot"
 - Consumes: §0.
 - Produces: id di flotta `cyboros*`; il Task 15 (invariante) si aspetta `.agents/cyboros-root.ts`.
 
-- [ ] **Step 1: Spostare i 28 file e il root, in un colpo solo**
+- [x] **Step 1: Spostare i 28 file e il root, in un colpo solo**
 
 ```bash
 for f in $(git ls-files local/fleet | grep -E 'stavros'); do
@@ -698,7 +698,7 @@ done
 git mv .agents/stavros-root.ts .agents/cyboros-root.ts
 ```
 
-- [ ] **Step 2: Rinominare gli `id` e le stringhe identificatrici dentro gli agenti**
+- [x] **Step 2: Rinominare gli `id` e le stringhe identificatrici dentro gli agenti**
 
 ```bash
 patch_live '\bstavros-' 'cyboros-'
@@ -709,23 +709,23 @@ patch_live '\bStavros\b' 'Cyboros'
 `spawnableAgents` cita gli id: se un id è rinominato e un riferimento no, l'invariante di flotta lo
 dice per nome.
 
-- [ ] **Step 3: Verificare che gli id risolvano**
+- [x] **Step 3: Verificare che gli id risolvano**
 
 Run: `node tools/test-repo-invariants.js`
 Expected: exit 0. Un fallimento nomina `${where}: spawnableAgents referenzia 'X', che non esiste` —
 correggere il riferimento, non il nome.
 
-- [ ] **Step 4: Verificare l'aderenza al binario Freebuff**
+- [x] **Step 4: Verificare l'aderenza al binario Freebuff**
 
 Run: `node tools/vet-agents-vs-freebuff.js`
 Expected: exit 0 (o SKIP esplicito se il binario non è installato — il vet è un pre-flight locale).
 
-- [ ] **Step 5: Verificare che la flotta conti ancora 28 file**
+- [x] **Step 5: Verificare che la flotta conti ancora 28 file**
 
 Run: `ls local/fleet/*.ts | wc -l`
 Expected: `28`. Un numero diverso significa un `git mv` perso o un file duplicato.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add -A .
@@ -753,7 +753,7 @@ git commit -m "refactor(fleet): i 28 agenti e il root si chiamano cyboros"
   `CyborosReproducer/1.0` e il nuovo `CYBOROS-MARKER`, con il vecchio marker ancora riconoscibile
   nella nota di compatibilità.
 
-- [ ] **Step 1: Estendere il test perché pretenda entrambe le chiavi**
+- [x] **Step 1: Estendere il test perché pretenda entrambe le chiavi**
 
 In `tools/test-report-sarif.js`, sostituire l'assert su `properties.stavros` e aggiungere:
 
@@ -778,12 +778,12 @@ ok('driver e fingerprint usano il nome nuovo, e il vecchio resta per una release
 });
 ```
 
-- [ ] **Step 2: Eseguirlo e verificare che fallisca**
+- [x] **Step 2: Eseguirlo e verificare che fallisca**
 
 Run: `node tools/test-report-sarif.js`
 Expected: FAIL — `properties.cyboros` è `undefined`.
 
-- [ ] **Step 3: Implementare l'emissione doppia**
+- [x] **Step 3: Implementare l'emissione doppia**
 
 In `toResult()`, la riga finale diventa:
 
@@ -819,7 +819,7 @@ dove `inv` è l'oggetto oggi scritto inline (`findings_total`, `findings_emitted
 `refused`, `severity_bounded_by_evidence`): estrarre la costante una volta sola per non duplicare la
 verità.
 
-- [ ] **Step 4: Eseguire il test e il CLI**
+- [x] **Step 4: Eseguire il test e il CLI**
 
 Run:
 ```bash
@@ -829,7 +829,7 @@ node tools/report-sarif.js --findings /dev/null --out - | grep -c '"cyboros"'
 Expected: PASS, exit 0; il grep conta ≥ 2 (una per il result, una per l'invocation) su un file vuoto
 resta 1 (solo l'invocation) — il punto è che il comando non esploda.
 
-- [ ] **Step 5: I marcatori di evidenza (decisione: emettere entrambi)**
+- [x] **Step 5: I marcatori di evidenza (decisione: emettere entrambi)**
 
 `STAVROS-MARKER` serve ad attribuire un'esecuzione al nostro artefatto e `StavrosReproducer/1.0` è lo
 User-Agent del PoC: entrambi **finiscono nei log del target**. Il codice nuovo emette il nome nuovo e
@@ -850,13 +850,13 @@ In `tools/payloads/upload-bypass/README.md` la frase va riscritta per dire **ent
 o l'altro. Quella nota è l'unico posto dove la stringa vecchia sopravvive in superficie viva, ed è già
 in `REBRAND_ALLOWLIST` con il motivo (Task 14).
 
-- [ ] **Step 6: Documentare la finestra**
+- [x] **Step 6: Documentare la finestra**
 
 `docs/toolbox.md` e `docs/TOOL-ALTERNATIVES-AUDIT.md:193` nominano il sacco in inglese per un lettore
 esterno: aggiornarli a `properties.cyboros` con una riga che dice che `properties.stavros` è emesso
 ancora per una release. Voce nuova di `CHANGELOG.md`.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add tools/report-sarif.js tools/test-report-sarif.js tools/portal.js tools/gen-poc.js \
@@ -879,7 +879,7 @@ git commit -m "feat(format): properties.cyboros e i marcatori di prova sotto il 
   `tools/autopilot.js`, `memory/`).
 - Produces: la pagina del tema; il Task 12 la cita dal README.
 
-- [ ] **Step 1: Scrivere il test che fallisce**
+- [x] **Step 1: Scrivere il test che fallisce**
 
 ```js
 #!/usr/bin/env node
@@ -926,12 +926,12 @@ ok('il ciclo è dichiarato nei suoi passi', () => {
 summary('test-ouroboros-doc');
 ```
 
-- [ ] **Step 2: Eseguirlo e verificare che fallisca**
+- [x] **Step 2: Eseguirlo e verificare che fallisca**
 
 Run: `node tools/test-ouroboros-doc.js`
 Expected: FAIL con `ENOENT … docs/OUROBOROS.md`.
 
-- [ ] **Step 3: Scrivere `docs/OUROBOROS.md`**
+- [x] **Step 3: Scrivere `docs/OUROBOROS.md`**
 
 Struttura richiesta (i percorsi devono esistere, il test lo verifica):
 
@@ -981,23 +981,23 @@ l'operatore approva. Il nome dice "si morde la coda"; il codice dice "chiude il 
 un umano sul bordo". Questa è la versione vera.
 ```
 
-- [ ] **Step 4: Eseguirlo e verificare che passi**
+- [x] **Step 4: Eseguirlo e verificare che passi**
 
 Run: `node tools/test-ouroboros-doc.js`
 Expected: PASS, exit 0. Se fallisce su un percorso, il percorso nella pagina è sbagliato: correggere
 la pagina.
 
-- [ ] **Step 5: Aggiornare i numeri e rigenerare l'indice**
+- [x] **Step 5: Aggiornare i numeri e rigenerare l'indice**
 
 `tools/test-ouroboros-doc.js` è un test nuovo: aggiornare il conteggio dei test nel README. Poi
 `node tools/docs-index.js && node tools/docs-index.js --check` (la nuova pagina entra nell'indice).
 
-- [ ] **Step 6: Verificare**
+- [x] **Step 6: Verificare**
 
 Run: `npm test`
 Expected: exit 0.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add docs/OUROBOROS.md tools/test-ouroboros-doc.js docs/INDEX.md README.md
@@ -1016,7 +1016,7 @@ git commit -m "docs(brand): la pagina dell'anello, e il test che la ancora agli 
 - Consumes: `docs/OUROBOROS.md` (Task 10).
 - Produces: la frase di tesi che F5 non tocca più.
 
-- [ ] **Step 1: Aprire il README con il nome del tema, non con l'origine**
+- [x] **Step 1: Aprire il README con il nome del tema, non con l'origine**
 
 Nel blocco centrale, dopo la riga del titolo, sostituire l'attuale tesi con una che nomini l'anello e
 lo agganci alla pagina appena scritta (il link deve essere relativo: `docs/OUROBOROS.md`):
@@ -1034,7 +1034,7 @@ that page names the file that proves it.
 Il numero `114 tests` è un esempio: va messo quello che `node tools/test-repo-invariants.js` accetta
 (nomina lui il valore corretto se è sbagliato).
 
-- [ ] **Step 2: Far puntare alla pagina dell'anello dalla sezione Documentation**
+- [x] **Step 2: Far puntare alla pagina dell'anello dalla sezione Documentation**
 
 Aggiungere in cima all'elenco dei link:
 
@@ -1042,12 +1042,12 @@ Aggiungere in cima all'elenco dei link:
 - [`docs/OUROBOROS.md`](docs/OUROBOROS.md) — the loop, and the artifact behind every claim
 ```
 
-- [ ] **Step 3: Verificare i numeri e l'indice**
+- [x] **Step 3: Verificare i numeri e l'indice**
 
 Run: `node tools/test-repo-invariants.js && node tools/docs-index.js && node tools/docs-index.js --check`
 Expected: exit 0.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add README.md docs/INDEX.md
@@ -1066,12 +1066,12 @@ git commit -m "docs(brand): il README apre con l'anello"
 - Consumes: il token `@cyboros` (§0).
 - Produces: il contratto di progetto che `tools/check-identity.js` cerca nel prompt assemblato.
 
-- [ ] **Step 1: Misurare la partenza**
+- [x] **Step 1: Misurare la partenza**
 
 Run: `wc -c AGENTS.md`
 Expected: ≤ 6000. Annotare il valore: ogni carattere aggiunto va tolto altrove.
 
-- [ ] **Step 2: Rinominare titolo, persona e token (sostituzioni letterali)**
+- [x] **Step 2: Rinominare titolo, persona e token (sostituzioni letterali)**
 
 | da | a |
 |---|---|
@@ -1083,7 +1083,7 @@ Expected: ≤ 6000. Annotare il valore: ogni carattere aggiunto va tolto altrove
 Il blocco `ATTIVAZIONE` resta identico nella sostanza: è il marcatore che `check-identity.js` cerca
 (`at('ATTIVAZIONE')`), e la sua forma è l'oggetto del gate.
 
-- [ ] **Step 3: Verificare il budget e il testo**
+- [x] **Step 3: Verificare il budget e il testo**
 
 Run:
 ```bash
@@ -1092,7 +1092,7 @@ wc -c AGENTS.md && node tools/test-repo-invariants.js
 Expected: ≤ 6000; exit 0. Se il budget sfonda, **togliere prosa** (le rinomine sono length-neutral:
 `Stavros`/`Cyboros` e `@stavros`/`@cyboros` hanno la stessa lunghezza).
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add AGENTS.md
@@ -1112,7 +1112,7 @@ git commit -m "docs(identity): il contratto di progetto è Cyboros, armato da @c
 - Consumes: `AGENTS.md` (Task 12), il router `~/.AGENTS.md` (Task 15, operatore).
 - Produces: `node tools/check-identity.js` che verifica il ramo `@cyboros` sul prompt assemblato.
 
-- [ ] **Step 1: Sostituire i default cablati**
+- [x] **Step 1: Sostituire i default cablati**
 
 ```js
 const MODE = argv[0] === 'eni' ? 'eni' : 'cyboros'
@@ -1124,7 +1124,7 @@ e, nelle righe che seguono, `'@' + (MODE === 'eni' ? 'eni' : 'stavros')` → `'c
 `'router    ramo @stavros'` → `'router    ramo @cyboros'`; `// default: il ramo @stavros del router`
 → `@cyboros`; e i messaggi utente che nominano Stavros → Cyboros.
 
-- [ ] **Step 2: Estendere il riconoscimento del token in `bench-provenance.js`**
+- [x] **Step 2: Estendere il riconoscimento del token in `bench-provenance.js`**
 
 ```js
   const armed = !!firstPrompt && /^\s*@(cyboros|eni)\b/.test(firstPrompt);
@@ -1133,18 +1133,18 @@ e, nelle righe che seguono, `'@' + (MODE === 'eni' ? 'eni' : 'stavros')` → `'c
 e il warning corrispondente: `il primo messaggio non arma nessuna identita\` (@cyboros/@eni): la
 sessione non e\` Cyboros`.
 
-- [ ] **Step 3: Verificare che il checker riconosca il ramo nuovo**
+- [x] **Step 3: Verificare che il checker riconosca il ramo nuovo**
 
 Run: `node tools/check-identity.js 2>&1 | head -20`
 Expected: `[identity] mode     cyboros`, e il FAIL atteso su `~/.AGENTS.md` (il router è ancora
 `@stavros`: si aggiorna al Task 15, con l'operatore). Nessun FAIL su `ATTIVAZIONE` o sul token.
 
-- [ ] **Step 4: Verificare la suite**
+- [x] **Step 4: Verificare la suite**
 
 Run: `npm test`
 Expected: exit 0.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add tools/check-identity.js tools/bench-provenance.js
@@ -1163,7 +1163,7 @@ git commit -m "refactor(identity): check-identity e bench-provenance conoscono @
 - Consumes: `tracked()` e `read()` già definiti nel file.
 - Produces: il gate che impedisce al nome vecchio di rientrare in superficie viva.
 
-- [ ] **Step 1: Aggiungere l'invariante**
+- [x] **Step 1: Aggiungere l'invariante**
 
 ```js
 // ---- rebrand: nessun nome vecchio fuori dalla storia -------------------------------------
@@ -1235,7 +1235,7 @@ ok('rebrand: nessun file tracciato porta il nome vecchio nel nome', () => {
 });
 ```
 
-- [ ] **Step 2: Eseguirlo e leggere i residui**
+- [x] **Step 2: Eseguirlo e leggere i residui**
 
 Run: `node tools/test-repo-invariants.js 2>&1 | grep -A2 "rebrand:"`
 Expected: o exit 0, o la lista esatta dei file rimasti. **Ogni residuo è una decisione**: se è
@@ -1248,17 +1248,17 @@ Il gate cerca il **progetto**, non la stringa: `REBRAND_IGNORE` toglie prima il 
 l'invariante sarebbe verde o rosso per il motivo sbagliato — e il nome utente compare in 5 file vivi
 che non c'entrano con il rename.
 
-- [ ] **Step 3: Iterare finché è verde**
+- [x] **Step 3: Iterare finché è verde**
 
 Run: `node tools/test-repo-invariants.js && npm test`
 Expected: exit 0.
 
-- [ ] **Step 4: Aggiornare i numeri se la suite è cambiata**
+- [x] **Step 4: Aggiornare i numeri se la suite è cambiata**
 
 L'invariante sta in un file esistente: nessun test nuovo. Se `npm test` nomina una discrepanza,
 aggiornare il README.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add tools/test-repo-invariants.js README.md
@@ -1272,6 +1272,14 @@ git commit -m "test(invariants): il nome vecchio non rientra in superficie viva"
 **Questo task non lo esegue l'agente.** Tocca file di casa dell'operatore e la cartella in cui la
 sessione sta girando: eseguirlo da dentro è come smontare la scala su cui si è appoggiati. Va
 eseguito a sessione chiusa, o da un'altra cartella.
+
+> **Nota dopo l'esecuzione dei Task 1–14 (2026-10-13).** Lo step 3 non richiede altre modifiche nel
+> repo: i tre `.desktop` e `tools/app/cyboros-cc.service` nominano già `cyboros-harness` (diventano
+> validi con la rinomina, e il gate nuovo di `tools/test-repo-invariants.js` verifica che il percorso
+> dopo il nome del checkout esista davvero), e `tools/f3-client-setup.sh` risolve il nome della
+> cartella interrogando il PC — niente da aggiornare a mano. L'unica occorrenza del percorso vecchio
+> che resta di proposito è in `docs/system-prompt-dump.md`, che è la fotografia di un prompt
+> assemblato, non un'istruzione.
 
 **Files (fuori dal repo):**
 - `~/.AGENTS.md` (5 righe del router) — autorizzazione esplicita dell'operatore

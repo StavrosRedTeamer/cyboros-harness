@@ -10,7 +10,7 @@
 
 - [**AGENTS.md — Cyboros Harness**](AGENTS.md) — Operatore AI per operazioni di pentest autorizzate (web/host, wireless, mobile). · 5,9 KB
 - [**Benchmark**](BENCHMARK.md) — Public security benchmarks are in the model's training data. "Solved" on OWASP Juice · 15,6 KB
-- [**Changelog**](CHANGELOG.md) — All notable changes to this project are documented here. Dates are commit dates. · 44,5 KB
+- [**Changelog**](CHANGELOG.md) — All notable changes to this project are documented here. Dates are commit dates. · 45,6 KB
 - [**Contributor Covenant Code of Conduct**](CODE_OF_CONDUCT.md) — We as members, contributors, and leaders pledge to make participation in our community a · 5,8 KB
 - [**Contributing**](CONTRIBUTING.md) — This repository is a penetration-testing harness built around one claim: a finding is only a · 4,5 KB
 - [**Cyboros Harness**](README.md) — A penetration-testing harness where a finding is only a finding if code can prove it — · 12,1 KB
@@ -56,7 +56,7 @@
 - [**Offensive Batch 2 — Implementation Plan (6 workstream)**](docs/superpowers/plans/2026-09-26-offensive-batch2-plan.md) — Goal: Sei capacità offensive indipendenti per l'harness: matrice permessi multi-identità (Gate P1), ingest OpenAPI/Swagger, wordlist adattive dal targ · 25,5 KB · 0/34 check
 - [**F3 — Arsenale completo + root: Implementation Plan**](docs/superpowers/plans/2026-09-30-f3-arsenal-and-root.md) — Goal: portare il Poco F3 (client *e* target mobile della harness) alla parità con l'arsenale · 23,8 KB · 0/40 check
 - [**Simulazione del forum con admin abliterato — piano**](docs/superpowers/plans/2026-10-01-forum-admin.md) — Data: 2026-10-01 · Stato: F0–F3 fatti (server, wrapper, runtime dell'agente); F4–F5 aperti · 4,3 KB
-- [**Cyboros Harness Rebrand Implementation Plan**](docs/superpowers/plans/2026-10-13-cyboros-rebrand-plan.md) — Goal: Il repository si presenta, si invoca e si arma come Cyboros Harness — nome, binari, · 57,9 KB · 0/84 check
+- [**Cyboros Harness Rebrand Implementation Plan**](docs/superpowers/plans/2026-10-13-cyboros-rebrand-plan.md) — Goal: Il repository si presenta, si invoca e si arma come Cyboros Harness — nome, binari, · 58,5 KB · 79/84 check
 - [**Stavros Radar — Design Specification**](docs/superpowers/specs/2026-09-08-stavros-radar-design.md) — Status: Approved · 7,6 KB
 - [**Ondata 7 — Integrità e promozione della prova (design spec)**](docs/superpowers/specs/2026-09-28-findings-integrity-design.md) — Data: 2026-09-28 · Repo: stavrosredteamer · Stato: design, in attesa di revisione · 12,7 KB
 - [**Forum agentico con admin — design spec (F0)**](docs/superpowers/specs/2026-10-01-forum-admin-design.md) — Data: 2026-10-01 · Repo: stavrosredteamer · Stato: congelato per F1–F2 · 4,8 KB
