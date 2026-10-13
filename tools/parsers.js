@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Pure, zero-dependency parsers that normalize third-party tool output into records
-// for the deterministic pipeline (tools/stavros.js). Each function takes a string
+// for the deterministic pipeline (tools/cyboros.js). Each function takes a string
 // (one line for the JSONL tools, a whole blob for nmap/netexec) and returns a plain
 // record or array — NO network I/O, NO subprocesses, NO external XML parser.
 //

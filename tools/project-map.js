@@ -142,7 +142,7 @@ const AREAS = [
     id: 'plan', name: 'Pipeline e piano', accent: '#ff8a3d',
     blurb: 'Cosa fare adesso e cosa manca: la pipeline deterministica, il piano guidato dai finding, i gap di copertura.',
     modules: [
-      'stavros', 'workflow', 'planner', 'planner-demo', 'next-actions',
+      'cyboros', 'workflow', 'planner', 'planner-demo', 'next-actions',
       'autopilot', 'autopilot-checkpoint', 'loop-watch',
       'coverage', 'coverage-loop', 'attack-coverage', 'target-model', 'attack-galaxy',
     ],

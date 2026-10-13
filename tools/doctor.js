@@ -112,7 +112,7 @@ const CORE_FILES = [
   'tools/tool-registry.json',
   'tools/run.js',
   'tools/scope-guard.js',
-  'tools/stavros.js',
+  'tools/cyboros.js',
   'tools/repeater.js',
   'tools/gui-server.js',
   'tools/gui/index.html',

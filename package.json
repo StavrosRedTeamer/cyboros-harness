@@ -25,7 +25,7 @@
   },
   "homepage": "https://github.com/CSI-entitymorton/cyboros-harness#readme",
   "bin": {
-    "stavros": "tools/stavros.js",
+    "stavros": "tools/cyboros.js",
     "stavros-doctor": "tools/doctor.js",
     "stavros-record-finding": "tools/record-finding.js",
     "stavros-gen-bench": "tools/gen-bench.js",

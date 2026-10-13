@@ -112,7 +112,7 @@ a function of its evidence, not of the model's confidence.**
 Agents are good at choosing what to try and bad at being reproducible. So the
 mechanical part is pinned down:
 
-- `tools/stavros.js recon|scan|enumerate` write to `reports/state.db`; agents do not
+- `tools/cyboros.js recon|scan|enumerate` write to `reports/state.db`; agents do not
   hand-run these pipelines. What the model picks is tests and exploits, not the scan.
 - Stage gates (`gate.js`) make the engagement order structural: recon → map → test →
   authenticated → chains → report, with explicit criteria per stage.

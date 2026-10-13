@@ -252,7 +252,7 @@ local/
 
 - Un modello ~3B-attivi sbaglia più spesso il JSON dei tool: il fallback testuale mitiga, ma
   tieni `max_tool_iters` basso e preferisci le fasi singole.
-- La pipeline deterministica (`tools/stavros.js`) fa il lavoro meccanico pesante; l'LLM serve
+- La pipeline deterministica (`tools/cyboros.js`) fa il lavoro meccanico pesante; l'LLM serve
   per triage/verifica/report. Non aspettarti che il modello locale "buchi" da solo.
 - Nessuna integrazione MCP (chrome-devtools) in questa edizione: solo tool locali.
 
@@ -322,7 +322,7 @@ Ora `.agents/` contiene **un solo file**, `stavros-root.ts` (displayName **Stavr
 - contiene il contratto d'engagement di `local/fleet/stavros.ts` — regole byte-identiche,
   meno i passaggi di delega agli sub-agent;
 - ha `spawnableAgents: []` e `run_terminal_command`, e pilota il motore deterministico
-  (`tools/stavros.js`, `run.js`, `workflow.js`, `planner.js`, `coverage.js`, `gate.js`,
+  (`tools/cyboros.js`, `run.js`, `workflow.js`, `planner.js`, `coverage.js`, `gate.js`,
   `chain.js`) seguendo i playbook di `local/fleet/`.
 
 Il modello è fissato in `~/.config/manicode/settings.json` (`"freebuffModel":

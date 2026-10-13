@@ -127,9 +127,9 @@ harness is fail-closed until you fill it in:
 
 ```bash
 node tools/scope-guard.js check https://target.example   # exit 0 = authorized
-node tools/stavros.js recon target.example
-node tools/stavros.js scan target.example
-node tools/stavros.js status
+node tools/cyboros.js recon target.example
+node tools/cyboros.js scan target.example
+node tools/cyboros.js status
 ```
 
 Install the external tool binaries with `./install-tools.sh` (Parrot/Debian) or

@@ -3,13 +3,13 @@
 // hand — this orchestrator does the mechanical work, writes results to reports/state.db
 // (SQLite via node:sqlite), and supports resuming an interrupted run.
 //
-//   node tools/stavros.js recon <host>       subfinder|amass|dnsx → katana|gau|waybackurls → httpx -json
-//   node tools/stavros.js scan <host|cidr>   naabu/rustscan → nmap -sC -sV -oX - → ports/services
-//   node tools/stavros.js enumerate <host>   ffuf/feroxbuster + arjun (+ noauth_finder when installed) → endpoints/params
-//   node tools/stavros.js fuzz <host>        OPTIONAL post-scan service fuzzing via APT++ (tcp/udp/http), operator-installed
-//   node tools/stavros.js status [<host>]    summary of state.db
-//   node tools/stavros.js resume             re-drive the last incomplete run, skipping done phases
-//   node tools/stavros.js report             consolidate state.db + findings.jsonl (and close the run)
+//   node tools/cyboros.js recon <host>       subfinder|amass|dnsx → katana|gau|waybackurls → httpx -json
+//   node tools/cyboros.js scan <host|cidr>   naabu/rustscan → nmap -sC -sV -oX - → ports/services
+//   node tools/cyboros.js enumerate <host>   ffuf/feroxbuster + arjun (+ noauth_finder when installed) → endpoints/params
+//   node tools/cyboros.js fuzz <host>        OPTIONAL post-scan service fuzzing via APT++ (tcp/udp/http), operator-installed
+//   node tools/cyboros.js status [<host>]    summary of state.db
+//   node tools/cyboros.js resume             re-drive the last incomplete run, skipping done phases
+//   node tools/cyboros.js report             consolidate state.db + findings.jsonl (and close the run)
 //
 // Principles (see the plan): "i tool eseguono, la pipeline orchestra, gli agenti decidono".
 // - Every third-party binary runs through runBin (default = scope-check + audit + streaming
@@ -594,7 +594,7 @@ function report(db, opts) {
 
 function usage() {
   console.error(
-    'usage: node tools/stavros.js recon <host> [--takeover] | scan <host|cidr> | enumerate <host> | fuzz <host> [--ports N,N] | status [<host>] | resume | report'
+    'usage: node tools/cyboros.js recon <host> [--takeover] | scan <host|cidr> | enumerate <host> | fuzz <host> [--ports N,N] | status [<host>] | resume | report'
   );
   process.exit(2);
 }

@@ -1,13 +1,13 @@
 // Offline self-check for the deterministic pipeline (stavros.js). No network, no real
 // scanners: a fake runBin returns canned tool output, and we assert the records written
 // to a temporary STATE_DB + the phase/resume bookkeeping.
-// Run: node tools/test-stavros.js
+// Run: node tools/test-cyboros.js
 const assert = require('assert');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const state = require('./state');
-const stavros = require('./stavros');
+const stavros = require('./cyboros');
 
 const tmpDir = path.join(os.tmpdir(), 'stavros-test-' + process.pid);
 fs.mkdirSync(tmpDir, { recursive: true });

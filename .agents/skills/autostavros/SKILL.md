@@ -23,7 +23,7 @@ metadata:
 
 1. `scope.json` presente e **caricabile** (vuoto = nulla eseguito; non caricabile = STUCK).
 2. Stato seedato: almeno un target nel target-model (`reports/state.db`). Se `targetsCount == 0`
-   l'autopilot risponde STUCK "fai il seed prima" — seeda con `node tools/stavros.js scan <host>`
+   l'autopilot risponde STUCK "fai il seed prima" — seeda con `node tools/cyboros.js scan <host>`
    o un workflow (`node tools/workflow.js run workflows/recon-baseline.yaml -t <host>`) SE l'operatore
    lo autorizza, poi riparti.
 

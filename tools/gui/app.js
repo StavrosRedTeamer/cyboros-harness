@@ -689,7 +689,7 @@ function renderPipeline(data) {
   if (!data.db) {
     pane.replaceChildren(el('div', { class: 'card' }, [
       el('h2', null, 'Pipeline'),
-      el('div', { class: 'muted', html: 'no <span class="mono">reports/state.db</span> yet — run <code>node tools/stavros.js recon &lt;host&gt;</code> first.' }),
+      el('div', { class: 'muted', html: 'no <span class="mono">reports/state.db</span> yet — run <code>node tools/cyboros.js recon &lt;host&gt;</code> first.' }),
     ]));
     return;
   }

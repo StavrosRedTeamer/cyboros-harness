@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Wireless scope-enforcing runner + orchestration (Fase 4). Wireless is a SEPARATE mode from
-// the web/network pipeline (tools/stavros.js): targets are BSSID/ESSID/station/channel, NOT
+// the web/network pipeline (tools/cyboros.js): targets are BSSID/ESSID/station/channel, NOT
 // IPs, so run.js/scope-guard.js don't apply here — this is the wireless analog of run.js.
 //
 //   node tools/wifi.js check <target>                      scope verdict (exit 0 = in scope)

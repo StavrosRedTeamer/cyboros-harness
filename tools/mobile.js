@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Mobile scope-enforcing runner (ReDroid lab). Mobile is a SEPARATE mode from the
-// web/network pipeline (tools/stavros.js) and from wifi.js: targets are Android packages,
+// web/network pipeline (tools/cyboros.js) and from wifi.js: targets are Android packages,
 // adb serials and APK hashes — NOT IPs/BSSIDs — so run.js/scope-guard.js don't apply here.
 // This is the mobile analog of wifi.js.
 //

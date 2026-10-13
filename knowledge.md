@@ -74,16 +74,16 @@ independently of you (scope-guard/run/c2-guard/wifi-guard — all fail-closed).
 
 ## Pipeline deterministica (recon/scan/enumerate)
 
-Non lanciare recon/scan/enumerate a mano: `tools/stavros.js` scrive su `reports/state.db`
+Non lanciare recon/scan/enumerate a mano: `tools/cyboros.js` scrive su `reports/state.db`
 (SQLite); gli agenti decidono solo su test/exploit.
 
 ```bash
-node tools/stavros.js recon <host>        # subfinder|amass|dnsx → katana|gau|waybackurls → httpx -json
-node tools/stavros.js scan <host|cidr>    # naabu/rustscan → nmap -sC -sV -oX -
-node tools/stavros.js enumerate <host>    # ffuf/feroxbuster + arjun + noauth_finder*
-node tools/stavros.js fuzz <host> [--ports 80,53:udp]   # opzionale post-scan: APT++ tcp/udp/http*
-node tools/stavros.js status [<host>]     # riepilogo state.db
-node tools/stavros.js resume / report     # riparte dall'ultima run / consolida state.db + findings
+node tools/cyboros.js recon <host>        # subfinder|amass|dnsx → katana|gau|waybackurls → httpx -json
+node tools/cyboros.js scan <host|cidr>    # naabu/rustscan → nmap -sC -sV -oX -
+node tools/cyboros.js enumerate <host>    # ffuf/feroxbuster + arjun + noauth_finder*
+node tools/cyboros.js fuzz <host> [--ports 80,53:udp]   # opzionale post-scan: APT++ tcp/udp/http*
+node tools/cyboros.js status [<host>]     # riepilogo state.db
+node tools/cyboros.js resume / report     # riparte dall'ultima run / consolida state.db + findings
 ```
 
 `*` = opzionali operator-vetted (env `STAVROS_NOAUTH_FINDER`/`STAVROS_APTPP` o `vendor/tools/<name>/`):

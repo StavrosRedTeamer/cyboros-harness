@@ -106,7 +106,7 @@ const EVIDENCE_FILE = process.env.EVIDENCE_INDEX_FILE || path.join(WS_ROOT, 'evi
 const CMD_PREFIXES = [
   'node tools/run.js ',
   'node tools/repeater.js ',
-  'node tools/stavros.js ',
+  'node tools/cyboros.js ',
   'node tools/ad.js ',
   'node tools/wifi.js ',
   'node tools/mobile.js ',

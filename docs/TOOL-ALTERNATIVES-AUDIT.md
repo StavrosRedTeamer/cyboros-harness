@@ -83,7 +83,7 @@ intrusive`.
 
 ### 1.3 RustScan: repo moved, and `stavros.js` still calls the old name
 
-`tools/stavros.js:383` invokes `rustscan`. The canonical repo is now **`bee-san/RustScan`**
+`tools/cyboros.js:383` invokes `rustscan`. The canonical repo is now **`bee-san/RustScan`**
 (the `RustScan/rustscan` path 302-redirects). Last release **2.4.1**, February — the project
 is alive but its release cadence is a fraction of ProjectDiscovery's, and `naabu` is already
 installed, already registered, and already the declared `alternative` for it.

@@ -25,7 +25,7 @@ function readText(file) { try { return fs.readFileSync(file, 'utf8'); } catch { 
 
 // Tools the app is allowed to dispatch through. Anything else is refused fail-closed.
 const ALLOWED_TOOLS = new Set([
-  'tools/run.js', 'tools/workflow.js', 'tools/stavros.js',
+  'tools/run.js', 'tools/workflow.js', 'tools/cyboros.js',
   'tools/gate.js', 'tools/budget.js', 'tools/report-html.js', 'tools/coverage-loop.js',
 ]);
 

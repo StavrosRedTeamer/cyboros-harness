@@ -199,7 +199,7 @@ const tmpFile = (...names) => path.join(TMP, ...names);
   {
     process.env.STAVROS_NOAUTH_FINDER = tmpFile('nf.py');
     fs.writeFileSync(process.env.STAVROS_NOAUTH_FINDER, '#!/usr/bin/env python3\n');
-    const S = require('./stavros');
+    const S = require('./cyboros');
     assert.strictEqual(S.resolveOperatorTool('STAVROS_NOAUTH_FINDER', 'noauth_finder/x.py'), tmpFile('nf.py'));
     assert.strictEqual(S.resolveOperatorTool('STAVROS_MISSING_ENV', 'missing/x.py', { noVendorDefaults: true }), null);
     const cmd = S.noauthCommand('/opt/nf.py', '10.1.2.3');
