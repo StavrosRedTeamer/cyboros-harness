@@ -51,9 +51,9 @@ account, or acting as an appointed representative at an online or offline event.
 ## Enforcement
 
 Instances of abusive, harassing, or otherwise unacceptable behavior may be reported to the
-community leaders responsible for enforcement through the repository's **private issue
-tracker** — this repository is private, so an issue is visible to the maintainers only — or by
-contacting the maintainer directly on GitHub ([@stavrosredteamer][maintainer]).
+community leaders responsible for enforcement by contacting the maintainer directly on GitHub
+([@stavrosredteamer][maintainer]). Do **not** use a public issue for this: a conduct report is
+not something to file where the whole internet can read it.
 
 There is deliberately no reporting e-mail address here: no address for this project exists in
 `SECURITY.md` or anywhere else in the repository, and inventing one would send reports into the
