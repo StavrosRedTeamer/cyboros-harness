@@ -3,12 +3,11 @@
 # Idempotente: rigenera il .desktop con il path REALE del progetto (funziona anche
 # se il repo è stato spostato) e lo copia in ~/Scrivania (o ~/Desktop su sistemi EN).
 #
-#   ./freebuff-edition/install-launcher.sh
+#   ./install-launcher.sh
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 EDITION="$(cd "$SCRIPT_DIR" && pwd)"
-ROOT="$(cd "$EDITION/.." && pwd)"
 
 LAUNCH="$EDITION/launch-freebuff.sh"
 WRAP="$EDITION/open-freebuff-terminal.sh"
@@ -30,7 +29,7 @@ cat > "$DESKTOP_FILE" <<EOF
 Type=Application
 Version=1.0
 Name=Cyboros RedTeaming — Freebuff
-Comment=Avvia Cyboros (orchestratore red-team) su Freebuff — variante freebuff-edition (disciplina pentest + MCP)
+Comment=Avvia Cyboros (orchestratore red-team) su Freebuff (disciplina pentest + MCP)
 Exec=$WRAP
 Icon=applications-development
 Terminal=false
@@ -42,4 +41,4 @@ chmod +x "$DESKTOP_FILE"
 echo "[cyboros] launcher installato: $DESKTOP_FILE"
 echo "[cyboros] doppio clic su \"Cyboros RedTeaming — Freebuff\" per avviare."
 echo "[cyboros] prima volta: se il sistema chiede \"consenti esecuzione\", scegli Esegui/Apri."
-echo "[cyboros] pre-flight: ./freebuff-edition/launch-freebuff.sh --check"
+echo "[cyboros] pre-flight: ./launch-freebuff.sh --check"

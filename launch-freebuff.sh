@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-# Cyboros RedTeaming — avvio della variante Freebuff (freebuff-edition)
+# Cyboros RedTeaming — avvio della variante Freebuff
 #
-#   ./freebuff-edition/launch-freebuff.sh          # avvio interattivo
-#   ./freebuff-edition/launch-freebuff.sh --check  # solo pre-flight (esce subito)
+#   ./launch-freebuff.sh          # avvio interattivo
+#   ./launch-freebuff.sh --check  # solo pre-flight (esce subito)
 #
 # Pre-flight (fail-closed): scope.json non vuoto, CLI freebuff presente,
 # Chrome per chrome-devtools MCP (warning, non bloccante).
@@ -82,7 +82,7 @@ fi
 CHROME_BIN="$(command -v google-chrome 2>/dev/null || command -v chromium 2>/dev/null || command -v chromium-browser 2>/dev/null || true)"
 if [[ -z "$CHROME_BIN" ]]; then
   warn "Chrome/Chromium non trovato: il server MCP 'chrome-devtools' non partirà."
-  warn "Installa Chrome oppure disattiva chrome-devtools in build-agents.mjs (MCP_SERVERS)."
+  warn "Installa Chrome oppure togli chrome-devtools dal campo mcpServers dell'agente (.ts in local/fleet/)."
 fi
 
 # --- 6. modello di default (info) ---

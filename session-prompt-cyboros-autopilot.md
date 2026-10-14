@@ -1,6 +1,6 @@
 # Handoff — sessione con AUTOPILOT attivo (opt-in)
 
-> Incolla questo prompt in una NUOVA sessione Freebuff (cwd: `Scrivania/Redteamingtest/freebuff-edition`).
+> Incolla questo prompt in una NUOVA sessione Freebuff (cwd: la root del repository, la cartella che contiene questo file).
 > Prima di incollarlo: `scope.json` deve contenere il target autorizzato.
 > Attivazione esplicita richiesta: questa modalità NON è default.
 

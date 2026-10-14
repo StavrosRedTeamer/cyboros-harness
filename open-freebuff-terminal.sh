@@ -6,7 +6,7 @@
 # esplicitamente il terminale nativo del desktop (konsole su Parrot/KDE Plasma) cosi stdin
 # e in raw-mode reale e il TERM e color-capable. Fallback per altri ambienti a seguire.
 #
-#   ./freebuff-edition/open-freebuff-terminal.sh
+#   ./open-freebuff-terminal.sh
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

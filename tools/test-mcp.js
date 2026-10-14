@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // test-tags: e2e        # boots chrome-devtools-mcp via npx + live network -> not offline
 // tools/test-mcp.js — smoke test for the chrome-devtools MCP server wired into the agents
-// (mcpServers in .agents/*.ts, generated from build-agents.mjs MCP_SERVERS).
+// (mcpServers is declared per agent: local/fleet/*.ts and .agents/cyboros-root.ts).
 //
 //   node tools/test-mcp.js [url]        (default url: https://google.com)
 //   node tools/test-mcp.js [url] -v     (verbose)

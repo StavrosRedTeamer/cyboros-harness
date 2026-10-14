@@ -1,14 +1,14 @@
 {
-  "_comment": "Freebuff MCP nativo (v>=0.0.156). Ogni server MCP espone tool come <server>__<tool> (es. chrome-devtools__navigate_page, chrome-devtools__evaluate_script, kali__nmap_scan). Nota: chrome-devtools-mcp@latest espone navigate_page (pageId numerico) — il tool 'navigate' non esiste più. I server attivi sono dichiarati nel campo mcpServers della definizione di ogni agente (generato da build-agents.mjs, costante MCP_SERVERS). Questo file è documentazione operatore: per attivare un server, aggiungi/rimuovi la voce in freebuff-edition/build-agents.mjs e rigenera (node freebuff-edition/build-agents.mjs), oppure aggiungi il campo mcpServers direttamente nel .ts dell'agente.",
+  "_comment": "Freebuff MCP nativo (v>=0.0.156). Ogni server MCP espone tool come <server>__<tool> (es. chrome-devtools__navigate_page, chrome-devtools__evaluate_script, kali__nmap_scan). Nota: chrome-devtools-mcp@latest espone navigate_page (pageId numerico) — il tool 'navigate' non esiste più. I server attivi sono dichiarati nel campo mcpServers della definizione di ogni agente: non c'e' un generatore, si edita il .ts dell'agente interessato in local/fleet/ (piu' .agents/cyboros-root.ts per il root). Questo file e' documentazione operatore: per attivare o disattivare un server, aggiungi o rimuovi la voce li'.",
   "servers": {
     "chrome-devtools": {
       "command": "npx",
       "args": ["-y", "chrome-devtools-mcp@latest", "--headless", "--isolated", "--executablePath", "/usr/bin/chromium"],
-      "_comment": "Browser MCP ufficiale (stdio). Chrome headless; richiede Chrome installato (auto-detect). Su macchine con solo Chromium il server non parte senza --executablePath (es. /usr/bin/chromium): il generatore build-agents.mjs lo aggiunge da solo (detectBrowserPath) — se installi Chrome vero, rigenera o aggiorna l'arg. Attivo per default nella edition."
+      "_comment": "Browser MCP ufficiale (stdio). Chrome headless; richiede Chrome installato (auto-detect). Su macchine con solo Chromium il server non parte senza --executablePath (es. /usr/bin/chromium): aggiungi l'arg a mano nel campo mcpServers dell'agente che lo usa (es. --executablePath=/usr/bin/chromium). Attivo per default."
     },
     "kali": {
       "url": "http://127.0.0.1:8765/mcp",
-      "_comment": "kali-mcp-server dal vendor (260+ tool Kali: nmap/nuclei/sqlmap/ffuf/httpx/netexec/impacket/msf...). Avvio: unzip vendor/dsh-redteam-model/deploy/assets/kali-mcp-server.zip -d ~/kali-mcp && cd ~/kali-mcp && pip install -r requirements.txt && python3 mcp_server.py --transport streamable-http --host 127.0.0.1 --port 8765. Disattivo per default: togli il commento in build-agents.mjs."
+      "_comment": "kali-mcp-server dal vendor (260+ tool Kali: nmap/nuclei/sqlmap/ffuf/httpx/netexec/impacket/msf...). Avvio: unzip vendor/dsh-redteam-model/deploy/assets/kali-mcp-server.zip -d ~/kali-mcp && cd ~/kali-mcp && pip install -r requirements.txt && python3 mcp_server.py --transport streamable-http --host 127.0.0.1 --port 8765. Disattivo per default: aggiungi la voce al campo mcpServers dell'agente che lo deve usare."
     },
     "burp": {
       "url": "http://127.0.0.1:9876/mcp",
