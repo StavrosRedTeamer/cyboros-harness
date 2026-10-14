@@ -31,7 +31,7 @@ nominato non esiste.
 | la lezione rientra in contesto a budget fisso | `tools/memory-recall.js`, `tools/retrieval-budget.js` |
 | l'harness sa cosa gli manca | `tools/coverage-loop.js`, `tools/next-actions.js` |
 | l'harness cerca capacità nuove da solo | `tools/radar.js`, `tools/radar-scout.js` |
-| l'harness misura se è migliorato | `tools/gen-bench.js`, `reports/bench-history.jsonl` |
+| l'harness misura se è migliorato | `tools/gen-bench.js` |
 | l'harness si esercita senza operatore | `tools/autopilot.js`, `tools/autopilot-checkpoint.js` |
 
 ## Il limite, dichiarato
