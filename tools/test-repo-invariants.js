@@ -507,6 +507,12 @@ const REBRAND_LEGACY = /stavros/i;
 // che esiste sulla macchina.
 const REBRAND_IGNORE = [
   [/\/home\/stavros\b/g, "il nome utente dell'operatore: una persona, non il progetto"],
+  // L'handle GitHub dell'operatore, che l'account porta nel nome (rinominato il 2026-10-14):
+  // una persona, non il progetto, esattamente come `/home/stavros`. Di proposito qui non c'e'
+  // il flag `i`: il nome vecchio del PROGETTO si scrive `StavrosRedTeamer`, quindi resta
+  // intercettato da REBRAND_LEGACY anche con questa eccezione attiva. Passa solo il token in
+  // minuscolo, che e' lo slug dell'account e compare dentro un URL o come `@handle`.
+  [/\bstavrosredteamer\b/g, "handle GitHub dell'operatore: una persona, non il progetto"],
   // Le chiavi in deprecazione (F4): `properties.stavros` / `stavrosFindingId` escono ancora per una
   // release. La forma con cui compaiono nel codice non è solo `properties.stavros` — c'è anche
   // l'accesso `r.stavros`, il campo dell'oggetto `stavros: inv,` e l'header legacy nel test che

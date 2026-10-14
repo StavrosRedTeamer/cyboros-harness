@@ -7,8 +7,8 @@ body:
       value: |
         **Not for vulnerabilities.** If you found a way to defeat a guardrail, a scope check or
         the verification ceiling, that is a security report: use
-        [Security → Report a vulnerability](https://github.com/CSI-entitymorton/cyboros-harness/security/advisories/new)
-        or read [SECURITY.md](https://github.com/CSI-entitymorton/cyboros-harness/blob/master/SECURITY.md).
+        [Security → Report a vulnerability](https://github.com/stavrosredteamer/cyboros-harness/security/advisories/new)
+        or read [SECURITY.md](https://github.com/stavrosredteamer/cyboros-harness/blob/master/SECURITY.md).
         Do not open a public issue for it.
 
   - type: textarea

@@ -105,7 +105,7 @@ ok('the properties bag is emitted under both keys, with identical content', () =
 ok('the driver and fingerprint use the new name, and the old keys stay for one release', () => {
   const doc = buildSarif([finding({})], {});
   assert.equal(doc.runs[0].tool.driver.name, 'Cyboros Harness');
-  assert.equal(doc.runs[0].tool.driver.informationUri, 'https://github.com/CSI-entitymorton/cyboros-harness');
+  assert.equal(doc.runs[0].tool.driver.informationUri, 'https://github.com/stavrosredteamer/cyboros-harness');
   const fp = doc.runs[0].results[0].partialFingerprints;
   assert.equal(fp.cyborosFindingId, fp.stavrosFindingId);
 });

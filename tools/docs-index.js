@@ -40,6 +40,11 @@ const TRACKED = (() => {
 const kb = (n) => (n / 1024).toFixed(1).replace('.', ',') + ' KB';
 const read = (p) => fs.readFileSync(p, 'utf8');
 const rel = (p) => path.relative(WS, p).split(path.sep).join('/');
+// I link dell'indice devono risolversi DA `docs/INDEX.md`, non dalla radice: GitHub risolve i
+// link relativi rispetto al file che li contiene, quindi un `docs/ARCHITECTURE.md` scritto qui
+// viene letto come `docs/docs/ARCHITECTURE.md` e va in 404. Il link statico a `archive/README.md`
+// qui sotto era gia' nella forma giusta — questa riga allinea `entry()` a quella.
+const linkFromOut = (p) => path.relative(path.dirname(OUT), p).split(path.sep).join('/');
 
 function listing(dir, filter) {
   if (!fs.existsSync(dir)) return [];
@@ -92,7 +97,7 @@ function entry(file) {
   const text = read(file);
   const size = fs.statSync(file).size;
   const bits = [blurbOf(text), kb(size), isPlan(file) ? progressOf(text) : ''].filter(Boolean);
-  return `- [**${titleOf(text, path.basename(file))}**](${rel(file)}) — ${bits.join(' · ')}`;
+  return `- [**${titleOf(text, path.basename(file))}**](${linkFromOut(file)}) — ${bits.join(' · ')}`;
 }
 
 // Il "perché" di un file archiviato sta nell'archivio, non nell'indice: l'indice lo cita.

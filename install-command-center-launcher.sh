@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Installa il launcher cliccabile "Cyboros Command Center" sul desktop.
-# Idempotente: rigenera il .desktop con il path REALE del progetto (funziona anche
+# Idempotente: genera il .desktop con il path REALE del progetto (funziona anche
 # se il repo è stato spostato) e lo copia in ~/Scrivania (o ~/Desktop su sistemi EN),
 # marcandolo eseguibile/affidabile così il doppio click parte senza avvisi.
 #
@@ -24,9 +24,12 @@ if [[ -z "$DESKTOP_DIR" || ! -d "$DESKTOP_DIR" ]]; then
 fi
 [[ -z "$DESKTOP_DIR" ]] && { mkdir -p "$HOME/Desktop"; DESKTOP_DIR="$HOME/Desktop"; }
 
-# Rigenera anche il template versionato nel repo (path reale) e installa sul desktop.
-for TARGET in "$EDITION/cyboros-command-center.desktop" "$DESKTOP_DIR/cyboros-command-center.desktop"; do
-  cat > "$TARGET" <<EOF
+# Solo la copia sul desktop. Il repo non versiona piu' un .desktop: `Exec` non ha un field code
+# portabile per la home — `%h` esiste in systemd, non nell'Exec di un Desktop Entry, dove un
+# codice non previsto rende la riga invalida e non processabile — quindi un file versionato con
+# `/home/<utente>/...` funziona per il solo autore. Qui il path reale si risolve all'installazione.
+TARGET="$DESKTOP_DIR/cyboros-command-center.desktop"
+cat > "$TARGET" <<EOF
 [Desktop Entry]
 Type=Application
 Version=1.0
@@ -38,10 +41,9 @@ Terminal=true
 Categories=Development;Security;
 StartupNotify=true
 EOF
-  chmod +x "$TARGET"
-  # GNOME/Nautilus: serve il flag "trusted" per lanciare senza prompt.
-  gio set "$TARGET" metadata::trusted true 2>/dev/null || true
-done
+chmod +x "$TARGET"
+# GNOME/Nautilus: serve il flag "trusted" per lanciare senza prompt.
+gio set "$TARGET" metadata::trusted true 2>/dev/null || true
 
 echo "[cyboros] launcher installato: $DESKTOP_DIR/cyboros-command-center.desktop"
 echo "[cyboros] doppio clic su \"Cyboros Command Center\" per avviare la dashboard."

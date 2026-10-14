@@ -131,7 +131,7 @@ function buildSarif(findings, opts) {
     driver: {
       name: 'Cyboros Harness',
       version: require('../package.json').version,
-      informationUri: 'https://github.com/CSI-entitymorton/cyboros-harness',
+      informationUri: 'https://github.com/stavrosredteamer/cyboros-harness',
       rules: [],
     },
   };

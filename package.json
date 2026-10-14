@@ -18,12 +18,12 @@
   "license": "Apache-2.0",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/CSI-entitymorton/cyboros-harness.git"
+    "url": "git+https://github.com/stavrosredteamer/cyboros-harness.git"
   },
   "bugs": {
-    "url": "https://github.com/CSI-entitymorton/cyboros-harness/issues"
+    "url": "https://github.com/stavrosredteamer/cyboros-harness/issues"
   },
-  "homepage": "https://github.com/CSI-entitymorton/cyboros-harness#readme",
+  "homepage": "https://github.com/stavrosredteamer/cyboros-harness#readme",
   "bin": {
     "cyboros": "tools/cyboros.js",
     "cyboros-doctor": "tools/doctor.js",

@@ -113,7 +113,7 @@ clean scan.
 Requires **Node ≥ 22** (the Command Center backend uses `node:sqlite`).
 
 ```bash
-git clone https://github.com/CSI-entitymorton/cyboros-harness.git
+git clone https://github.com/stavrosredteamer/cyboros-harness.git
 cd cyboros-harness
 npm test                 # 114 tests, no install, no network, 2 workers (--jobs 1 to serialize)
 ```
@@ -236,7 +236,7 @@ cite the commit you used rather than `master`:
 ```
 Cyboros Harness — severity-enforced findings and a contamination-proof
 precision benchmark for AI security agents.
-https://github.com/CSI-entitymorton/cyboros-harness @ <commit-sha>
+https://github.com/stavrosredteamer/cyboros-harness @ <commit-sha>
 ```
 
 Scores produced by this harness are only meaningful alongside the seed, the agent

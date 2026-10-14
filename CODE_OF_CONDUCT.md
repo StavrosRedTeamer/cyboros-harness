@@ -53,7 +53,7 @@ account, or acting as an appointed representative at an online or offline event.
 Instances of abusive, harassing, or otherwise unacceptable behavior may be reported to the
 community leaders responsible for enforcement through the repository's **private issue
 tracker** — this repository is private, so an issue is visible to the maintainers only — or by
-contacting the maintainer directly on GitHub ([@CSI-entitymorton][maintainer]).
+contacting the maintainer directly on GitHub ([@stavrosredteamer][maintainer]).
 
 There is deliberately no reporting e-mail address here: no address for this project exists in
 `SECURITY.md` or anywhere else in the repository, and inventing one would send reports into the
@@ -64,7 +64,7 @@ All complaints will be reviewed and investigated promptly and fairly.
 All community leaders are obligated to respect the privacy and security of the reporter of any
 incident.
 
-[maintainer]: https://github.com/CSI-entitymorton
+[maintainer]: https://github.com/stavrosredteamer
 
 ## Enforcement Guidelines
 

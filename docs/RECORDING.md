@@ -101,7 +101,7 @@ docs/assets/demo.webp` does it.
 Command Center screenshot.
 
 For the anchor post, the same file needs a stable public URL:
-`https://github.com/CSI-entitymorton/cyboros-harness/raw/main/docs/assets/demo.gif`
+`https://github.com/stavrosredteamer/cyboros-harness/raw/main/docs/assets/demo.gif`
 works and costs nothing, and it inherits the repository's credibility. Do not
 upload the recording to a third-party GIF service — not because the content is
 sensitive (it is all synthetic `.example` hosts), but because a canonical URL on
