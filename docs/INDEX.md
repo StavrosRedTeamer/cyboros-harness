@@ -10,13 +10,13 @@
 
 - [**AGENTS.md — Cyboros Harness**](../AGENTS.md) — Operatore AI per operazioni di pentest autorizzate (web/host, wireless, mobile). · 5,9 KB
 - [**Benchmark**](../BENCHMARK.md) — Public security benchmarks are in the model's training data. "Solved" on OWASP Juice · 15,6 KB
-- [**Changelog**](../CHANGELOG.md) — All notable changes to this project are documented here. Dates are commit dates. · 45,6 KB
+- [**Changelog**](../CHANGELOG.md) — All notable changes to this project are documented here. Dates are commit dates. · 49,3 KB
 - [**Contributor Covenant Code of Conduct**](../CODE_OF_CONDUCT.md) — We as members, contributors, and leaders pledge to make participation in our community a · 5,8 KB
 - [**Contributing**](../CONTRIBUTING.md) — This repository is a penetration-testing harness built around one claim: a finding is only a · 4,5 KB
 - [**Cyboros Harness**](../README.md) — A penetration-testing harness where a finding is only a finding if code can prove it — · 12,1 KB
 - [**Security Policy**](../SECURITY.md) — Cyboros Harness is offensive-security tooling. It executes reconnaissance and · 4,1 KB
 - [**Prompt di sessione — benchmark gen-bench**](../bench-session-prompt.md) — Sei Cyboros. Questa sessione è una run di benchmark, non un engagement. · 5,1 KB
-- [**Cyboros — Web Red Team Methodology & Rules of Engagement**](../knowledge.md) — Shared brain for every Cyboros agent — read before acting. Detail lives in docs/ (map at bottom); · 14,8 KB
+- [**Cyboros — Web Red Team Methodology & Rules of Engagement**](../knowledge.md) — Shared brain for every Cyboros agent — read before acting. Detail lives in docs/ (map at bottom); · 15,7 KB
 - [**Piano di ottimizzazione workspace Stavros (Red Teamer harness)**](../piano-ottimizzazione-stavros.md) — Data: 10 settembre 2026 · Repo: stavrosredteamer (Freebuff) · Branch: `command-center-redesign` · 12,6 KB
 - [**Handoff — sessione con AUTOPILOT attivo (opt-in)**](../session-prompt-cyboros-autopilot.md) — Sei Cyboros, orchestratore red-team. In questa sessione l'operatore richiede ESPLICITAMENTE la · 2,1 KB
 
@@ -40,10 +40,10 @@
 - [**docs/f3-rom-alioth.md — Poco F3 (alioth): ROM dedicata per il client harness**](f3-rom-alioth.md) — (`docs/egress-opsec.md`). Le uniche app extra: Termux (F-Droid) e nulla altro. · 7,6 KB
 - [**Forum — il lato admin: ruolo, homepage, sanzioni**](forum-admin.md) — Il forum firmato (`tools/forum-server.js` + `tools/forum.js`) ha un ruolo admin lato server: lo · 7,4 KB
 - [**Host exploitation (post-web: C2 / post-ex / lateral) + threat intel**](host-exploitation.md) — Confirm-tier is refused unless `--confirm "<reason>"` is passed, which needs your explicit in-session · 9,1 KB
-- [**Testing by class — dettaglio metodologico**](methodology-classes.md) — Class names for `record-finding.js` are the canonical keys of `tools/test-registry.json` — · 5,1 KB
+- [**Testing by class — dettaglio metodologico**](methodology-classes.md) — Class names for `record-finding.js` are the canonical keys of `tools/test-registry.json` — · 6,9 KB
 - [**Mobile (Android) — methodology & tool detail**](mobile.md) — (`127.0.0.1`, `localhost`) o un serial USB esplicitamente in allowlist (device fisico autorizzato). · 4,9 KB
 - [**System Prompt Dump — StavrosRedTeamer**](system-prompt-dump.md) — Nessun dato di target, credenziale o output di engagement lascia la macchina. Vedi `docs/egress-opsec.md`. · 6,7 KB
-- [**Toolbox — dettaglio per-tool (knowledge.md tiene la tabella compatta)**](toolbox.md) — (it refuses out-of-scope hosts; supports `-l -`/`--stdin` AND a piped stdin for target lists; every · 27,2 KB
+- [**Toolbox — dettaglio per-tool (knowledge.md tiene la tabella compatta)**](toolbox.md) — (it refuses out-of-scope hosts; supports `-l -`/`--stdin` AND a piped stdin for target lists; every · 29,1 KB
 - [**Wireless (modalità separata)**](wireless.md) — WiFi is a SEPARATE mode from the web/network pipeline: targets are BSSIDs/ESSIDs/stations/channels, · 6,1 KB
 
 ## `ops/` — regole della harness

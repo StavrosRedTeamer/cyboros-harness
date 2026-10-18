@@ -101,6 +101,7 @@
 
   "schemathesis": { "args_schema": "run <schema-url> [--base-url <b>] [--checks all] [--hypothesis-max-examples <n>]", "risk_tier": "active", "timeout_ms": 3600000, "rate_class": "normal", "alternative": "arjun", "read_only": false },
   "h2csmuggler": { "args_schema": "-x <url> -t | --scan-list <file> --threads <n>", "risk_tier": "intrusive", "timeout_ms": 600000, "rate_class": "slow", "alternative": "desync.js", "read_only": false },
+  "zaproxy": { "args_schema": "-cmd -quickurl <url> -quickprogress [-quickout <dir>] | -cmd -autorun <plan.yaml>", "risk_tier": "active", "timeout_ms": 3600000, "rate_class": "aggressive", "alternative": "nuclei", "read_only": false },
 
   "brutus": { "args_schema": "creds --target <host:port> --protocol <p> [--mode cautious|default|aggressive] [--json] | badkeys --nmap-file <xml>", "risk_tier": "intrusive", "timeout_ms": 7200000, "rate_class": "aggressive", "alternative": "medusa", "read_only": false },
   "titus": { "args_schema": "scan <path|github.com/org/repo|--git <repo>|--docker <img>> [--extract=all] [--validate] [--format json|sarif]", "risk_tier": "read", "timeout_ms": 3600000, "rate_class": "normal", "alternative": "trufflehog", "read_only": true }

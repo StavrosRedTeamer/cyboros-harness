@@ -59,13 +59,15 @@ independently of you (scope-guard/run/c2-guard/wifi-guard — all fail-closed).
 | map/chain | endpoint map + link findings → catene (key leak+authz → ATO) | `node tools/map.js add '<json>'` / `chain.js` |
 | cvss/epss/threatintel | CVSS v3.1 + EPSS/CWE offline + NVD/KEV/EPSS live | `node tools/{cvss,epss,threatintel}.js ...` |
 | searchsploit/wp-check | exploit-db + PoC archive; fingerprint WP | `node tools/{searchsploit,wp-check}.js ...` |
-| kb-search | retrieval FTS5 knowledge.md + docs/**/*.md — usa per il dettaglio | `node tools/kb-search.js "query"` |
+| kb-search | retrieval FTS5 knowledge.md + docs/** + `tools/payloads/**` + `workflows/*.yaml` — usa per il dettaglio | `node tools/kb-search.js "query"` |
 | report-html | report HTML standalone (severity+CVSS+CWE+EPSS) | `node tools/report-html.js [--findings ..]` |
 | report-sarif | SARIF 2.1.0 per GitHub/DefectDojo/SIEM + evidence bag (verify_level, ceiling, oracle) | `node tools/report-sarif.js [--out ..]` |
 | attack-api-stateful | property-based stateful API fuzzing dalla spec (BOLA/lifecycle/authz) | `node tools/workflow.js run workflows/attack-api-stateful.yaml -t <url>` |
 | attack-h2c | h2c smuggling detection-only (`-t`: non tunnella) | `node tools/workflow.js run workflows/attack-h2c.yaml -t <url>` |
 | attack-wp | WP fingerprint (zero-token) + CVE plugin/temi via wpscan | `node tools/workflow.js run workflows/attack-wp.yaml -t <url>` |
 | attack-creds | default-credential audit (brutus) su UN servizio — **confirm-tier**: solo con approvazione esplicita in sessione | `node tools/workflow.js run workflows/attack-creds.yaml -t <host> --var port=22 --var protocol=ssh` |
+| attack-nextjs | Next.js/RSC detection-only: versione, middleware bypass, image optimizer, bundle | `node tools/workflow.js run workflows/attack-nextjs.yaml -t <url> --var protected_path=/admin` |
+| attack-dataapi | Supabase/PostgREST + Firebase detection-only, chiave `anon` e letture canary | `node tools/workflow.js run workflows/attack-dataapi.yaml -t <url> --var anon_key=<key> --var table=<canary>` |
 | h8mail | breach OSINT (dominio checkato) | `node tools/run.js h8mail -t <email> -sk -j reports/tmp/h8mail-<ts>.json` |
 | record-finding | registra finding (dedup, redact, loot vault) — per OGNI finding | `node tools/record-finding.js '{...}'` |
 | egress/wifi/host-exploit | egress+OPSEC · wireless · C2/post-ex/privesc | vedi docs/{egress-opsec,wireless,host-exploitation}.md |
@@ -155,9 +157,14 @@ finding is re-verified by an independent DSH subagent — that IS the deliverabl
 Sanitized memory lives in `memory/` (committed; engagement data MUST NOT enter): `lessons.jsonl`
 (technique→outcome, "worked" only if verified) + `env-profiles.jsonl` (WAF behavior, rates).
 
+0. **RAG first, before any class**: `node tools/memory-recall.js "<stack> <classe> <ostacolo>"`
+   interroga lo store vettoriale (`memory/rag-store.jsonl`, tecniche cristallizzate, recall per
+   similarità stack+ostacolo). Un hit è una procedura già funzionata, non una prova: riprovala.
 1. BEFORE a surface class: `node tools/memory.js search "<class> <tech>"` (top-k ≤5) → useful =
    `review --reinforce`; wrong = `review --contradict` (×2 → review).
-2. AT close: distill ≤10 lessons via `add --stdin` (procedure: `memory/README.md`).
+2. AT close: distill ≤10 lessons via `add --stdin` (procedure: `memory/README.md`) and
+   crystallize what worked with `node tools/memory-rag.js store --file entry.json` (schema in
+   `memory/README.md`; the sanitizer is the same one).
 3. Recurring lessons → `promote <id>` → `memory/promotions.md`; apply here after human review.
 
 Sanitizer: rejects in-scope hosts/IPs/emails/tokens/creds (never bypass for client data). Lessons

@@ -1,55 +1,51 @@
 #!/usr/bin/env node
-// Local knowledge retrieval over knowledge.md + reports/*.md (+ docs/**) — glassmind-style
-// context bundles for the agents (repo-vet churchofmalware plan QW10). SQLite FTS5 via
-// node:sqlite (Node >= 22.5, zero npm deps).
+// Local knowledge retrieval over knowledge.md + docs/** + tools/payloads/** + workflows/*.yaml
+// (+ reports/*.md with --docs) — glassmind-style context bundles for the agents (repo-vet
+// churchofmalware plan QW10). SQLite FTS5 via node:sqlite (Node >= 22.5, zero npm deps).
 //
 //   node tools/kb-search.js index                 # rebuild reports/kb-index.db
 //   node tools/kb-search.js "query terms" [--limit 5] [--docs]   # search (findings included only with --docs)
 //
-// Chunking: one row per markdown heading section (heading kept as context). Every chunk is an
-// owned plain-text copy — no live objects are persisted.
+// Perché payloads e workflow sono nel corpus di default: sono metodologia, non dati di
+// engagement (a differenza di reports/), e sono esattamente ciò che un agente deve ritrovare
+// prima di testare una classe — «come si conferma un CSPT» non deve richiedere di aprire a
+// mano quattro .md. `--docs` resta l'unico modo per includere reports/.
+//
+// Chunking: one row per markdown heading section (heading kept as context); un file YAML senza
+// heading produce un solo chunk con l'intero file — i workflow sono piccoli e restano leggibili.
+// Every chunk is an owned plain-text copy — no live objects are persisted.
 const fs = require('fs');
 const path = require('path');
 
 const ROOT = path.join(__dirname, '..');
 const DB_PATH = () => process.env.KB_INDEX_DB || path.join(ROOT, 'reports', 'kb-index.db');
 
-// Corpus: knowledge.md always; reports/*.md and docs/**/*.md opt-in (--docs) because report
-// bodies are engagement evidence and pollute methodology queries.
-function corpusFiles(includeReports) {
-  const files = [{ file: 'knowledge.md', kind: 'knowledge' }];
-  const addDir = (dir, prefix) => {
-    let entries = [];
-    try { entries = fs.readdirSync(dir); } catch { return; }
-    for (const e of entries) {
-      const full = path.join(dir, e);
-      let st = null;
-      try { st = fs.statSync(full); } catch { continue; }
-      if (st.isDirectory()) {
-        if (prefix === 'reports' && (e === 'tmp' || e === '.git')) continue;
-        files.push(...corpusFilesRecursive(full, prefix));
-      } else if (/\.md$/i.test(e)) {
-        files.push({ file: path.relative(ROOT, full), kind: prefix });
-      }
-    }
-  };
-  // one recursion level is enough here; keep it simple and explicit
-  function corpusFilesRecursive(dir, kind) {
-    const out = [];
-    let entries = [];
-    try { entries = fs.readdirSync(dir); } catch { return out; }
-    for (const e of entries) {
-      const full = path.join(dir, e);
-      let st = null;
-      try { st = fs.statSync(full); } catch { continue; }
-      if (st.isDirectory()) out.push(...corpusFilesRecursive(full, kind));
-      else if (/\.md$/i.test(e)) out.push({ file: path.relative(ROOT, full), kind });
-    }
-    return out;
+// Corpus: knowledge.md + docs + payloads + workflows always; reports/*.md only with --docs
+// because report bodies are engagement evidence and pollute methodology queries.
+function walk(dir, kind, re) {
+  const out = [];
+  let entries = [];
+  try { entries = fs.readdirSync(dir); } catch { return out; }
+  for (const e of entries) {
+    if (e === 'tmp' || e === '.git' || e === 'node_modules') continue;
+    const full = path.join(dir, e);
+    let st = null;
+    try { st = fs.statSync(full); } catch { continue; }
+    if (st.isDirectory()) out.push(...walk(full, kind, re));
+    else if (re.test(e)) out.push({ file: path.relative(ROOT, full), kind });
   }
-  addDir(path.join(ROOT, 'reports'), 'reports');
-  addDir(path.join(ROOT, 'docs'), 'docs');
-  return includeReports ? files : files.filter((f) => f.kind === 'knowledge' || f.kind === 'docs');
+  return out;
+}
+
+function corpusFiles(includeReports) {
+  const files = [
+    { file: 'knowledge.md', kind: 'knowledge' },
+    ...walk(path.join(ROOT, 'docs'), 'docs', /\.md$/i),
+    ...walk(path.join(ROOT, 'tools', 'payloads'), 'payloads', /\.md$/i),
+    ...walk(path.join(ROOT, 'workflows'), 'workflows', /\.ya?ml$/i),
+  ];
+  if (includeReports) files.push(...walk(path.join(ROOT, 'reports'), 'reports', /\.md$/i));
+  return files;
 }
 
 // Split markdown into {heading, body} chunks at ## / ### boundaries (H1 stays preamble).
@@ -143,4 +139,4 @@ if (require.main === module) {
   process.exit(r.ok && r.matches.length ? 0 : r.ok ? 1 : 2);
 }
 
-module.exports = { corpusFiles, chunksOf, safeQuery, index, search, DB_PATH };
+module.exports = { corpusFiles, chunksOf, safeQuery, index, search, DB_PATH, walk };

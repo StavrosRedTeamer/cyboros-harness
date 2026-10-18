@@ -36,6 +36,19 @@ and tracked by `coverage.js`.
   read `tools/payloads/<class>.md` first, then `nuclei` + manual via `repeater.js`. SSTI: fingerprint the
   engine from the error, confirm with a math marker (`{{7*7}}`→49). Deser/NoSQLi/LFI/proto-pollution:
   detection-only (error/time/reflect) until the user confirms escalation.
+- **Client-side path traversal (class `cspt`):** a client-controlled path fragment (`location.hash`,
+  `location.search`, a `postMessage` payload) is interpolated into a `fetch()`/XHR path, so the
+  attacker can redirect the request to an endpoint the UI never calls; chain it with CSRF when that
+  endpoint mutates state (Doyensec CSPT-to-CSRF). Detection: read the client code first
+  (`analyze-bundle.js`, `dom-check.js`) for path concatenation from a controllable source, then
+  replay both paths via `repeater.js --diff` — the proof is a request that reaches an API surface
+  the page does not legitimately expose. Record class `cspt`, not `xss`.
+- **HTTP/2 desync (class `h2-desync`):** a front end speaking HTTP/2 that downgrades to HTTP/1.1
+  upstream exposes H2.CL / H2.TE smuggling and cache poisoning through desync; the CL.TE/TE.CL/TE.TE
+  checks in `desync.js` do not cover it. Detection: `desync.js` first, then confirm the front-end/CDN
+  and upstream protocol versions (`httpx -http2`), and treat a status/timeout differential under H2
+  as a candidate until reproduced. Detection-only: no cache poisoning against a live cache without
+  explicit approval for that action.
 - **File upload:** `repeater.js --upload file=./poc.html --form k=v` — extension/polyglot/content-type
   bypass, stored-XSS via upload, path traversal in filename, upload-to-RCE only with explicit approval.
 - **Race conditions (TOCTOU):** `repeater.js --race 8` on redeem/coupon/transfer endpoints — look for
@@ -55,6 +68,13 @@ and tracked by `coverage.js`.
   back) for Critical.
 - **Cloud (cyboros-cloud):** metadata via SSRF (169.254.169.254 etc., only if `allowed_ips` allows),
   exposed S3/GCS/Azure buckets, provider fingerprint. Read the smallest proof (role NAME, not creds).
+- **Data API / backend-as-a-service (class `data-api`):** Supabase/PostgREST and Firebase expose
+  tables and documents directly to the browser SDK, so the flaw is authorization, not injection.
+  Check RLS **and** table grants (a policy does not revoke a grant), exposed views/functions, Storage
+  buckets and Realtime DB rules. Detection: with the public anon/publishable key, read a deliberately
+  seeded canary row — never a `service_role` key, never real data — then repeat with a second identity
+  to expose cross-tenant reads; write a canary row only with explicit confirmation. Record class
+  `data-api`: a permissive rule is `triggered`, a cross-tenant read is `exploited`.
 - **LLM / GenAI / Agentic AI (cyboros-llm):** `tools/payloads/llm-agentic.md` + `tools/payloads/mcp.md`.
   Detection-only, benign MARKER always. LLM01 prompt injection, LLM07 system-prompt leak, RAG poisoning
   (LLM08/ASI06), and Agentic AI 2026: ASI02 tool misuse / ASI03 identity (exposed `tools/list`,

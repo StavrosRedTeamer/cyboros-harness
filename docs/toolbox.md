@@ -86,6 +86,26 @@
   attiva in scope.json passa `--var approval=<id>`. Per liste utente/password
   (`-U users.txt -P pass.txt`), chiavi SSH note (`brutus badkeys`) o scan da un XML nmap
   (`--nmap-file`) usa `node tools/run.js brutus ...` con la stessa regola di conferma.
+- **Next.js / RSC (detection-only):** `node tools/workflow.js run workflows/attack-nextjs.yaml -t https://<host> [--var protected_path=/dashboard]`
+  — fingerprint della versione, poi la route protetta **con e senza** header
+  `x-middleware-subrequest` (CVE-2025-29927): 200 dove l'anonimo prende 307/401 è un candidato,
+  la conferma è una seconda identità che legge dati veri. Seguono l'image optimizer su un asset
+  locale (`/_next/image`, 55173/57752 — mai un host remoto che non controlliamo) e l'inventario
+  del bundle (endpoint, chiavi pubbliche, hash `Next-Action`). Nessun flusso RSC serializzato:
+  CVE-2025-55182 si prova dall'SBOM. `analyze-bundle.js` è ammesso come guard wrapper nei workflow
+  perché i suoi fetch passano già da `scope-guard` (DNS/IP-pinned). Riferimento:
+  `tools/payloads/nextjs-rsc.md`.
+- **Data-API Supabase/PostgREST e Firebase (detection-only):** `node tools/workflow.js run workflows/attack-dataapi.yaml -t https://<proj>.supabase.co --var anon_key=<publishable> --var table=<canary>`
+  — la chiave `anon` è pubblica per disegno: la domanda non è "c'è una chiave" ma "cosa può
+  leggere". Lettura `select=*&limit=1` su una tabella canary, listato dei bucket pubblici,
+  `/.json?shallow=true` per il Realtime Database. Scritture e RPC state-changing restano fuori dal
+  workflow: sono confirm-tier e si fanno a mano su una riga canary. Una `service_role` trovata nel
+  bundle è un finding `config`, non una chiave da usare. Riferimento: `tools/payloads/data-api.md`.
+- **ZAP come scanner di riserva:** `node tools/run.js zaproxy -cmd -quickurl <url> -quickprogress [-quickout <dir>]`
+  — registrato nel registry (`active`, `alternative: nuclei`) per passare da scope + enforce come
+  gli altri binari. La quick scan è attiva sul target: tier `active`, e con un WAF davanti si
+  abbassa il ritmo (non lo si alza). Per una scansione guidata serve un piano `-autorun`;
+  l'API keyless di ZAP resta locale, nessun dato lascia la macchina.
 - **Secrets scan con Titus (alternativa a trufflehog):** `node tools/run.js titus scan <github.com/org/repo|path> [--extract=all] [--format json]`
   — 487 regole, scoring 0–100, estrazione da binari (Office/PDF/archivi, **APK/IPA**) e scan di
   immagini OCI incluse le layer cancellate. `--validate` e `--score-scope` sono **egress**

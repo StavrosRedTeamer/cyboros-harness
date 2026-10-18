@@ -9,6 +9,15 @@ grouped by milestone, and `v0.1.0` (2026-09-28) is the first tagged release.
 
 ### Changed
 
+- **La matrice di copertura deriva le classi dal registry, non da una lista cablata.**
+  `tools/coverage.js` aveva 20 nomi hardcoded: 32 classi di `tools/test-registry.json` (jwt, cors,
+  graphql, race, cache-poison, smuggling, ssti, xxe, llm, mcp, privesc…) non comparivano mai in
+  matrice, e 8 nomi usati dalla matrice non erano chiavi valide per `record-finding.js` (un finding
+  `class: "file-upload"` veniva rifiutato). Ora le classi si derivano dal registry, i cinque nomi
+  storici restano alias di display (una sola riga per classe) e `reports/<host>-map.json` viene letto
+  in tutte e tre le forme realmente presenti — inclusa quella che `map.js` scrive
+  (`endpoints[].candidates`), che prima dava "zero candidati" su una mappa piena. Invariante in
+  `tools/test-coverage.js`.
 - **Il progetto si chiama Cyboros Harness** — repo, package npm, i cinque `bin`, le etichette
   mostrate e il motore deterministico (`tools/cyboros.js`). Il rebrand non tocca la storia:
   `CHANGELOG.md`, le run registrate e i piani datati restano come erano. Design e mappatura in
@@ -35,6 +44,39 @@ grouped by milestone, and `v0.1.0` (2026-09-28) is the first tagged release.
 
 ### Added
 
+- **Quattro payload reference nuove, tutte detection-only.** `tools/payloads/nextjs-rsc.md`
+  (fingerprint versione, middleware bypass CVE-2025-29927, image optimizer 55173/57752, Server
+  Action come endpoint di autorizzazione) non contiene **nessun** flusso RSC serializzato: la
+  CVE-2025-55182 è RCE non autenticata e si prova dall'SBOM, non sparando un gadget. `data-api.md`
+  (Supabase/PostgREST: RLS **e** grants, viste senza `security_invoker`, RPC `SECURITY DEFINER`,
+  Storage, Realtime; Firebase: `shallow=true`, regole dedotte dal comportamento) lavora canary-first
+  con la sola chiave `anon`; `cspt.md` (sink di navigazione dal bundle → catena CSRF) e
+  `jndi-spel-ognl.md` (marker OOB sul nostro listener, `49` come marker matematico) chiudono le
+  classi che non avevano un tool dedicato. Ognuno ha la tabella di mapping osservazione → classe →
+  `verify_level`, così un finding non nasce da un'etichetta inventata.
+- **`kb-search` indicizza anche `tools/payloads/**` e `workflows/*.yaml`.** Il corpus di default era
+  `knowledge.md` + `docs/**`: la metodologia per classe c'era, ma i payload e i workflow —
+  esattamente ciò che serve *prima* di testare — restavano fuori. `reports/` continua a richiedere
+  `--docs`, perché lì dentro c'è evidenza di engagement e non metodologia.
+- **Il RAG store parte con 18 tecniche cristallizzate.** `memory/rag-store.jsonl` + `RAG-INDEX.md`
+  (rigenerato a ogni mutazione) coprono authz, cache poison, data-API, JWT, SSTI/JNDI, race, MCP,
+  prototype pollution, GraphQL, CSRF-chain e altro. Ogni voce ha stack + ostacolo + soluzione
+  generalizzata, passa lo stesso sanitizer delle lezioni (niente host/IP/email/token di scope) ed è
+  richiamabile con `node tools/memory-recall.js "<stack> <classe> <ostacolo>"`. In `knowledge.md` il
+  recall diventa il **passo 0** prima di ogni classe: un hit è una procedura già funzionata, non una
+  prova, e va riprovata sul target.
+- **Due workflow di classe nuovi e `zaproxy` nel registry.** `workflows/attack-nextjs.yaml`
+  (fingerprint → middleware bypass con e senza header, controllo anonimo della stessa route, image
+  optimizer, bundle) e `workflows/attack-dataapi.yaml` (bundle/chiavi pubbliche → lettura `anon`
+  sulla tabella canary → Storage pubblico → regole Realtime) sono read-tier, ogni step con
+  `on_error: continue` e artefatto su disco. Per il passo di fingerprint `tools/analyze-bundle.js`
+  entra tra i guard wrapper ammessi da `workflow.js`: i suoi fetch passano già da `scope-guard`
+  (DNS/IP-pinned). `zaproxy` (installato, ma invisibile a `run.js`) è ora nel registry (100 → 101,
+  `active`, `alternative: nuclei`), quindi instradabile con scope + enforce.
+- **Tre classi nuove nella tassonomia web**: `cspt` (client-side path traversal → catena CSRF),
+  `data-api` (Supabase/PostgREST RLS+grants, Firebase rules) e `h2-desync` (HTTP/2→HTTP/1.1
+  downgrade, H2.CL/H2.TE). Mapping CWE/WSTG/ASVS/OWASP-API e procedura di test detection-only in
+  `docs/methodology-classes.md`; nessun payload RCE.
 - **Credential testing con Brutus e secrets scan con Titus**, dalla scansione community di
   ottobre (`docs/community-scout-2026-10.md`). `go install` in `install-tools.sh`/`.ps1` e due
   voci in `tools/tool-registry.json` (97 → 99): `brutus` `intrusive` (43 protocolli, JSONL di

@@ -125,6 +125,11 @@ const CMD_PREFIXES = [
   // verificato: blocca fuori scope con ok:false) — stessa disciplina dei wrapper qui sopra,
   // quindi ammesso come guard nei workflow.
   'node tools/wp-check.js ',
+  // analyze-bundle.js non è un attacco: legge il bundle del target, e ogni fetch passa da
+  // scope-guard (loadScope/inScope, DNS/IP-pinned) prima di toccare la rete. È il passo di
+  // fingerprint dei workflow Next.js/data-API, dove non esiste un wrapper più stretto che
+  // restituisca endpoint e chiavi pubbliche.
+  'node tools/analyze-bundle.js ',
 ];
 const CMD_PREFIX = CMD_PREFIXES[0]; // legacy hint text
 function cmdAllowed(cmd) {

@@ -261,6 +261,15 @@ const tmpFile = (...names) => path.join(TMP, ...names);
     assert.strictEqual(weird.ok === true || /query failed/.test(weird.error || ''), true);
     assert.strictEqual(KB.search('', { dbFile }).ok, false);
     assert.strictEqual(KB.search('anything', { dbFile: tmpFile('nope.db') }).error, 'index missing — run: node tools/kb-search.js index');
+    // Corpus esteso: le reference dei payload e i workflow sono metodologia (non dati di
+    // engagement), quindi entrano sempre; reports/ resta opt-in con --docs.
+    const corpus = KB.corpusFiles(false);
+    assert.ok(corpus.some((f) => f.kind === 'payloads' && /payloads\/cspt\.md$/.test(f.file)), 'payload refs indexed');
+    assert.ok(corpus.some((f) => f.kind === 'workflows' && /workflows\/.*\.ya?ml$/.test(f.file)), 'workflows indexed');
+    assert.ok(!corpus.some((f) => f.kind === 'reports'), 'reports stay opt-in');
+    assert.ok(KB.corpusFiles(true).some((f) => f.kind === 'reports'), '--docs still adds reports');
+    const csptHit = KB.search('CSPT', { dbFile, limit: 3 });
+    assert.ok(csptHit.matches.some((m) => m.doc === 'tools/payloads/cspt.md'), JSON.stringify(csptHit));
   }
 
   console.log('repo-vet integrations: all tests passed');

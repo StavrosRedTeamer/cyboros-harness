@@ -10,7 +10,8 @@
       "owasp_llm": "OWASP GenAI LLM Top 10 (2025/2026) ids",
       "owasp_agentic": "OWASP Top 10 for Agentic Applications 2026 ids (ASI01-ASI10)",
       "attack": "MITRE ATT&CK Enterprise technique ids; tactic/name resolved in tools/attack-coverage.js",
-      "note_2025": "Registry aligned with OWASP Top 10:2025 — A01 Broken Access Control now explicitly covers BOLA/BFLA (bola/bfla classes); new 2025 categories A03 Software Supply Chain (supply-chain) and A10 Mishandling of Exceptional Conditions (exceptional); plus the 2025/2026 GenAI surface (llm, mcp)."
+      "note_2025": "Registry aligned with OWASP Top 10:2025 — A01 Broken Access Control now explicitly covers BOLA/BFLA (bola/bfla classes); new 2025 categories A03 Software Supply Chain (supply-chain) and A10 Mishandling of Exceptional Conditions (exceptional); plus the 2025/2026 GenAI surface (llm, mcp).",
+      "note_2026-10": "Added three classes on 2026-10-18 after the RAG/vuln-DB review: cspt (client-side path traversal → CSRF chain, Doyensec CSPT-to-CSRF), data-api (Supabase/PostgREST RLS+grants, Firebase rules — configuration class, no CVE), h2-desync (HTTP/2→HTTP/1.1 downgrade, H2.CL/H2.TE, cache poisoning via desync; PortSwigger 2025). coverage.js now DERIVES its class list from this registry, keeping the five historical display names as aliases."
     },
     "note": "Pointers to methodology references per finding/vuln CLASS. They guide the tester and enrich reports; they are NOT evidence that a check was executed."
   },
@@ -132,6 +133,19 @@
       "owasp_api": []
     },
     "smuggling": {
+      "attack": ["T1190"],
+      "wstg": [
+        "WSTG-INPV-15"
+      ],
+      "asvs": [
+        "V5 Validation & Encoding"
+      ],
+      "cwe": [
+        "CWE-444"
+      ],
+      "owasp_api": []
+    },
+    "h2-desync": {
       "attack": ["T1190"],
       "wstg": [
         "WSTG-INPV-15"
@@ -372,6 +386,18 @@
       ],
       "owasp_api": []
     },
+    "cspt": {
+      "attack": ["T1190", "T1059.007"],
+      "wstg": [],
+      "asvs": [
+        "V5 Validation & Encoding"
+      ],
+      "cwe": [
+        "CWE-22",
+        "CWE-352"
+      ],
+      "owasp_api": []
+    },
     "upload": {
       "attack": ["T1190", "T1505.003"],
       "wstg": [
@@ -429,6 +455,23 @@
         "CWE-200"
       ],
       "owasp_api": [
+        "API8"
+      ]
+    },
+    "data-api": {
+      "attack": ["T1190"],
+      "wstg": [],
+      "asvs": [
+        "V4 Access Control"
+      ],
+      "cwe": [
+        "CWE-284",
+        "CWE-863",
+        "CWE-732"
+      ],
+      "owasp_api": [
+        "API1",
+        "API3",
         "API8"
       ]
     },

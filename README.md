@@ -165,7 +165,7 @@ only the processes the harness owns.
 | `tools/` | the engine: 161 modules, scope guards, repeater, oracle, pipeline, C2, wifi, GUI, tests |
 | `local/fleet/` | 28 agent definitions (orchestrator + specialists) |
 | `local/` | standalone runner against a local model — no cloud, no Freebuff |
-| `workflows/` | 18 reusable `enum-*` / `attack-*` pipelines |
+| `workflows/` | 20 reusable `enum-*` / `attack-*` pipelines |
 | `knowledge.md` | the engagement contract: rules, toolbox, verification discipline |
 | `docs/` | per-tool and per-class methodology, retrieved with `node tools/kb-search.js` |
 | `memory/` | sanitized cross-engagement lessons |

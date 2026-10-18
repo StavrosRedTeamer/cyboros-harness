@@ -19,6 +19,10 @@ marker (unique string / arithmetic / time) — never a destructive action.
 | `cache-poisoning.md` | Web cache poisoning (unkeyed inputs) / cache deception — detection-only; runs via `tools/cachepoison.js` |
 | `saml.md` | SAML / XML Signature Wrapping (XSW1–8, sig-strip, NameID tamper) — detection-only; minted via `tools/saml.js`, replayed via `tools/repeater.js` |
 | `injection.md` | OS command injection, header injection/CRLF, open redirect — detection-only; runs via `tools/repeater.js` + `tools/oob.js` |
+| `jndi-spel-ognl.md` | JNDI (Log4Shell family) + SpEL/OGNL/EL expression injection — OOB marker on our own listener, math marker (`49`) |
+| `nextjs-rsc.md` | Next.js / React Server Components: middleware bypass (CVE-2025-29927), image optimizer (55173/57752), Server Action authz, RSC CVE (55182) via SBOM — **no serialized RSC payload** |
+| `data-api.md` | Supabase/PostgREST + Firebase: RLS vs grants, views, RPC, Storage, Realtime rules — canary row, public key only |
+| `cspt.md` | Client-side path traversal → CSRF chain (source→sink in the bundle, `--vary` with traversal segments) |
 | `upload-bypass/gen-polyglot-jpeg.js` | Valid-JPEG/script polyglot for magic-byte/MIME upload filters (see `upload-bypass/README.md`) |
 
 ## Rules of use

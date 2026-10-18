@@ -1,0 +1,59 @@
+# Workflow offensivo — attack-dataapi (dialetto workflow)
+# Superficie data-API (Supabase/PostgREST, Firebase) in quattro passate read-only.
+# Il payload di riferimento è tools/payloads/data-api.md: la chiave `anon`/publishable è
+# pubblica per disegno, quindi la domanda non è "c'è una chiave" ma "cosa può leggere".
+# Canary-first: si leggono righe che dovrebbero essere pubbliche o una riga canary nostra,
+# mai dati di tenant. `service_role` trovata nel bundle è un finding `config`, non una chiave
+# da usare — lo step non la usa nemmeno se la incontra.
+#
+# Ordine:
+#   1. bundle — endpoint REST/Auth/Storage e chiavi pubbliche già esposte dal frontend.
+#   2. rest — `GET /rest/v1/<table>?select=*&limit=1` con la sola chiave anon: 200+rows
+#      significa che il ruolo anon legge quella tabella; 401/403 è il comportamento corretto.
+#   3. storage — bucket pubblici (`/storage/v1/object/public/`): un listato aperto è già
+#      esposizione, un 400/404 è la norma.
+#   4. firebase — `/.json?shallow=true` sul Realtime Database: `permission_denied` è
+#      default-deny corretto, un oggetto JSON è una collezione leggibile.
+#
+# `anon_key` : chiave pubblica presa dal bundle (JWT con "role":"anon" o `sb_publishable_…`).
+# `table`    : tabella canary o pubblica da interrogare. Default `users` — se il nome è
+#              sbagliato PostgREST risponde `PGRST205` e non si è letto nulla.
+# Rischio: read (solo GET). Scritture e chiamate RPC state-changing restano fuori da questo
+# workflow: sono confirm-tier e si fanno a mano con `--method POST` su una riga canary.
+# Uso: node tools/workflow.js run workflows/attack-dataapi.yaml -t https://<proj>.supabase.co --var anon_key=<key> --var table=<canary>
+name: attack-dataapi
+description: Supabase/PostgREST + Firebase detection-only — chiave pubblica dal bundle, letture anon, storage, regole Realtime
+vars:
+  tag: target
+  outdir: reports
+  anon_key: ""
+  table: users
+steps:
+  - id: bundle
+    cmd: node tools/analyze-bundle.js {target}
+    on_error: continue
+    artifacts:
+      - path: "{outdir}/attack-{tag}-dataapi-bundle.txt"
+        surface: fingerprint
+        from: stdout
+  - id: rest-canary
+    cmd: 'node tools/repeater.js --url "{target}/rest/v1/{table}?select=*&limit=1" --header "apikey: {anon_key}" --header "Authorization: Bearer {anon_key}" --show-body'
+    on_error: continue
+    artifacts:
+      - path: "{outdir}/attack-{tag}-dataapi-rest.txt"
+        surface: scan
+        from: stdout
+  - id: storage-public
+    cmd: 'node tools/repeater.js --url "{target}/storage/v1/object/public/" --show-body'
+    on_error: continue
+    artifacts:
+      - path: "{outdir}/attack-{tag}-dataapi-storage.txt"
+        surface: scan
+        from: stdout
+  - id: firebase-shallow
+    cmd: 'node tools/repeater.js --url "{target}/.json?shallow=true" --show-body'
+    on_error: continue
+    artifacts:
+      - path: "{outdir}/attack-{tag}-dataapi-firebase.txt"
+        surface: scan
+        from: stdout

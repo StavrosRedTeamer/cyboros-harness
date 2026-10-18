@@ -19,16 +19,66 @@
 'use strict';
 const fs = require('fs');
 const path = require('path');
+const { env } = require('./env');
 
 const REPORTS = path.join(__dirname, '..', 'reports');
 const FINDINGS = path.join(REPORTS, 'findings.jsonl');
+const REGISTRY_FILE = () => env('TEST_REGISTRY') || path.join(__dirname, 'test-registry.json');
 
-// Vulnerability classes tracked by the harness (matches knowledge.md methodology).
-const CLASSES = [
+// Vulnerability classes tracked by the harness. FONTE UNICA: tools/test-registry.json — lo stesso
+// file che validano record-finding.js, map.js e attack-coverage.js. Prima questa lista era
+// hardcoded a 20 nomi e 32 classi del registry non comparivano MAI in matrice (jwt, cors,
+// graphql, race, cache-poison, smuggling, ssti, xxe, llm, mcp, privesc…): il gate P3 dichiarava
+// copertura su meno della metà della tassonomia. Ora le classi derivate si aggiungono a CORE.
+//
+// I cinque nomi storici restano il display name della matrice (mappe, finding e report esistenti
+// continuano a risolvere): sono alias di chiavi del registry, non classi separate.
+const LEGACY_ALIASES = Object.freeze({
+  'file-upload': 'upload',
+  'path-traversal': 'lfi',
+  'deserialization': 'deser',
+  'info-disclosure': 'info',
+  'logic': 'business-logic',
+});
+
+// Superfici/esiti dell'harness senza chiave di registry: non sono classi testabili del registry
+// (una chain è la conseguenza di più classi; rete e post-exploitation non hanno una entry).
+const HARNESS_ONLY = Object.freeze(['chain', 'network', 'postex']);
+
+// Classi web di base: sempre presenti, in questo ordine (l'ordine è parte dell'output
+// diffabile della matrice).
+const CORE_CLASSES = Object.freeze([
   'sqli', 'xss', 'ssrf', 'injection', 'authn', 'authz', 'csrf', 'idor', 'file-upload',
   'path-traversal', 'deserialization', 'info-disclosure', 'config', 'crypto', 'logic',
   'chain', 'cloud', 'network', 'wireless', 'postex',
-];
+]);
+
+// Chiave di registry -> display name della matrice (solo i cinque alias differiscono).
+function displayName(key) {
+  for (const [disp, k] of Object.entries(LEGACY_ALIASES)) if (k === key) return disp;
+  return key;
+}
+
+function loadRegistryClasses() {
+  try {
+    const reg = JSON.parse(fs.readFileSync(REGISTRY_FILE(), 'utf8'));
+    return (reg && reg.classes) || {};
+  } catch { return {}; }
+}
+
+// CORE first, then the registry classes not already covered, sorted: deterministic output.
+// 'other' è il bucket di fallback del registry, non una classe testabile: resta fuori dalle
+// righe e vive in otherFindings. Registry assente/corrotto -> solo CORE (fallback pre-ondata).
+function classList(registry) {
+  const reg = registry || loadRegistryClasses();
+  const derived = Object.keys(reg)
+    .filter((k) => !k.startsWith('_'))
+    .map(displayName)
+    .filter((c) => c !== 'other' && !CORE_CLASSES.includes(c));
+  return [...CORE_CLASSES, ...new Set(derived.sort())];
+}
+
+const CLASSES = classList();
 
 // Superfici introdotte dal piano servizi che NON sono classi web (container/K8s, mobile) e che
 // entrano nella matrice SOLO dove la superficie esiste davvero: candidato esplicito nella map,
@@ -48,6 +98,38 @@ function loadJsonl(file) {
   } catch { return []; }
 }
 
+// Normalizza le TRE forme di reports/<host>-map.json che esistono nel repo in un unico
+// {classe: conteggio | {candidates, skip_reason}}:
+//   1. {classe: n} oppure {classe: [candidati]}      — forma storica attesa da questa matrice;
+//   2. {candidates: {classe: [...]}}                  — forma letta da planner.js;
+//   3. {endpoints: [{candidates: {classe: [...]}}]}   — quella che map.js SCRIVE davvero.
+// Prima la matrice leggeva il top-level e sulla forma reale (3) vedeva zero candidati: ogni
+// classe risultava n-a anche su una mappa piena. I conteggi si sommano per classe (un candidato
+// per endpoint è un candidato da testare), il skip_reason dell'handoff viene preservato.
+function normalizeCandidates(doc) {
+  if (!doc || typeof doc !== 'object' || Array.isArray(doc)) return {};
+  const counts = new Map();
+  const skip = new Map();
+  const bump = (k, n, reason) => {
+    counts.set(k, (counts.get(k) || 0) + n);
+    if (reason) skip.set(k, reason);
+  };
+  const eat = (obj) => {
+    for (const [k, v] of Object.entries(obj || {})) {
+      if (k === 'candidates' || k === 'endpoints' || k === 'host' || k.startsWith('_')) continue;
+      if (Array.isArray(v)) bump(k, v.length);
+      else if (typeof v === 'number') bump(k, v);
+      else if (v && typeof v === 'object') bump(k, typeof v.candidates === 'number' ? v.candidates : 0, v.skip_reason);
+    }
+  };
+  eat(doc);
+  if (doc.candidates && typeof doc.candidates === 'object') eat(doc.candidates);
+  for (const e of Array.isArray(doc.endpoints) ? doc.endpoints : []) eat(e && e.candidates);
+  const out = {};
+  for (const [k, n] of counts) out[k] = skip.has(k) ? { candidates: n, skip_reason: skip.get(k) } : n;
+  return out;
+}
+
 // Parse one candidate entry: legacy numeric count OR {candidates, skip_reason} object
 // (Ondata 2/B2: the skip_reason documents WHY a class was not tested — surfaced in the
 // report's "Copertura & accuratezza" section).
@@ -57,14 +139,31 @@ function parseCandidateEntry(v) {
   return { candidates: 0, skip_reason: null };
 }
 
+// Una mappa può chiavare i candidati per display name o per chiave di registry (map.js valida
+// sulle chiavi): accetta entrambi, più il plurale storico, così le righe alias non perdono
+// segnale quando la map è scritta con la chiave canonica.
+function candidatesFor(candidates, cls) {
+  const keys = [cls, cls + 's', LEGACY_ALIASES[cls]];
+  for (const k of keys) {
+    if (k && Object.prototype.hasOwnProperty.call(candidates, k) && candidates[k] !== undefined) return candidates[k];
+  }
+  return undefined;
+}
+
 function classOf(f) {
   // F4 (Ondata 4): preferisce il testo umano (title/type) al solo ID CWE — un titolo
   // "SQL injection" con cwe "CWE-89" deve classificarsi sqli, non 'other'. Fallback al cwe
   // solo quando non c'è testo. Miglioramento puro: nulla di corretto prima diventa errato.
   // Il campo `class` esplicito (già validato contro la tassonomia da record-finding.js) vince
   // sull'euristica testuale: un finding registrato come authz non deve finire in 'logic' solo
-  // perché il titolo contiene "business logic". Classi fuori tassonomia (es. 'info') proseguono.
-  if (typeof f.class === 'string' && CLASSES.includes(f.class)) return f.class;
+  // perché il titolo contiene "business logic". record-finding valida le CHIAVI del registry:
+  // 'upload'/'lfi'/'deser'/'info'/'business-logic' vengono riportate al display name della
+  // matrice, così un solo finding produce una sola riga. Classi sconosciute proseguono.
+  if (typeof f.class === 'string' && f.class) {
+    if (CLASSES.includes(f.class)) return f.class;
+    const disp = displayName(f.class);
+    if (CLASSES.includes(disp)) return disp;
+  }
   const t = String(f.title || f.type || f.cwe || '').toLowerCase();
   if (/sql|sqli/.test(t)) return 'sqli';
   if (/xss/.test(t)) return 'xss';
@@ -101,7 +200,7 @@ function buildMatrix(host, opts) {
   const findingsFile = opts.findingsFile || FINDINGS;
   const mapFile = path.join(reportsDir, `${host}-map.json`);
   let candidates = {};
-  try { candidates = JSON.parse(fs.readFileSync(mapFile, 'utf8')); } catch {}
+  try { candidates = normalizeCandidates(JSON.parse(fs.readFileSync(mapFile, 'utf8'))); } catch {}
   const findings = loadJsonl(findingsFile).filter((f) => !host || f.host === host || String(f.host || '').includes(host));
   const byClass = {};
   for (const f of findings) {
@@ -142,7 +241,7 @@ function buildMatrix(host, opts) {
     || (c === 'mobile' && !!opts.mobile));
   const classes = CLASSES.concat(extra);
   const rows = classes.map((cls) => {
-    const raw = candidates[cls] ?? candidates[cls + 's'];
+    const raw = candidatesFor(candidates, cls);
     const parsed = raw === undefined ? { candidates: 0, skip_reason: null } : parseCandidateEntry(raw);
     const cand = parsed.candidates;
     const found = byClass[cls] || [];
@@ -193,4 +292,8 @@ function main() {
 
 if (require.main === module) main();
 
-module.exports = { CLASSES, EXTRA_CLASSES, CONTAINER_PORTS, hasContainerSurface, buildMatrix, classOf, matrixTable };
+module.exports = {
+  CLASSES, CORE_CLASSES, HARNESS_ONLY, LEGACY_ALIASES, EXTRA_CLASSES, CONTAINER_PORTS,
+  hasContainerSurface, buildMatrix, classOf, matrixTable,
+  displayName, classList, loadRegistryClasses, candidatesFor, normalizeCandidates, REGISTRY_FILE,
+};

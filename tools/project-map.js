@@ -92,9 +92,10 @@ const AREAS = [
     tools: [
       'curl', 'nuclei', 'ffuf', 'feroxbuster', 'gobuster', 'dirsearch', 'dirb', 'wfuzz', 'arjun',
       'nikto', 'dalfox', 'xsser', 'sqlmap', 'commix', 'wpscan', 'schemathesis', 'h2csmuggler',
-      'interactsh-client',
+      'zaproxy', 'interactsh-client',
     ],
-    files: ['workflows/attack-http-surface.yaml', 'workflows/attack-jwt.yaml', 'docs/methodology-classes.md'],
+    files: ['workflows/attack-http-surface.yaml', 'workflows/attack-jwt.yaml',
+      'workflows/attack-nextjs.yaml', 'workflows/attack-dataapi.yaml', 'docs/methodology-classes.md'],
   },
   {
     id: 'host', name: 'Attacchi host, AD e rete', accent: '#7d9cff',
