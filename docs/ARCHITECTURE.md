@@ -102,7 +102,10 @@ harness makes over-claiming structurally impossible rather than merely discourag
   against the target rather than against the reporter's own summary.
 - **The gate refuses to produce a report.** `gate.js` blocks report generation until
   the coverage matrix is complete and no finding is pending. An incomplete assessment
-  yields no artifact that could be mistaken for a finished one.
+  yields no artifact that could be mistaken for a finished one. The verdict is scoped to
+  one engagement: findings, pending rows, oracle revalidation and the per-host
+  `reports/coverage-<host>.md` are read for that host only, and a pass recorded for
+  another host neither blocks nor unlocks this one.
 
 The result is the property this project is actually about: **a finding's severity is
 a function of its evidence, not of the model's confidence.**

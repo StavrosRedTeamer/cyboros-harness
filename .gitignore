@@ -59,6 +59,9 @@ scope.json.bak-*
 tools/.pace.json
 tools/.test-routes.txt
 node_modules/
+# `wrangler dev` (usato solo in sites/, e mai come dipendenza: gira via npx) scrive qui bundle
+# e cache. Stato di build generato, non sorgente.
+.wrangler/
 npm-debug.log*
 __pycache__/
 *.pyc

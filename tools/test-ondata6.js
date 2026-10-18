@@ -107,7 +107,8 @@ console.log('G1 — gate: pocReplay + chainHead (coda additiva, SA1 intatto) + h
   const receipt = oracle.writeReceipt({ type: 'http-diff', anchor: 'ondata6 head-anchor test', data: {} });
   assert.ok(receipt.ok, JSON.stringify(receipt));
   const base = {
-    severity: 'High', title: 'Ondata6 chain A', host: 'target.example', poc: 'p', status: 'confirmed',
+    // High/Critical richiedono un verify_level esplicito; qui conta solo la catena.
+    severity: 'Medium', verify_level: 'triggered', title: 'Ondata6 chain A', host: 'target.example', poc: 'p', status: 'confirmed',
     oracle: { type: 'http-diff', ref: receipt.ref, token: receipt.token },
     evidence_quote: { file: receipt.ref, text: 'ondata6 head-anchor test' },
   };

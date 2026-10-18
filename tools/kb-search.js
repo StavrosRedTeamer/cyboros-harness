@@ -22,7 +22,7 @@ const DB_PATH = () => process.env.KB_INDEX_DB || path.join(ROOT, 'reports', 'kb-
 
 // Corpus: knowledge.md + docs + payloads + workflows always; reports/*.md only with --docs
 // because report bodies are engagement evidence and pollute methodology queries.
-function walk(dir, kind, re) {
+function walk(dir, kind, re, root = ROOT) {
   const out = [];
   let entries = [];
   try { entries = fs.readdirSync(dir); } catch { return out; }
@@ -31,20 +31,23 @@ function walk(dir, kind, re) {
     const full = path.join(dir, e);
     let st = null;
     try { st = fs.statSync(full); } catch { continue; }
-    if (st.isDirectory()) out.push(...walk(full, kind, re));
-    else if (re.test(e)) out.push({ file: path.relative(ROOT, full), kind });
+    if (st.isDirectory()) out.push(...walk(full, kind, re, root));
+    else if (re.test(e)) out.push({ file: path.relative(root, full), kind });
   }
   return out;
 }
 
-function corpusFiles(includeReports) {
+// `root` esiste perché il corpus deve essere verificabile su una fixture: un clone pulito
+// non ha `reports/`, e un test che pretende un file di engagement lì dentro è verde solo
+// sulla macchina di chi ha già lavorato (la classe di difetto di test-repo-invariants).
+function corpusFiles(includeReports, root = ROOT) {
   const files = [
     { file: 'knowledge.md', kind: 'knowledge' },
-    ...walk(path.join(ROOT, 'docs'), 'docs', /\.md$/i),
-    ...walk(path.join(ROOT, 'tools', 'payloads'), 'payloads', /\.md$/i),
-    ...walk(path.join(ROOT, 'workflows'), 'workflows', /\.ya?ml$/i),
+    ...walk(path.join(root, 'docs'), 'docs', /\.md$/i, root),
+    ...walk(path.join(root, 'tools', 'payloads'), 'payloads', /\.md$/i, root),
+    ...walk(path.join(root, 'workflows'), 'workflows', /\.ya?ml$/i, root),
   ];
-  if (includeReports) files.push(...walk(path.join(ROOT, 'reports'), 'reports', /\.md$/i));
+  if (includeReports) files.push(...walk(path.join(root, 'reports'), 'reports', /\.md$/i, root));
   return files;
 }
 

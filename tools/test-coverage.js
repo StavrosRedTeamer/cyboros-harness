@@ -6,9 +6,10 @@
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
+const { spawnSync } = require('child_process');
 const {
   CLASSES, CORE_CLASSES, HARNESS_ONLY, LEGACY_ALIASES, EXTRA_CLASSES,
-  buildMatrix, classOf, matrixTable, displayName, candidatesFor, normalizeCandidates,
+  buildMatrix, classOf, matrixTable, displayName, candidatesFor, normalizeCandidates, coverageFile,
 } = require('./coverage');
 const REGISTRY = require('./test-registry.json');
 
@@ -118,6 +119,49 @@ try {
     && epM.rows.find((r) => r.class === 'file-upload').status === 'tested');
 } finally {
   fs.rmSync(TMP, { recursive: true, force: true });
+}
+
+// Il nome del file scritto da --write deve essere ESATTAMENTE quello che il gate cerca, o il
+// gate dichiara "matrice mancante" su una matrice appena generata.
+{
+  const gate = require('./gate');
+  for (const h of ['example.com', 'Example.COM:8443', 'https://example.com/app/x', 'api.example.com.']) {
+    ok(`coverageFile(${h}) matches the gate lookup`,
+      coverageFile(h) === `coverage-${gate.safeHost(gate.normalizeHost(h))}.md`);
+  }
+}
+
+// ── CLI: --help non deve stampare una matrice, --write non deve sovrascrivere un altro host ──
+const CLI = path.join(__dirname, 'coverage.js');
+const help = spawnSync(process.execPath, [CLI, '--help'], { encoding: 'utf8' });
+ok('--help exits 0 with usage, not a matrix', help.status === 0 && /usage:/.test(help.stdout) && !/\| Class \|/.test(help.stdout));
+const noArgs = spawnSync(process.execPath, [CLI], { encoding: 'utf8' });
+ok('no args exits 2 with usage', noArgs.status === 2 && /usage:/.test(noArgs.stderr));
+
+const OUT = fs.mkdtempSync(path.join(os.tmpdir(), 'cyb-cov-out-'));
+try {
+  const run = (host) => spawnSync(process.execPath, [CLI, host, '--write'], {
+    encoding: 'utf8', env: { ...process.env, COVERAGE_REPORTS_DIR: OUT },
+  });
+  fs.writeFileSync(path.join(OUT, 'a.example-map.json'), JSON.stringify({ candidates: { sqli: 2 } }));
+  fs.writeFileSync(path.join(OUT, 'b.example-map.json'), JSON.stringify({ candidates: { xss: 2 } }));
+  const a = run('a.example');
+  const b = run('b.example');
+  // Con una mappa, le classi senza candidati sono n-a: nessun missed, exit 0.
+  ok('--write exits 0 when a map marks the other classes n-a', a.status === 0 && b.status === 0);
+  // Senza mappa ogni classe resta missed: la matrice non è un pass.
+  const noMap = run('no-map.example');
+  ok('--write without a map exits 1 (everything missed)', noMap.status === 1);
+  ok('--write writes a per-host file', fs.existsSync(path.join(OUT, 'coverage-a.example.md'))
+    && fs.existsSync(path.join(OUT, 'coverage-b.example.md')));
+  ok('a second host does not overwrite the first matrix',
+    /Host: a\.example/.test(fs.readFileSync(path.join(OUT, 'coverage-a.example.md'), 'utf8'))
+    && /Host: b\.example/.test(fs.readFileSync(path.join(OUT, 'coverage-b.example.md'), 'utf8')));
+  ok('no shared coverage-matrix.md is written any more', !fs.existsSync(path.join(OUT, 'coverage-matrix.md')));
+  const missing = run('no-map.example');
+  ok('missing map is called out on stderr', /no map at/.test(missing.stderr));
+} finally {
+  fs.rmSync(OUT, { recursive: true, force: true });
 }
 
 console.log(`\ncoverage: ${pass} pass, ${fail} fail`);

@@ -7,8 +7,44 @@ grouped by milestone, and `v0.1.0` (2026-09-28) is the first tagged release.
 
 ## [Unreleased]
 
+### Fixed
+
+- **`npm test` torna verde su un clone pulito.** Il test del corpus di `kb-search` chiamava
+  `corpusFiles(true)` sul workspace e pretendeva un file in `reports/`: quella cartella è
+  gitignored, quindi su un clone pulito — cioè nel gate di release e in CI — `test-repo-vet`
+  falliva, mentre qui era verde perché il workspace ha 734 MB di evidenza. `corpusFiles` accetta
+  ora un `root` (default invariato) e il test costruisce la propria fixture in mkdtemp.
+- **I gate sono per ingaggio, e un gate non passa più senza il suo artefatto.** `gate.js status`
+  ignorava l'host e `checkNoPending` guardava l'intero `findings.jsonl`: il report di un host era
+  bloccato da finding pending di altri ingaggi, e un pass di un altro host sbloccava il successivo.
+  Ora `pass/check <fase> <host>` filtrano findings, pending, verify, oracle, evidenceQuote,
+  pocReplay e coverage su quell'host; il pass è taggato `host=` nel gate-log e non vale per altri.
+  Il gate `map` richiede `reports/<host>-map.json` (prima passava senza mappa); il gate `test`
+  interroga il gate `map` per lo stesso host invece di cercare la stringa `cyboros/map` nel log
+  globale; il gate `report` boccia qualunque classe `missed` e una matrice il cui header nomina un
+  altro host (prima bastava che il file contenesse una pipe). `report-html.js` applica lo stesso
+  scope al proprio controllo del gate.
+- **La matrice di copertura non viene più sovrascritta da un altro host.** `coverage.js --write`
+  scriveva sempre `reports/coverage-matrix.md`: l'ingaggio successivo distruggeva la matrice del
+  precedente e il gate leggeva dati sbagliati. Ora è `reports/coverage-<host>.md`, e `--write`
+  avvisa su stderr quando manca la mappa (senza mappa ogni classe risulta `missed`).
+- **Il tetto di severità non si aggira omettendo `verify_level`.** Il ceiling di
+  `record-finding.js` era condizionato al campo: un finding `High`/`Critical` senza `verify_level`
+  passava senza prova (è così che una riga `inconclusive` ha preso severità High). Ora
+  `verify_level` è obbligatorio per High/Critical; i record promossi da `--verify` restano esenti.
+- **`--help` non esegue più il tool.** `coverage.js` stampava la matrice dell'host `--help`,
+  `record-finding.js` rispondeva con un errore JSON, `analyze-bundle.js` apriva `--help` come file
+  (ENOENT) e `chain.js` cercava un findings file chiamato `--help`.
+- **Uccidere il wrapper non libera la porta.** `node tools/kill-port.js <port>` risolve il PID del
+  listener dal kernel (`ss -ltnp`, `lsof` fallback), manda il segnale, attende la morte e rilegge il
+  kernel per confermare che la porta è libera (`--dry-run`, `--json`, `--signal`, `--udp`).
+
 ### Changed
 
+- **Il bootstrap del forum è uscito dal prompt.** `AGENTS.md` entra verbatim nel system prompt di
+  ogni sessione: il paragrafo operativo del forum (541 byte) ora vive in `ops/harness.md` §Forum e
+  il contratto ne tiene solo il puntatore. L'assemblato scende da 20.269 a ~19.900 caratteri, sotto
+  il tetto di 20 KB che `check-identity.js` misura — il gate di release era rosso di 269 caratteri.
 - **La matrice di copertura deriva le classi dal registry, non da una lista cablata.**
   `tools/coverage.js` aveva 20 nomi hardcoded: 32 classi di `tools/test-registry.json` (jwt, cors,
   graphql, race, cache-poison, smuggling, ssti, xxe, llm, mcp, privesc…) non comparivano mai in

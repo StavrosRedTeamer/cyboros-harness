@@ -113,8 +113,15 @@ function buildChains(findings) {
 
 const argv = process.argv.slice(2);
 if (require.main === module) {
-  const file = argv[argv.indexOf('--file') + 1] || path.join(__dirname, '..', 'reports', 'findings.jsonl');
-  const hostFilter = argv[argv.indexOf('--host') + 1];
+  // Parsing esplicito: `argv.indexOf(flag) + 1` vale 0 quando il flag manca, quindi il primo
+  // argomento ("--help", o niente) finiva usato come path del findings file.
+  const flagValue = (name) => { const i = argv.indexOf(name); return i >= 0 && argv[i + 1] && !argv[i + 1].startsWith('--') ? argv[i + 1] : null; };
+  if (argv.includes('--help') || argv.includes('-h')) {
+    console.log('usage: node tools/chain.js [--file reports/findings.jsonl] [--host <host>]');
+    process.exit(0);
+  }
+  const file = flagValue('--file') || path.join(__dirname, '..', 'reports', 'findings.jsonl');
+  const hostFilter = flagValue('--host');
   if (!fs.existsSync(file)) {
     console.error(JSON.stringify({ error: 'findings file not found: ' + file }));
     process.exit(1);

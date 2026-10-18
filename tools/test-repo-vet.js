@@ -90,7 +90,8 @@ const tmpFile = (...names) => path.join(TMP, ...names);
     process.env.TI_CACHE_DIR = tmpFile('ti-cache');    // warmed above
     const RF = require('./record-finding');
     const res = RF.record(JSON.stringify({
-      severity: 'High', title: 'RCE via log4j lookup', host: 'lab.local', endpoint: '/api/log', status: 'inconclusive',
+      // High richiede un verify_level esplicito (il tetto di severità non si toglie omettendolo).
+      severity: 'Medium', verify_level: 'triggered', title: 'RCE via log4j lookup', host: 'lab.local', endpoint: '/api/log', status: 'inconclusive',
       poc: '${jndi:ldap://oob/lab}', cves: ['CVE-2021-44228'],
     }));
     assert.strictEqual(res.ok, true, res.error);
@@ -267,7 +268,12 @@ const tmpFile = (...names) => path.join(TMP, ...names);
     assert.ok(corpus.some((f) => f.kind === 'payloads' && /payloads\/cspt\.md$/.test(f.file)), 'payload refs indexed');
     assert.ok(corpus.some((f) => f.kind === 'workflows' && /workflows\/.*\.ya?ml$/.test(f.file)), 'workflows indexed');
     assert.ok(!corpus.some((f) => f.kind === 'reports'), 'reports stay opt-in');
-    assert.ok(KB.corpusFiles(true).some((f) => f.kind === 'reports'), '--docs still adds reports');
+    // Su una fixture, non sul workspace: un clone pulito non ha `reports/`, e il test deve
+    // passare lì esattamente come qui (vedi test-repo-invariants, indice worktree vs clone).
+    const fixtureRoot = tmpFile('corpus');
+    fs.mkdirSync(path.join(fixtureRoot, 'reports'), { recursive: true });
+    fs.writeFileSync(path.join(fixtureRoot, 'reports', 'engagement.md'), '# evidence\n');
+    assert.ok(KB.corpusFiles(true, fixtureRoot).some((f) => f.kind === 'reports'), '--docs still adds reports');
     const csptHit = KB.search('CSPT', { dbFile, limit: 3 });
     assert.ok(csptHit.matches.some((m) => m.doc === 'tools/payloads/cspt.md'), JSON.stringify(csptHit));
   }

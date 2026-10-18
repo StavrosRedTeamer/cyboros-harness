@@ -146,8 +146,8 @@
 - **Structured endpoint map:** `node tools/map.js add '<json>'` / `candidates <host>` — the mapper
   records endpoints + candidate params per vuln class in `reports/<host>-map.json`; testers consume
   `map.js candidates` instead of freeform markdown (deterministic handoff).
-- **Attack chains:** `node tools/chain.js` links findings.jsonl entries into exploitable chains
-  (leaked key + broken authz -> ATO). Run it before writing the report.
+- **Attack chains:** `node tools/chain.js [--file <f>] [--host <h>]` links findings.jsonl entries into
+  exploitable chains (leaked key + broken authz -> ATO). Run it before writing the report.
 - **CVSS:** `node tools/cvss.js 'AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H'` -> real v3.1 base score; put the
   score/vector into `record-finding.js` (`cvss`, `cvss_vector` fields).
 - **EPSS / CWE (offline + live):** `node tools/epss.js CVE-2021-44228` / `node tools/epss.js --cwe CWE-79` —
@@ -182,6 +182,19 @@
   methodology pointers. `map.js candidates <host>` returns a `refs` block per class (testers read the
   standard first); `record-finding.js` accepts `"class":"idor"` (validated against the registry) and
   auto-attaches a `standards` block (or derives it from `cwe`). Unknown class = recording refused.
+- **Coverage matrix (per host):** `node tools/coverage.js <host> --write` → `reports/coverage-<host>.md`.
+  The file is per-engagement: one host no longer overwrites another's matrix. The report/test gate
+  fails if any class is `missed` and if the header names a different host — a file that merely
+  contains a pipe is not coverage. Exit 1 means classes are still untested.
+- **Stage gates (host-scoped):** `node tools/gate.js status <host>` · `pass <phase> <host>` ·
+  `check <phase> <host>`. `map`, `test` and `report` read per-engagement artifacts, so the host is
+  required; a pass recorded for one host never satisfies another. `map` demands
+  `reports/<host>-map.json`, and `test` demands that `map` passed for the same host — no more
+  "gate passed without a map".
+- **Kill a port's real listener:** `node tools/kill-port.js <port> [--dry-run] [--signal KILL] [--udp] [--yes]`
+  reads the listener PID from the kernel (`ss -ltnp`, `lsof` fallback) instead of the background
+  wrapper PID, sends the signal, waits for the process to die and re-reads the kernel to confirm the
+  port is free (`--json` reports `killed`, `survived`, `port_free`). Ports < 1024 need `--yes`.
 - **ATT&CK coverage matrix:** `node tools/attack-coverage.js [--host <h>] [--json] [--write]` — the
   offensive-coverage view per MITRE ATT&CK technique, from `test-registry.json` (`attack` per class +
   `extra_surfaces`). PLANNED = techniques reachable by a harness class; EXECUTED = techniques recorded
@@ -228,7 +241,10 @@
   fail-closed. `-j` scrive JSON — normalizza con `parsers.js parseH8mailJson`; hit confermati →
   `record-finding.js` con campo `secret` (loot vault). Chiavi API via `-k "hibp=...,snusbase=..."` o file
   config `-c`; `-q username|ip|hash|domain` per query non-email (l'IP viene scope-checkato, username no).
-- **Record a finding:** `node tools/record-finding.js '{"severity":"High","title":..,"host":..,"endpoint":..,"poc":..,"status":"confirmed","cvss":8.1,"cvss_vector":"AV:N/...","cwe":"CWE-200","cve":"CVE-2021-44228","remediation":"..."}'`
+- **Record a finding:** `node tools/record-finding.js '{"severity":"Medium","verify_level":"triggered","title":..,"host":..,"endpoint":..,"poc":..,"status":"confirmed","cvss":8.1,"cvss_vector":"AV:N/...","cwe":"CWE-200","cve":"CVE-2021-44228","remediation":"..."}'`
+  `verify_level` is mandatory for `High`/`Critical`: the ceiling is enforced only when a level is
+  declared, so a missing level used to lift it silently. Above `triggered` (Medium max) only
+  `--verify` gets you, because that is code that actually fired the PoC.
   → appends to `reports/findings.jsonl` (deduped). Evidence in `poc`/`remediation`/`notes` is
   auto-redacted (JWTs, cookies, `Bearer` tokens, API keys stripped) before it hits disk. Do this for
   EVERY confirmed finding. If a finding carries a `secret` field (a looted hash/key/token), the raw

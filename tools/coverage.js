@@ -2,7 +2,12 @@
 // Coverage matrix for the Cyboros harness: vulnerability-class × status per host.
 //   node tools/coverage.js <host>            # matrix to stdout
 //   node tools/coverage.js <host> --json     # machine-readable
-//   node tools/coverage.js <host> --write    # write reports/coverage-matrix.md (report gate input)
+//   node tools/coverage.js <host> --write    # write reports/coverage-<host>.md (report gate input)
+//   node tools/coverage.js --help            # usage
+//
+// PER-HOST OUTPUT: prima ogni `--write` sovrascriveva reports/coverage-matrix.md, quindi la
+// matrice di un ingaggio veniva distrutta dal successivo e il gate del report leggeva (e
+// bocciava) dati di un altro host. Ora il file è per-host e il gate risolve lo stesso nome.
 //
 // Pattern adapted from SeaOf0/dsh-redteam-model (MIT) — coverage-matrix semantics.
 // A class that was tested without findings is "tested" (a negative result is a result), never
@@ -22,6 +27,8 @@ const path = require('path');
 const { env } = require('./env');
 
 const REPORTS = path.join(__dirname, '..', 'reports');
+// Override per i test (fixture in mkdtemp): la produzione resta reports/.
+const reportsDir = () => process.env.COVERAGE_REPORTS_DIR || REPORTS;
 const FINDINGS = path.join(REPORTS, 'findings.jsonl');
 const REGISTRY_FILE = () => env('TEST_REGISTRY') || path.join(__dirname, 'test-registry.json');
 
@@ -268,21 +275,59 @@ function matrixTable(m) {
   return lines.join('\n');
 }
 
+// Stesso schema di nome del gate (tools/gate.js normalizeHost + safeHost): i due lati devono
+// coincidere o il gate cerca un file che il tool non scrive. L'host è normalizzato come nel gate
+// (schema, path e porta rimossi) prima di essere reso un nome di file.
+function normalizeHost(h) {
+  return String(h == null ? '' : h).trim().toLowerCase()
+    .replace(/^[a-z][a-z0-9+.-]*:\/\//, '')
+    .replace(/\/.*$/, '')
+    .replace(/^.*@/, '')
+    .replace(/:\d+$/, '')
+    .replace(/\.$/, '');
+}
+
+function coverageFile(host) {
+  return `coverage-${normalizeHost(host).replace(/[^a-z0-9._-]+/g, '-')}.md`;
+}
+
+const USAGE = [
+  'usage: node tools/coverage.js <host> [--json|--write]',
+  '       node tools/coverage.js --help',
+  '',
+  '  <host>    target host/host:port (map: reports/<host>-map.json, findings: reports/findings.jsonl)',
+  '  --json    machine-readable matrix on stdout',
+  '  --write   write reports/coverage-<host>.md (input of the report/test stage gate)',
+  '',
+  'Exit: 0 = no class missed, 1 = at least one class missed, 2 = bad invocation.',
+].join('\n');
+
 function main() {
   const args = process.argv.slice(2);
+  if (args.includes('--help') || args.includes('-h') || args[0] === 'help') {
+    console.log(USAGE);
+    process.exit(0);
+  }
   const host = args[0];
-  if (!host) {
-    console.error('usage: node tools/coverage.js <host> [--json|--write]');
+  if (!host || host.startsWith('-')) {
+    console.error(USAGE);
     process.exit(2);
   }
-  const m = buildMatrix(host);
+  const m = buildMatrix(host, process.env.COVERAGE_REPORTS_DIR
+    ? { reportsDir: reportsDir(), findingsFile: path.join(reportsDir(), 'findings.jsonl') }
+    : {});
   if (args.includes('--json')) {
     console.log(JSON.stringify(m, null, 2));
   } else {
     console.log(matrixTable(m));
   }
   if (args.includes('--write')) {
-    const out = path.join(REPORTS, 'coverage-matrix.md');
+    const out = path.join(reportsDir(), coverageFile(host));
+    const mapFile = path.join(reportsDir(), `${host}-map.json`);
+    if (!fs.existsSync(mapFile)) {
+      console.error(`[coverage] no map at ${mapFile}: every class has 0 candidates and the matrix WILL be all-missed.`);
+      console.error(`[coverage] run: node tools/map.js ${host}   (or node tools/target-model.js ${host})`);
+    }
     fs.writeFileSync(out, matrixTable(m) + '\n');
     console.log(`\nwrote ${out}`);
   }
@@ -294,6 +339,6 @@ if (require.main === module) main();
 
 module.exports = {
   CLASSES, CORE_CLASSES, HARNESS_ONLY, LEGACY_ALIASES, EXTRA_CLASSES, CONTAINER_PORTS,
-  hasContainerSurface, buildMatrix, classOf, matrixTable,
+  hasContainerSurface, buildMatrix, classOf, matrixTable, coverageFile, normalizeHost,
   displayName, classList, loadRegistryClasses, candidatesFor, normalizeCandidates, REGISTRY_FILE,
 };

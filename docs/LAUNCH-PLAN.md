@@ -49,7 +49,7 @@ field or in this repository.
 | `docs/TOOL-LANDSCAPE.md` | where the published benchmarks stop. The narrow gap, argued against the strongest existing work rather than around it |
 | `docs/THREAT-MODEL.md` | our own attack surface, written down before someone else finds it. Framed as a challenge |
 | `docs/RECORDING.md` + `docs/demo.tape` + `tools/demo.sh` | the README demo: deterministic, isolated, one command from a GIF |
-| `tools/ensure-test-scope.js` | a clean clone can run its own suite: 93 pass, 0 fail, verified from scratch |
+| `tools/ensure-test-scope.js` | a clean clone can run its own suite: 115 pass, 0 fail, verified from scratch |
 | `tools/mcp-guard-proxy.js` | committed and tested. It was untracked while the README documented it |
 | `tools/testkit.js` | landed alone, so the three tests that require it can land safely |
 | `tools/gen-bench.js` | the contamination-proof generator and evaluator, instrument ready, no scores published yet |
@@ -144,7 +144,7 @@ Nothing is published before the thing it depends on exists.
 **Week 0 — make it publishable.**
 The pending change set has landed as one unit (the tip of `master`), the README
 counts are re-derived and held there by `tools/test-repo-invariants.js`, and
-`npm test` is green from a clean clone: 93 pass, 0 fail. What is left in this
+`npm test` is green from a clean clone: 115 pass, 0 fail, 1 e2e skip. What is left in this
 week is the demo recording and the README links. Nothing goes public this week.
 
 **Week 1 — measure, do not write.**

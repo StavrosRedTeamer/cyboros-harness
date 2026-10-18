@@ -141,6 +141,15 @@ function validate(f, opts) {
       + '`node tools/record-finding.js --verify \'<json>\'` or `node tools/verify-finding.js batch`.';
   if (f.verify_level && !VERIFY_LEVELS.includes(f.verify_level))
     return `verify_level must be one of ${VERIFY_LEVELS.join('|')} (suspected|triggered|exploited|proven_impact)`;
+  // ── IL TETTO NON SI PUO' TOGLIERE OMETTENDO IL CAMPO ────────────────────────────
+  // Il ceiling qui sotto era condizionato a `f.verify_level`: bastava NON dichiararlo per
+  // registrare un High/Critical senza alcuna prova (è così che un finding 'inconclusive' ha
+  // preso severità High). Ora un livello è obbligatorio per High/Critical; i record promossi
+  // da codice che ha eseguito davvero (recordWithVerify / verify-finding) restano esenti.
+  if (!(opts && opts.promoted) && !f.verify_level && (f.severity === 'High' || f.severity === 'Critical'))
+    return `severity ${f.severity} requires an explicit verify_level: the severity ceiling is enforced only when a level is declared, so omitting it would silently lift the cap. `
+      + `Declare {"verify_level":"suspected"|"triggered"} while the claim is unproven (Low/Medium max), or "exploited"/"proven_impact" with a mechanical oracle once the PoC actually ran. `
+      + `An unverified hypothesis belongs at severity Medium at most with {"status":"inconclusive"}.`;
   // Coherence: severity must never exceed the verification level (pentest persona rule).
   if (f.verify_level && f.severity && !severityAllowedAt(f.verify_level, f.severity))
     return `severity ${f.severity} exceeds verify_level ${f.verify_level}: proven_impact→Critical, exploited→High max, triggered→Medium max, suspected→Low max`;
@@ -520,8 +529,28 @@ async function recordWithVerify(raw, verifier) {
   return res;
 }
 
+const USAGE = [
+  'usage: node tools/record-finding.js \'<json finding>\' [--verify]',
+  '       node tools/record-finding.js verify-head-anchor',
+  '       node tools/record-finding.js --help',
+  '',
+  'Required: severity, title, host, poc, status.',
+  '  status         confirmed | inconclusive | verified   (no default)',
+  '  verify_level   suspected | triggered | exploited | proven_impact',
+  '                 mandatory for severity High/Critical (ceiling per level)',
+  '  Reality claims (status confirmed/verified, exploited/proven_impact) also need',
+  '  oracle {type,ref,token} and evidence_quote {file,text} validated against disk.',
+  '',
+  '  --verify       re-fire the finding\'s `verify` block N times, then promote to verified',
+  '                 (this is the only hand-free road to verified/exploited).',
+].join('\n');
+
 if (require.main === module) {
   const args = process.argv.slice(2);
+  if (!args.length || args[0] === '--help' || args[0] === '-h' || args[0] === 'help') {
+    console.log(USAGE);
+    process.exit(args.length ? 0 : 2);
+  }
   if (args[0] === 'verify-head-anchor') {
     const r = verifyHeadAnchor();
     console.log(JSON.stringify(r));

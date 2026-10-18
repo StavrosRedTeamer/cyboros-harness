@@ -227,13 +227,30 @@ function secretValues(text) {
   }
 }
 
+const USAGE = [
+  'usage: node tools/analyze-bundle.js <url|localfile> [--validate-secrets --confirm "<reason>"]',
+  '',
+  '  <url|localfile>       bundle (JS/HTML/JSON) to mine: source maps are followed for sourcesContent',
+  '  --validate-secrets    confirm-tier: try the credential with trufflehog (egress, needs --confirm)',
+  '  --confirm "<reason>"  written reason; validation is refused without it',
+].join('\n');
+
 async function main() {
   const argv = process.argv.slice(2);
-  const target = argv[0];
+  if (!argv.length || argv.includes('--help') || argv.includes('-h')) {
+    console.log(USAGE);
+    process.exit(argv.length ? 0 : 2);
+  }
+  // Un flag non è mai il target: prima `--help` (o `--validate-secrets` da solo) veniva aperto
+  // come file locale e il tool crashava con ENOENT invece di spiegare l'uso.
+  const confirmIdx = argv.indexOf('--confirm');
+  // Solo il VALORE di --confirm va saltato: con il flag assente `confirmIdx + 1` è 0 e
+  // scarterebbe il primo argomento (il target stesso).
+  const target = argv.find((a, i) => !a.startsWith('-') && (confirmIdx < 0 || i !== confirmIdx + 1));
   const validate = argv.includes('--validate-secrets');
-  const confirm = (() => { const i = argv.indexOf('--confirm'); return i >= 0 && argv[i + 1] ? argv[i + 1] : null; })();
+  const confirm = confirmIdx >= 0 && argv[confirmIdx + 1] ? argv[confirmIdx + 1] : null;
   if (!target) {
-    console.error('usage: node analyze-bundle.js <url|localfile> [--validate-secrets --confirm "<reason>"]');
+    console.error(USAGE);
     process.exit(2);
   }
   // Fail closed BEFORE any fetch: validation is egress and must never be implicit.

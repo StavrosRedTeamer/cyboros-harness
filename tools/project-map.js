@@ -155,7 +155,7 @@ const AREAS = [
     modules: [
       'run', 'state', 'opstate', 'proc-registry', 'tool-plane', 'tool-path',
       'budget', 'accounting', 'audit-trail', 'artifact-ledger', 'chain', 'chain-log', 'rechain',
-      'continuation', 'circuit-breaker', 'recover', 'sessions', 'workspace-gc',
+      'continuation', 'circuit-breaker', 'recover', 'sessions', 'workspace-gc', 'kill-port',
       'daily-maintenance', 'ensure-test-scope', 'mcp-bridge',
     ],
     files: ['docs/ARCHITECTURE.md', 'tools/tool-registry.json'],

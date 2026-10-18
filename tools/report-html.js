@@ -326,21 +326,24 @@ function main() {
 
   // Gate check: report generation requires the report gate to have PASSed in gate-log.md.
   // This is the deterministic enforcement boundary (same as dsh-sec-enforce reportGate).
+  // SCOPED BY HOST: a pass recorded for another engagement is not a pass for this report.
+  // Prima bastava `l.includes('cyboros/report') && l.includes('pass')` su QUALSIASI riga: il
+  // report di un host poteva uscire grazie al gate passato da un ingaggio diverso.
   const gateLog = path.join(__dirname, '..', 'reports', 'gate-log.md');
   const skipGate = argv.includes('--skip-gate');
+  const gateHost = hostFilter;
   if (!skipGate) {
-    try {
-      const log = fs.readFileSync(gateLog, 'utf8');
-      const hasPass = log.split('\n').some((l) => l.includes('cyboros/report') && l.includes('pass'));
-      if (!hasPass) {
-        console.error(`[report-html] BLOCKED: report gate "cyboros/report" not PASSed in ${gateLog}.`);
-        console.error('[report-html] Run: node tools/gate.js pass report  (after validating all criteria)');
-        console.error('[report-html] Or use --skip-gate to bypass (not recommended for final reports).');
-        process.exit(1);
-      }
-    } catch (e) {
+    let log;
+    try { log = fs.readFileSync(gateLog, 'utf8'); } catch (e) {
       console.error(`[report-html] BLOCKED: cannot read ${gateLog} — gate-log.md missing. Run the gate first.`);
-      console.error('[report-html] Run: node tools/gate.js pass report  (after validating all criteria)');
+      console.error(`[report-html] Run: node tools/gate.js pass report ${gateHost || '<host>'}  (after validating all criteria)`);
+      process.exit(1);
+    }
+    const hasPass = require('./gate').gateLogHasPass(log, 'report', gateHost || null);
+    if (!hasPass) {
+      console.error(`[report-html] BLOCKED: report gate "cyboros/report" not PASSed${gateHost ? ` for ${gateHost}` : ' (pass --host to match the engagement)'} in ${gateLog}.`);
+      console.error(`[report-html] Run: node tools/gate.js pass report ${gateHost || '<host>'}  (after validating all criteria)`);
+      console.error('[report-html] Or use --skip-gate to bypass (not recommended for final reports).');
       process.exit(1);
     }
   }

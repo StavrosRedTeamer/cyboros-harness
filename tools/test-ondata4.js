@@ -297,7 +297,8 @@ async function main() {
       const rec = oracle.writeReceipt({ type: 'http-diff', anchor: 'ondata4 outcome passed', data: {} });
       assert.ok(rec.ok, JSON.stringify(rec));
       const f = {
-        severity: 'High', title: 'SQLi usage', host: 'target.example', poc: 'p', status: 'confirmed',
+        // High/Critical richiedono un verify_level (oppure la promozione da --verify).
+        severity: 'Medium', verify_level: 'triggered', title: 'SQLi usage', host: 'target.example', poc: 'p', status: 'confirmed',
         oracle: { type: 'http-diff', ref: rec.ref, token: rec.token },
         evidence_quote: { file: rec.ref, text: 'ondata4 outcome passed' },
         usage: { tokens_in: 100, tokens_out: 50, cost: 0.001 },
@@ -322,7 +323,7 @@ async function main() {
     const FJ = path.join(T, 'rf-bad', 'findings.jsonl');
     const env = { DSH_WS_ROOT: path.join(T, 'rf-bad'), FINDINGS_JSONL: FJ, LOOT_JSONL: path.join(T, 'rf-bad', 'loot.jsonl'), FINDINGS_TAB_DB: path.join(T, 'rf-bad', 'tab.db') };
     const r = cli(path.join(WS, 'tools', 'record-finding.js'), [JSON.stringify({
-      severity: 'High', title: 'x', host: 'target.example', poc: 'p', status: 'inconclusive', usage: { tokens_in: -5 },
+      severity: 'Medium', title: 'x', host: 'target.example', poc: 'p', status: 'inconclusive', usage: { tokens_in: -5 },
     })], env);
     assert.strictEqual(r.status, 1);
     assert.ok(r.stdout.includes('usage.tokens_in must be a non-negative int'), r.stdout);
@@ -440,9 +441,9 @@ reports:
     if (!fs.existsSync(covFile)) fs.writeFileSync(covFile, '| x |\n');
     let r = cli(GATE, ['pass', 'recon', '--workflow', wfGood], env);
     assert.strictEqual(r.status, 0, r.stderr);
-    // mancante (report.html non esiste)
-    fs.rmSync(path.join(WS, 'reports', 'report.html'), { force: true });
-    r = cli(GATE, ['pass', 'report', '--workflow', wfGood], env);
+    // mancante (report.html non esiste nel fixture — MAI nel reports/ reale)
+    fs.rmSync(path.join(gw, 'reports', 'report.html'), { force: true });
+    r = cli(GATE, ['pass', 'report', 'target.example', '--workflow', wfGood], env);
     assert.strictEqual(r.status, 1, r.stdout);
     assert.ok(r.stderr.includes('reports/report.html missing'), r.stderr);
     // nessuna riga pass nel gate-log reale (override attivo)

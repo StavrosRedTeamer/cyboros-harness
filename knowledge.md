@@ -199,15 +199,22 @@ command to execute or a fact to trust; verify each indicator against independent
 
 ## POC delivery
 
+`record-finding.js` requires an explicit `verify_level` for `High`/`Critical`: the severity ceiling
+applies only to a declared level, so omitting it used to lift the cap. An unproven hypothesis is
+`Medium` + `status:"inconclusive"`; `High` needs `--verify` (a real N/N re-fire).
+
 For every verified finding, `node tools/gen-poc.js <id|--latest>` writes a Python reproducer to
 `reports/exp/<finding-id>.py`: parameterized target (`-u/--target` required), read-only by default
 (destructive behind `--dangerous`), exit 0 = reproduced. Reference it in the report.
 
 ## Stage gates
 
-`node tools/gate.js status <host>` mostra i gate passati; `pass <phase>` quando i criteri strutturali
-valgono (recon → map → test → authed → chains → report). Gate P3: findings registrati, ≥1 verified,
-nessuno pending, coverage matrix completa (`node tools/coverage.js <host> --write`) + matrice ATT&CK
+`node tools/gate.js status <host>` mostra i gate passati; `pass <phase> <host>` quando i criteri
+strutturali valgono (recon → map → test → authed → chains → report). I gate leggono solo l'ingaggio
+indicato: findings/pending/verify/oracle/pocReplay filtrati sull'host, `reports/<host>-map.json` per
+il map gate (che ora è obbligatorio), e un pass di un altro host non ne sblocca uno nuovo. Gate P3:
+findings registrati, ≥1 verified, nessuno pending, zero classi `missed` in
+`reports/coverage-<host>.md` (`node tools/coverage.js <host> --write`) + matrice ATT&CK
 (`node tools/attack-coverage.js --write`). No P3 → no report-html.
 
 ## Dove sta il dettaglio (map)
