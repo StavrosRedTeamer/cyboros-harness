@@ -11,8 +11,8 @@ authorization is therefore the only boundary between the public anon key and the
 
 - Supabase/PostgREST: `/rest/v1/`, `/auth/v1/`, `/storage/v1/`, `<project>.supabase.co` in the
   bundle. The public key is a JWT with `"role":"anon"` — it is **meant** to be public.
-- Firebase: `firebaseio.com`, `<project>.firebaseapp.com`, `firestore.googleapis.com`,
-  `/__/firebase/init.json`, `google-services.json` in an APK.
+- Firebase: database realtime (`firebaseio.com`), hosting (`<project>.firebaseapp.com`), il
+  namespace Firestore su `googleapis`, `/__/firebase/init.json`, `google-services.json` in un APK.
 
 ```
 node tools/analyze-bundle.js <url-or-local-file>     # endpoints + embedded keys
