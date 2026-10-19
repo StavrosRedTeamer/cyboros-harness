@@ -2,8 +2,9 @@
 
 > The README needs one moving picture: the hero screenshot shows the Command
 > Center, and nothing shows the part that matters, which is a program refusing
-> to do something. `tools/demo.sh` is written, tested and deterministic. What is
-> left is one command on a machine with a terminal.
+> to do something. `tools/demo.sh` is written, tested and deterministic, and the
+> recording is committed at `docs/assets/demo.gif`. This file is the recipe that
+> reproduces it — including the three things that can make it come out wrong.
 
 ## What is already done
 
@@ -17,7 +18,7 @@ $ DEMO_FAST=1 DEMO_PACE=3 ./tools/demo.sh
 ```
 
 `DEMO_FAST=1` runs the real guard tests (`--only guard`, 4 tests) instead of the
-full 94-test gate. `DEMO_PACE=3` holds each step for three seconds.
+full 115-test gate. `DEMO_PACE=3` holds each step for three seconds.
 
 **Run it and read the output before recording anything.** The GIF is only worth
 making if the thing it shows is the thing you are willing to be known for.
@@ -40,15 +41,25 @@ identical across runs except two real timing numbers.
 
 ## The one command
 
-Requires a terminal, which the agent session does not have, so this is the part
-that has to happen on your machine.
+No window is needed: VHS serves the tape through `ttyd` to a headless Chromium
+and grabs the frames with `ffmpeg`, so this runs in an agent session as well as
+in yours. The prerequisites are those three binaries plus the font the tape
+names — without JetBrains Mono, VHS falls back silently and the GIF is a
+different artifact.
 
 ```bash
-npm i -g vhs            # or: brew install vhs
+go install github.com/charmbracelet/vhs@latest   # or: npm i -g vhs, brew install vhs
+ttyd --version && ffmpeg -version >/dev/null     # must be on PATH
 vhs docs/demo.tape
 ```
 
-`docs/assets/demo.gif` lands ready for the README. That is it.
+`docs/assets/demo.gif` lands ready for the README. The committed one was made
+with VHS 0.12.1, ttyd 1.7.7, ffmpeg 7.1.5, JetBrains Mono 2.304: 672 KB, 14.7 s.
+
+**Record it where `scope.json` does not exist.** `tools/demo.sh` never reads the
+real file, but it warns when one is present ("a real scope.json exists in this
+checkout"), and that warning is the first two lines of the GIF. A clean clone, or
+a worktree with no `scope.json`, renders the version the README shows.
 
 If you prefer to record a live session instead, the equivalent is:
 
@@ -83,8 +94,8 @@ A 50-second, 80-column terminal GIF at default settings is routinely 8–15 MB.
 That is a README that takes a visible moment to render, and it is the difference
 between a visitor reading past it and bouncing.
 
-`docs/demo.tape` is set up to land in the 1–2 MB range: ~12 seconds of content,
-font size 15, 1000px wide. Check it:
+`docs/demo.tape` is set up to land under 1 MB: ~15 seconds of content, font size
+15, 1000px wide — the committed file is 672 KB. Check it:
 
 ```bash
 ls -lh docs/assets/demo.gif
@@ -107,12 +118,15 @@ upload the recording to a third-party GIF service — not because the content is
 sensitive (it is all synthetic `.example` hosts), but because a canonical URL on
 your own repository is one fewer thing that can rot.
 
-## Checklist before it goes in the README
+## Checklist, as run before the GIF went in the README
 
-- [ ] Watch the GIF at least twice as a stranger would. Is every refusal on
-      screen long enough to read?
-- [ ] Confirm no real host, no real path outside `$TMPDIR`, no real token.
-- [ ] Confirm the output on screen matches what the command actually prints today.
-- [ ] Under 3 MB, or switch to WebP.
-- [ ] `docs/assets/` is tracked and the file is actually committed — an asset
-      referenced but not pushed is the most common way this silently fails.
+- [x] Every refusal is on screen long enough to read (the holds are in
+      `tools/demo.sh`, three seconds each).
+- [x] No real host, no real path outside `$TMPDIR`, no real token — the only
+      hostname is `target.example`, the only paths are `/tmp/cyboros-demo/*`.
+- [x] The output matches what the command prints today. It did not, at first:
+      the script said "92 tests" and this file said 94, while the runner
+      executes 115. Both were corrected before recording.
+- [x] Under 3 MB — 672 KB.
+- [x] Committed and pushed, not just referenced: an asset that is present on
+      disk but absent from the repository is the most common way this fails.

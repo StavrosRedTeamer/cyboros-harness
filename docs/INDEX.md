@@ -13,7 +13,7 @@
 - [**Changelog**](../CHANGELOG.md) — All notable changes to this project are documented here. Dates are commit dates. · 61,9 KB
 - [**Contributor Covenant Code of Conduct**](../CODE_OF_CONDUCT.md) — We as members, contributors, and leaders pledge to make participation in our community a · 5,8 KB
 - [**Contributing**](../CONTRIBUTING.md) — This repository is a penetration-testing harness built around one claim: a finding is only a · 4,5 KB
-- [**Cyboros Harness**](../README.md) — A penetration-testing harness where a finding is only a finding if code can prove it — · 15,0 KB
+- [**Cyboros Harness**](../README.md) — A penetration-testing harness where a finding is only a finding if code can prove it — · 15,4 KB
 - [**Security Policy**](../SECURITY.md) — Cyboros Harness is offensive-security tooling. It executes reconnaissance and · 4,1 KB
 - [**Prompt di sessione — benchmark gen-bench**](../bench-session-prompt.md) — Sei Cyboros. Questa sessione è una run di benchmark, non un engagement. · 5,1 KB
 - [**Cyboros — Web Red Team Methodology & Rules of Engagement**](../knowledge.md) — Shared brain for every Cyboros agent — read before acting. Detail lives in docs/ (map at bottom); · 16,2 KB
@@ -27,7 +27,7 @@
 - [**Launch plan**](LAUNCH-PLAN.md) — Most AI pentest agents are built to *find* things. The bottleneck in this field · 13,8 KB
 - [**Measuring whether an AI pentest agent's findings are real**](METHODOLOGY.md) — An agent that reports everything it can think of scores 100% recall and is · 7,3 KB
 - [**L'anello — perché questo harness si chiama Cyboros**](OUROBOROS.md) — Cyboros = cyber + ouroboros. La metafora è vera qui perché è già nel codice: l'harness · 2,4 KB
-- [**Recording the demo**](RECORDING.md) — $ DEMO_FAST=1 DEMO_PACE=3 ./tools/demo.sh · 5,0 KB
+- [**Recording the demo**](RECORDING.md) — $ DEMO_FAST=1 DEMO_PACE=3 ./tools/demo.sh · 6,1 KB
 - [**`refs/` — provenance, licensing, and why it is not in this repository**](REFS-PROVENANCE.md) — The corpus is not wholly first-party. Its own `refs/README.md` states that · 5,0 KB
 - [**Threat model: attacking Cyboros Harness itself**](THREAT-MODEL.md) — Not the target. The target is supposed to be attacked — that is the job. What is · 12,6 KB
 - [**Alternative-tools audit — what the harness should adopt, borrow, or leave alone**](TOOL-ALTERNATIVES-AUDIT.md) — Three concrete gaps, in priority order: · 26,1 KB

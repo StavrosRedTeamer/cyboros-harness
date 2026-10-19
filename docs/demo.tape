@@ -15,7 +15,7 @@ Set Height 620
 Set Theme {"background": "#0d1117", "foreground": "#c9d1d9", "accent": "#58a6ff"}
 Set PlaybackSpeed 1
 
-# DEMO_FAST runs the guard tests (4, ~1s) instead of the full 92-test gate.
+# DEMO_FAST runs the guard tests (4, ~1s) instead of the full 115-test gate.
 # DEMO_PACE holds each step so the refusals are readable in a GIF.
 Type "DEMO_FAST=1 DEMO_PACE=3 ./tools/demo.sh"
 Enter

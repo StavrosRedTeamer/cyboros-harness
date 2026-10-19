@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # demo.sh — three refusals, and a green suite. Meant to be recorded, not read.
 #
-#   ./tools/demo.sh              # full run, ~50s: the whole 92-test gate
+#   ./tools/demo.sh              # full run, ~40s: the whole 115-test gate
 #   DEMO_FAST=1 ./tools/demo.sh  # the guard tests only, for a README GIF
 #   DEMO_PACE=3 DEMO_FAST=1 ./tools/demo.sh   # ...with 3s of hold per step
 #
@@ -111,12 +111,12 @@ hold
 
 if [ "$DEMO_FAST" = "1" ]; then
   step "4. The guards, under test, offline"
-  cmd "npm test -- --only guard 2>&1 | tail -3  # 4 tests, ~5s"
+  cmd "npm test -- --only guard 2>&1 | tail -3  # 4 tests, offline"
   echo
-  echo "The full gate is 92 tests in ~45s. Zero dependencies either way:"
+  echo "The full gate is 115 tests, under a minute. Zero dependencies either way:"
   echo "nothing to audit but the repository."
 else
-  step "4. 92 tests, no install, no network"
+  step "4. 115 tests, no install, no network"
   cmd "npm test 2>&1 | tail -3  # ~45s"
   echo
   echo "Zero dependencies. Nothing to audit but the repository."

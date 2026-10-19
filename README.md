@@ -14,6 +14,10 @@ and where the lesson of one engagement changes the next.**
 that page names the file that proves it. The agent still cannot violate scope, because the
 enforcement is beneath it.
 
+<img src="docs/assets/demo.gif" alt="A shell session: an empty scope blocks the target, a Critical finding on a suspected rating is rejected, a 'verified' claim with no oracle is refused, then the guard tests pass" width="820">
+
+<sub>Three refusals and a green gate — real output of `DEMO_FAST=1 DEMO_PACE=3 ./tools/demo.sh`, not an edit.</sub>
+
 ![Command Center overview](docs/assets/command-center-overview.png)
 
 </div>
