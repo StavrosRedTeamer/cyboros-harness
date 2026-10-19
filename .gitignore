@@ -10,6 +10,10 @@ scope.wof.json
 mobile-scope.json
 mcp.json
 
+# Runtime agent — config dei provider (endpoint e nomi di variabili, mai chiavi).
+# Le chiavi restano solo nell'ambiente; il file puo' contenere endpoint di clienti.
+runtime/providers.json
+
 # Report, loot, findings e stato runtime (tutto generato)
 # Evidenze/PII dei client non vanno nel repo; loot.jsonl e sessions.json
 # contengono segreti in chiaro e NON devono mai essere committati.

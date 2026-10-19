@@ -4,16 +4,16 @@
 > dimensione, avanzamento delle checkbox dei piani). Non si modifica a mano: rigeneralo.
 > `tools/test-repo-invariants.js` fallisce se è rimasto indietro rispetto ai file.
 
-**Superficie viva:** 35 documenti · **piani:** 9 · **archivio:** 3 file superati.
+**Superficie viva:** 35 documenti · **piani:** 11 · **archivio:** 3 file superati.
 
 ## Root del repo
 
 - [**AGENTS.md — Cyboros Harness**](../AGENTS.md) — Operatore AI per operazioni di pentest autorizzate (web/host, wireless, mobile). · 5,5 KB
 - [**Benchmark**](../BENCHMARK.md) — Public security benchmarks are in the model's training data. "Solved" on OWASP Juice · 15,6 KB
-- [**Changelog**](../CHANGELOG.md) — All notable changes to this project are documented here. Dates are commit dates. · 53,4 KB
+- [**Changelog**](../CHANGELOG.md) — All notable changes to this project are documented here. Dates are commit dates. · 61,9 KB
 - [**Contributor Covenant Code of Conduct**](../CODE_OF_CONDUCT.md) — We as members, contributors, and leaders pledge to make participation in our community a · 5,8 KB
 - [**Contributing**](../CONTRIBUTING.md) — This repository is a penetration-testing harness built around one claim: a finding is only a · 4,5 KB
-- [**Cyboros Harness**](../README.md) — A penetration-testing harness where a finding is only a finding if code can prove it — · 12,3 KB
+- [**Cyboros Harness**](../README.md) — A penetration-testing harness where a finding is only a finding if code can prove it — · 15,0 KB
 - [**Security Policy**](../SECURITY.md) — Cyboros Harness is offensive-security tooling. It executes reconnaissance and · 4,1 KB
 - [**Prompt di sessione — benchmark gen-bench**](../bench-session-prompt.md) — Sei Cyboros. Questa sessione è una run di benchmark, non un engagement. · 5,1 KB
 - [**Cyboros — Web Red Team Methodology & Rules of Engagement**](../knowledge.md) — Shared brain for every Cyboros agent — read before acting. Detail lives in docs/ (map at bottom); · 16,2 KB
@@ -61,6 +61,8 @@
 - [**Ondata 7 — Integrità e promozione della prova (design spec)**](superpowers/specs/2026-09-28-findings-integrity-design.md) — Data: 2026-09-28 · Repo: stavrosredteamer · Stato: design, in attesa di revisione · 12,7 KB
 - [**Forum agentico con admin — design spec (F0)**](superpowers/specs/2026-10-01-forum-admin-design.md) — Data: 2026-10-01 · Repo: stavrosredteamer · Stato: congelato per F1–F2 · 4,8 KB
 - [**Cyboros Harness — rebrand da StavrosRedTeamer (design spec)**](superpowers/specs/2026-10-13-cyboros-rebrand-design.md) — Data: 2026-10-13 · Repo: stavrosredteamer · Stato: design, in attesa di revisione · 17,1 KB
+- [**Interfaccia CLI di `cyboros agent` — bozza**](superpowers/specs/2026-10-19-agent-cli-interface.md) — Data: 2026-10-19 · Stato: bozza per revisione · 22,5 KB
+- [**Runtime indipendente con API key proprie — design spec**](superpowers/specs/2026-10-19-independent-runtime-design.md) — Data: 2026-10-19 · Repo: cyboros-harness · Stato: design, in attesa di revisione · 16,6 KB
 
 ## Archivio — piani superati
 

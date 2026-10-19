@@ -1,0 +1,914 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cyboros Harness · Agent Runtime — visual draft</title>
+<style>
+/* ── tokens — copied from tools/gui/app.css (CYBERDECK), unchanged ───────── */
+:root{
+  --bg:#08060d; --bg2:#050409; --surface:#0f0b18; --surface-2:#160f26;
+  --line:#261a3d; --line-2:#3a2a5c;
+  --ink:#eae7f7; --muted:#9b90b8; --faint:#665b84;
+  --cyan:#24e3ff; --magenta:#ff2d95;
+  --crit:#ff2b5e; --high:#ff8324; --med:#ffd60a; --low:#2ad4ff; --info:#8090ab;
+  --green:#24e38b; --yellow:#ffd60a; --purple:#b98cff;
+  --glow-cyan:0 0 10px rgba(36,227,255,.55);
+  --glow-mag:0 0 10px rgba(255,45,149,.55);
+  --glow-crit:0 0 10px rgba(255,43,94,.6);
+  --mono:"JetBrains Mono","Cascadia Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  --sans:"Inter",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --notch:9px;
+  --shadow-card:0 2px 10px rgba(0,0,0,.45);
+  --hover-bg:rgba(36,227,255,.06);
+}
+
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+html{color-scheme:dark;scrollbar-color:#3a2a5c #050409}
+::-webkit-scrollbar{width:10px;height:10px}
+::-webkit-scrollbar-track{background:#050409}
+::-webkit-scrollbar-thumb{background:#2a1f42;border:1px solid #3a2a5c}
+::-webkit-scrollbar-thumb:hover{background:#3a2a5c}
+body{
+  background:
+    linear-gradient(var(--line) 1px,transparent 1px) 0 0/46px 46px,
+    linear-gradient(90deg,var(--line) 1px,transparent 1px) 0 0/46px 46px,
+    radial-gradient(1100px 640px at 82% -12%,#17102a 0%,transparent 62%),
+    radial-gradient(900px 560px at 6% 108%,#1a0c1e 0%,transparent 60%),
+    var(--bg);
+  background-blend-mode:overlay,overlay,normal,normal,normal;
+  color:var(--ink);
+  font:14px/1.55 var(--sans);
+  -webkit-font-smoothing:antialiased;
+}
+body::after{
+  content:"";position:fixed;inset:0;pointer-events:none;z-index:9999;
+  background:
+    repeating-linear-gradient(0deg,rgba(0,0,0,.28) 0 1px,transparent 1px 3px),
+    repeating-linear-gradient(0deg,rgba(36,227,255,.045) 0 1px,transparent 1px 6px);
+  opacity:.55;mix-blend-mode:multiply;
+}
+::selection{background:#4a0f37;color:#ffe6f4}
+a{color:var(--cyan);text-decoration:none}
+.mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
+.muted{color:var(--muted)}
+.faint{color:var(--faint)}
+.sr{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0}
+
+/* ── chrome ─────────────────────────────────────────────────────────────── */
+#chrome{position:sticky;top:0;z-index:40;background:linear-gradient(180deg,#0d0918,#070510);border-bottom:1px solid var(--line-2);box-shadow:0 1px 0 rgba(36,227,255,.15),0 8px 30px rgba(0,0,0,.5)}
+#topbar{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:10px 20px}
+.brand{display:flex;align-items:center;gap:13px;min-width:0}
+.logo{
+  position:relative;color:var(--magenta);font-size:19px;line-height:1;
+  width:36px;height:36px;display:grid;place-items:center;flex:0 0 auto;
+  border:1px solid var(--magenta);background:#1a0620;
+  clip-path:polygon(7px 0,100% 0,100% calc(100% - 7px),calc(100% - 7px) 100%,0 100%,0 7px);
+  box-shadow:inset 0 0 14px rgba(255,45,149,.35),var(--glow-mag);
+  text-shadow:var(--glow-mag);
+}
+.brand-text{min-width:0}
+h1{margin:0;display:flex;align-items:center;gap:10px;flex-wrap:wrap;line-height:1}
+.brand-name{font:800 17px/1 var(--mono);letter-spacing:2.4px;color:#f4f1ff;text-shadow:-1.4px 0 var(--magenta),1.4px 0 var(--cyan)}
+.brand-tag{
+  font:700 9px/1 var(--mono);letter-spacing:2.4px;color:var(--cyan);
+  border:1px solid var(--cyan);padding:3px 7px 2px;
+  clip-path:polygon(4px 0,100% 0,100% calc(100% - 4px),calc(100% - 4px) 100%,0 100%,0 4px);
+  box-shadow:0 0 9px rgba(36,227,255,.25);
+}
+.sub{color:var(--cyan);font:10.5px var(--mono);margin-top:5px;opacity:.8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.badges{display:flex;align-items:center;gap:7px;flex-wrap:wrap;justify-content:flex-end}
+.badge-group{display:flex;align-items:center;gap:7px;flex-wrap:wrap}
+.badge-group[hidden]{display:none}
+.badge{
+  font:600 10.5px/1.4 var(--mono);padding:3px 9px;border:1px solid var(--line-2);
+  background:var(--surface);color:var(--muted);white-space:nowrap;
+  clip-path:polygon(5px 0,100% 0,100% calc(100% - 5px),calc(100% - 5px) 100%,0 100%,0 5px);
+}
+.badge-ok{border-color:var(--green);color:var(--green);background:#06231a;box-shadow:0 0 8px rgba(36,227,139,.25)}
+.badge-warn{border-color:var(--yellow);color:var(--yellow);background:#221d05;box-shadow:0 0 8px rgba(255,214,10,.2)}
+.badge-bad{border-color:var(--crit);color:var(--crit);background:#240711;box-shadow:0 0 9px rgba(255,43,94,.3)}
+.btn{
+  background:var(--surface-2);color:var(--ink);border:1px solid var(--line-2);
+  padding:5px 12px;font:600 12px var(--mono);cursor:pointer;letter-spacing:.3px;
+  clip-path:polygon(6px 0,100% 0,100% calc(100% - 6px),calc(100% - 6px) 100%,0 100%,0 6px);
+  transition:color .12s,border-color .12s,box-shadow .12s,background .12s;
+}
+.btn:hover{border-color:var(--cyan);color:#dcfbff;box-shadow:var(--glow-cyan),inset 0 0 10px rgba(36,227,255,.12)}
+.btn:focus-visible{outline:2px solid var(--cyan);outline-offset:2px}
+.btn-primary{background:#0a2d33;border-color:var(--cyan);color:#cdf9ff;box-shadow:inset 0 0 10px rgba(36,227,255,.15)}
+.btn-ghost{background:transparent}
+.btn-sm{padding:3px 9px;font-size:11px}
+
+#views{display:flex;gap:2px;padding:0 16px;background:#070510;border-top:1px solid var(--line)}
+.viewtab{
+  background:transparent;border:0;color:var(--muted);padding:10px 15px 9px;cursor:pointer;
+  font:600 11px var(--mono);text-transform:uppercase;letter-spacing:1.4px;position:relative;
+}
+.viewtab:hover{color:var(--ink)}
+.viewtab:focus-visible{outline:2px solid var(--cyan);outline-offset:-4px}
+.viewtab.active{color:var(--cyan);text-shadow:var(--glow-cyan)}
+.viewtab.active::after{content:"";position:absolute;left:8px;right:8px;bottom:-1px;height:2px;background:var(--cyan);box-shadow:0 0 12px var(--cyan)}
+.viewtab .k{color:var(--faint);margin-right:6px}
+
+/* ── layout ─────────────────────────────────────────────────────────────── */
+#stage{max-width:1680px;margin:0 auto;padding:16px 20px 44px}
+.view{display:none}
+.view.active{display:block}
+.console-grid{display:grid;grid-template-columns:296px minmax(0,1fr) 344px;gap:13px;align-items:start}
+.col{display:flex;flex-direction:column;gap:12px;min-width:0}
+.col.center{gap:10px}
+@media(max-width:1280px){
+  .console-grid{grid-template-columns:256px minmax(0,1fr)}
+  .col.right{grid-column:1/-1;display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+@media(max-width:900px){
+  .console-grid{grid-template-columns:1fr}
+  .col.right{grid-template-columns:1fr}
+  .brand-tag{display:none}
+}
+
+/* ── HUD cards ──────────────────────────────────────────────────────────── */
+.card{
+  background:linear-gradient(180deg,rgba(36,227,255,.03),transparent 40%),var(--surface);
+  border:1px solid var(--line-2);padding:13px 15px;position:relative;
+  clip-path:polygon(var(--notch) 0,100% 0,100% calc(100% - var(--notch)),calc(100% - var(--notch)) 100%,0 100%,0 var(--notch));
+  box-shadow:var(--shadow-card);
+}
+.card::before,.card::after{content:"";position:absolute;width:12px;height:12px;pointer-events:none}
+.card::before{top:6px;right:6px;border-top:1px solid var(--cyan);border-right:1px solid var(--cyan);opacity:.42}
+.card::after{bottom:6px;left:6px;border-bottom:1px solid var(--cyan);border-left:1px solid var(--cyan);opacity:.42}
+.card h2,.card h3{
+  margin:0 0 9px;font:600 10.5px var(--mono);text-transform:uppercase;letter-spacing:1.5px;
+  color:var(--muted);display:flex;align-items:center;gap:8px;
+}
+.card h2::before,.card h3::before{content:"";width:3px;height:12px;background:var(--line-2);flex:0 0 auto}
+.card.keel-accent h2::before,.card.keel-accent h3::before{background:var(--cyan);box-shadow:0 0 8px var(--cyan)}
+.card.keel-crit{border-color:#5c1730;box-shadow:inset 0 0 24px rgba(255,43,94,.07)}
+.card.keel-crit h3::before{background:var(--crit);box-shadow:var(--glow-crit)}
+.kv{display:grid;grid-template-columns:78px minmax(0,1fr);gap:4px 10px;margin:0;font-size:12px}
+.kv dt{color:var(--faint);font:10px var(--mono);text-transform:uppercase;letter-spacing:.8px;padding-top:2px}
+.kv dd{margin:0;font:12px var(--mono);color:var(--ink);min-width:0;overflow-wrap:anywhere}
+.kv dd.small{font-size:11px;color:var(--muted)}
+.sep{height:1px;background:var(--line);margin:10px 0}
+
+/* ── run header ─────────────────────────────────────────────────────────── */
+.runhead{
+  background:linear-gradient(180deg,rgba(255,45,149,.05),transparent 55%),var(--surface);
+  border:1px solid var(--line-2);border-left:3px solid var(--magenta);padding:11px 14px;
+  display:flex;flex-direction:column;gap:8px;
+  clip-path:polygon(var(--notch) 0,100% 0,100% calc(100% - var(--notch)),calc(100% - var(--notch)) 100%,0 100%,0 var(--notch));
+}
+.runhead-top{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.runhead-top strong{font:800 11px var(--mono);letter-spacing:1.8px;color:var(--magenta)}
+.runhead-top .sid{font:11px var(--mono);color:var(--muted)}
+.runhead-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px 14px}
+@media(max-width:700px){.runhead-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.cell{min-width:0}
+.cell .k{display:block;font:9.5px var(--mono);text-transform:uppercase;letter-spacing:1px;color:var(--faint)}
+.cell .v{display:block;font:12px var(--mono);color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.livedot{width:7px;height:7px;border-radius:50%;background:var(--cyan);box-shadow:0 0 9px var(--cyan);animation:pulse 1.4s infinite;flex:0 0 auto}
+@keyframes pulse{50%{opacity:.25}}
+
+/* ── transcript ─────────────────────────────────────────────────────────── */
+.transcript{display:flex;flex-direction:column;gap:9px}
+.narration{
+  border-left:2px solid var(--line-2);padding:3px 0 3px 12px;color:#d8d2ea;font-size:13px;
+}
+.narration b{color:var(--ink);font-weight:600}
+.tool{border:1px solid var(--line);background:var(--surface)}
+.tool-head{
+  width:100%;display:grid;grid-template-columns:14px 118px minmax(0,1fr) auto auto;gap:9px;
+  align-items:center;padding:8px 11px;background:transparent;border:0;color:var(--ink);
+  font:12px var(--mono);text-align:left;cursor:pointer;
+}
+.tool-head:hover{background:var(--hover-bg)}
+.tool-head:focus-visible{outline:2px solid var(--cyan);outline-offset:-2px}
+.tool-head .caret{color:var(--faint);transition:transform .15s}
+.tool.open .tool-head .caret{transform:rotate(90deg)}
+.tool-name{color:var(--cyan);font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tool-args{color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tool-ms{color:var(--faint);font-size:11px;white-space:nowrap}
+.tool-status{font-size:10px;padding:1px 7px;border:1px solid var(--line-2);color:var(--muted);white-space:nowrap}
+.tool-status.ok{color:var(--green);border-color:#146b45;background:#04170f}
+.tool-status.warn{color:var(--yellow);border-color:#8a7410;background:#1a1604}
+.tool-body{display:none;border-top:1px dashed var(--line);padding:9px 11px;background:var(--bg2);font:11.5px/1.65 var(--mono);color:#c9c1e0;overflow-x:auto}
+.tool.open .tool-body{display:block}
+.tool-body .ln{display:block;white-space:pre}
+.tool-body .prompt{color:var(--faint)}
+.tool-body .ok{color:var(--green)}
+.tool-body .warn{color:var(--yellow)}
+.tool-body .bad{color:var(--crit)}
+.tool-body .cy{color:var(--cyan)}
+
+/* ── findings ───────────────────────────────────────────────────────────── */
+.finding{
+  border:1px solid var(--line-2);border-left:3px solid var(--low);
+  background:linear-gradient(90deg,rgba(42,212,255,.04),transparent 45%),var(--surface);
+  padding:11px 13px;
+}
+.finding.med{border-left-color:var(--med);background:linear-gradient(90deg,rgba(255,214,10,.05),transparent 45%),var(--surface)}
+.finding.crit{border-left-color:var(--crit);background:linear-gradient(90deg,rgba(255,43,94,.06),transparent 45%),var(--surface)}
+.finding-head{display:flex;align-items:flex-start;gap:9px;flex-wrap:wrap}
+.finding h4{margin:0;font:700 13.5px/1.35 var(--sans);letter-spacing:.1px;color:var(--ink);flex:1 1 260px}
+.finding .path{font:11.5px var(--mono);color:#9fd8ef}
+.finding .meta{display:flex;gap:7px;flex-wrap:wrap;margin:8px 0 6px}
+.finding .note{font-size:12px;line-height:1.55;color:var(--muted);max-width:78ch}
+.finding .actions{display:flex;gap:7px;margin-top:9px;flex-wrap:wrap}
+.chip{
+  display:inline-flex;align-items:center;gap:5px;font:600 10.5px/1.4 var(--mono);
+  padding:2px 8px;border:1px solid var(--line-2);background:var(--surface-2);color:var(--muted);
+  white-space:nowrap;clip-path:polygon(4px 0,100% 0,100% calc(100% - 4px),calc(100% - 4px) 100%,0 100%,0 4px);
+}
+.chip.crit{color:#ff9fb6;background:#240711;border-color:var(--crit)}
+.chip.high{color:#ffc39a;background:#241206;border-color:#a7521a}
+.chip.med{color:#ffe98f;background:#201b04;border-color:#8a7410}
+.chip.low{color:#a9e9ff;background:#061f2e;border-color:#1c6a86}
+.chip.info{color:#c3cddd;background:#12141d;border-color:#35414f}
+.chip.crit::before,.chip.high::before,.chip.med::before,.chip.low::before,.chip.info::before{
+  content:"";width:6px;height:6px;border-radius:50%;background:currentColor;box-shadow:0 0 7px currentColor;
+}
+.verify{display:inline-flex;align-items:center;gap:6px;font:600 10.5px var(--mono);color:var(--muted)}
+.verify::before{content:"";width:9px;height:9px;border-radius:50%;border:1.5px solid currentColor;box-sizing:border-box;flex:0 0 auto}
+.verify.suspected{color:var(--low)}
+.verify.suspected::before{border-style:dashed}
+.verify.triggered{color:var(--med)}
+.verify.triggered::before{background:currentColor;box-shadow:0 0 7px currentColor}
+.ceiling{font:600 10.5px var(--mono);color:var(--faint)}
+
+/* ── approval ───────────────────────────────────────────────────────────── */
+.approval{
+  border:1px solid #8a7410;border-left:3px solid var(--med);
+  background:linear-gradient(180deg,rgba(255,214,10,.06),transparent 60%),#141104;
+  padding:13px 14px;
+}
+.approval.granted{border-color:#146b45;border-left-color:var(--green);background:linear-gradient(180deg,rgba(36,227,139,.05),transparent 60%),#04170f}
+.approval.skipped{border-color:var(--line-2);border-left-color:var(--faint);background:var(--surface)}
+.approval-head{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:7px}
+.approval-head strong{font:800 10.5px var(--mono);letter-spacing:1.6px;color:var(--yellow)}
+.approval.granted .approval-head strong{color:var(--green)}
+.approval.skipped .approval-head strong{color:var(--faint)}
+.approval h4{margin:0 0 8px;font:700 13.5px/1.35 var(--sans);color:var(--ink)}
+.cmd{
+  background:var(--bg2);border:1px solid var(--line);padding:8px 10px;
+  font:11.5px/1.6 var(--mono);color:#cdf9ff;overflow-x:auto;white-space:pre;
+  box-shadow:inset 0 0 26px rgba(36,227,255,.03);
+}
+.approval .kv{grid-template-columns:64px minmax(0,1fr);margin:9px 0 4px}
+.approval-actions{display:flex;gap:7px;flex-wrap:wrap;margin-top:10px}
+.approval-note{font:11px/1.5 var(--mono);color:var(--muted);margin-top:9px;max-width:80ch}
+.approval.granted .approval-actions,.approval.skipped .approval-actions{display:none}
+.approval-details{margin-top:9px;padding-top:9px;border-top:1px dashed var(--line)}
+.approval-details[hidden]{display:none}
+.resolved{
+  display:none;margin-top:9px;padding-top:9px;border-top:1px dashed var(--line);
+  font:11.5px/1.6 var(--mono);color:var(--muted);
+}
+.approval.granted .resolved,.approval.skipped .resolved{display:block}
+#post-approval{display:none;flex-direction:column;gap:9px}
+#post-approval.show{display:flex}
+#post-skip{display:none;border-left:2px solid var(--faint);padding:4px 0 4px 12px;color:var(--muted);font-size:12.5px}
+#post-skip.show{display:block}
+
+/* ── composer ───────────────────────────────────────────────────────────── */
+.composer{
+  display:flex;align-items:center;gap:8px;border:1px solid var(--line-2);
+  background:var(--surface);padding:7px 9px;margin-top:1px;
+}
+.composer:focus-within{border-color:var(--cyan);box-shadow:0 0 0 1px var(--cyan),var(--glow-cyan)}
+.composer .sig{color:var(--magenta);font:700 13px var(--mono)}
+.composer input{flex:1;min-width:0;background:transparent;border:0;outline:0;color:var(--ink);font:12.5px var(--mono)}
+.composer input::placeholder{color:var(--faint)}
+.composer .slash{font:10.5px var(--mono);color:var(--faint);border:1px solid var(--line);padding:2px 6px}
+
+/* ── right rail: meters ─────────────────────────────────────────────────── */
+.meter{height:6px;background:#050409;border:1px solid var(--line);margin:5px 0 9px;overflow:hidden}
+.meter > span{display:block;height:100%;min-width:3px;background:linear-gradient(90deg,var(--cyan),var(--magenta));box-shadow:0 0 10px rgba(36,227,255,.35)}
+.meter.hot > span{background:linear-gradient(90deg,var(--yellow),var(--high))}
+.meter.crit > span{background:linear-gradient(90deg,var(--high),var(--crit))}
+.meter-row{display:flex;justify-content:space-between;align-items:baseline;gap:8px;font:11px var(--mono)}
+.meter-row .k{color:var(--muted);text-transform:uppercase;letter-spacing:.8px;font-size:9.5px}
+.meter-row .v{color:var(--ink)}
+.cost{font:700 20px/1.1 var(--mono);color:var(--ink);letter-spacing:-.3px}
+.cost small{font:500 10px var(--mono);color:var(--faint);letter-spacing:.4px}
+.pill-row{display:flex;gap:6px;flex-wrap:wrap;margin-top:7px}
+.pill{font:600 10px var(--mono);padding:2px 7px;border:1px solid var(--line-2);color:var(--muted)}
+.pill.hot{color:var(--yellow);border-color:#8a7410;background:#1a1604}
+.pill.ok{color:var(--green);border-color:#146b45;background:#04170f}
+.session-row{display:grid;grid-template-columns:auto 1fr auto;gap:8px;align-items:baseline;padding:6px 0;border-bottom:1px solid var(--line);font:11px var(--mono)}
+.session-row:last-child{border-bottom:0}
+.session-row .sid{color:var(--cyan)}
+.session-row .st{font-size:9.5px;padding:1px 6px;border:1px solid var(--line-2);color:var(--muted)}
+.session-row .st.ok{color:var(--green);border-color:#146b45}
+.session-row .st.halt{color:var(--yellow);border-color:#8a7410}
+.phase-row{display:flex;align-items:center;gap:8px;padding:4px 0;font:11.5px var(--mono);color:var(--muted)}
+.dot{width:7px;height:7px;border-radius:50%;background:var(--line-2);flex:0 0 auto}
+.dot.done{background:var(--green);box-shadow:0 0 7px var(--green)}
+.dot.run{background:var(--cyan);box-shadow:0 0 9px var(--cyan);animation:pulse 1.1s infinite}
+.dot.wait{background:#32294a}
+.dot.lock{background:transparent;border:1px solid var(--faint)}
+.phase-row .tag{margin-left:auto;font-size:9.5px;color:var(--faint)}
+.phase-row .tag.lock{color:var(--faint)}
+.gate-note{font:10.5px/1.5 var(--mono);color:var(--faint);margin-top:7px;border-top:1px solid var(--line);padding-top:7px}
+
+/* ── terminal view ───────────────────────────────────────────────────────── */
+.term-wrap{max-width:1180px;margin:0 auto}
+.term{
+  background:#050409;border:1px solid var(--line-2);padding:16px 18px;
+  font:12px/1.65 var(--mono);color:#d8d3ea;overflow-x:auto;white-space:pre;
+  box-shadow:inset 0 0 70px rgba(36,227,255,.035),0 18px 50px rgba(0,0,0,.45);
+}
+.term .cy{color:var(--cyan)}
+.term .mg{color:var(--magenta)}
+.term .gr{color:var(--green)}
+.term .ye{color:var(--yellow)}
+.term .rd{color:var(--crit)}
+.term .dim{color:var(--muted)}
+.term .fa{color:var(--faint)}
+.term .b{font-weight:700}
+.caption{font:11.5px/1.6 var(--mono);color:var(--muted);margin:10px 0 0;max-width:92ch}
+.caption b{color:var(--ink);font-weight:600}
+
+/* ── first run ──────────────────────────────────────────────────────────── */
+.setup{max-width:940px;margin:0 auto}
+.setup-head{margin:2px 0 16px}
+.setup-head h2{margin:0 0 5px;font:800 24px/1.15 var(--mono);letter-spacing:-.6px;color:var(--ink)}
+.setup-head p{margin:0;color:var(--muted);font-size:13px;max-width:70ch}
+.step{display:grid;grid-template-columns:44px minmax(0,1fr);gap:14px;padding:16px 0;border-bottom:1px solid var(--line)}
+.step:last-child{border-bottom:0}
+.step .num{font:800 25px/1 var(--mono);color:var(--cyan);text-shadow:var(--glow-cyan)}
+.step h3{margin:0 0 3px;font:700 14px/1.3 var(--sans);color:var(--ink);letter-spacing:.1px}
+.step p{margin:0 0 8px;color:var(--muted);font-size:12.5px;line-height:1.55;max-width:76ch}
+.code{background:var(--bg2);border:1px solid var(--line);padding:8px 10px;font:11.5px/1.65 var(--mono);color:#cdf9ff;overflow-x:auto;white-space:pre}
+.okline{color:var(--green)}
+.warnline{color:var(--yellow)}
+table.mini{width:100%;border-collapse:collapse;font-size:12px}
+table.mini th,table.mini td{text-align:left;padding:5px 8px;border-bottom:1px solid var(--line);vertical-align:top}
+table.mini th{font:600 9.5px var(--mono);text-transform:uppercase;letter-spacing:1px;color:var(--cyan);opacity:.8}
+table.mini td:first-child{font-family:var(--mono);color:var(--muted)}
+table.mini td.mono{font-family:var(--mono)}
+table.mini tr:last-child td{border-bottom:0}
+.synth{
+  margin-top:14px;padding:10px 12px;border:1px dashed var(--line-2);
+  font:11px/1.6 var(--mono);color:var(--faint);
+}
+.synth b{color:var(--muted);font-weight:600}
+.notlist{list-style:none;margin:0;padding:0;display:grid;gap:6px}
+.notlist li{display:flex;gap:8px;font-size:12.5px;color:var(--muted)}
+.notlist li::before{content:"✕";color:var(--crit);font:700 12px var(--mono);flex:0 0 auto}
+
+/* ── motion ─────────────────────────────────────────────────────────────── */
+@keyframes rise{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+.view.active .card,.view.active .runhead,.view.active .tool,.view.active .finding,.view.active .approval{
+  animation:rise .45s cubic-bezier(.16,1,.3,1) both;
+}
+.view.active .col.left .card:nth-child(2){animation-delay:.04s}
+.view.active .col.left .card:nth-child(3){animation-delay:.08s}
+.view.active .col.left .card:nth-child(4){animation-delay:.12s}
+.view.active .col.left .card:nth-child(5){animation-delay:.16s}
+.view.active .transcript > *:nth-child(2){animation-delay:.05s}
+.view.active .transcript > *:nth-child(3){animation-delay:.09s}
+.view.active .transcript > *:nth-child(4){animation-delay:.13s}
+.view.active .transcript > *:nth-child(5){animation-delay:.17s}
+.view.active .transcript > *:nth-child(6){animation-delay:.21s}
+.view.active .col.right .card:nth-child(2){animation-delay:.06s}
+.view.active .col.right .card:nth-child(3){animation-delay:.1s}
+.view.active .col.right .card:nth-child(4){animation-delay:.14s}
+@media(prefers-reduced-motion:reduce){
+  *{animation:none!important;transition:none!important}
+  .view.active .card,.view.active .runhead,.view.active .tool,.view.active .finding,.view.active .approval{opacity:1;transform:none}
+}
+</style>
+</head>
+<body>
+
+<div id="chrome">
+  <header id="topbar">
+    <div class="brand">
+      <span class="logo" aria-hidden="true">◈</span>
+      <div class="brand-text">
+        <h1>
+          <span class="brand-name">CYBOROS HARNESS</span>
+          <span class="brand-tag">AGENT RUNTIME</span>
+        </h1>
+        <div class="sub" id="server-sub">session 01J8Z… · app.example.com · web-test / sqli</div>
+      </div>
+    </div>
+    <div class="badges">
+      <span class="badge-group" id="run-badges">
+        <span class="badge badge-warn" id="top-approval">APPROVAL PENDING</span>
+        <span class="badge badge-ok">SCOPE IN SCOPE</span>
+        <span class="badge">EGRESS CLOUD</span>
+        <span class="badge">BUDGET 2.5%</span>
+      </span>
+      <span class="badge-group" id="setup-badges" hidden>
+        <span class="badge">NO CONFIG</span>
+        <span class="badge">SCOPE EMPTY</span>
+        <span class="badge badge-ok">FAIL-CLOSED</span>
+      </span>
+      <span class="badge" title="Synthetic data — no engagement data">SYNTHETIC DATA</span>
+    </div>
+  </header>
+  <nav id="views" role="tablist" aria-label="Mockup views">
+    <button class="viewtab active" role="tab" aria-selected="true" aria-controls="view-console" id="tab-console" data-view="console"><span class="k">01</span>Console</button>
+    <button class="viewtab" role="tab" aria-selected="false" aria-controls="view-terminal" id="tab-terminal" data-view="terminal"><span class="k">02</span>Terminal</button>
+    <button class="viewtab" role="tab" aria-selected="false" aria-controls="view-firstrun" id="tab-firstrun" data-view="firstrun"><span class="k">03</span>First run</button>
+  </nav>
+</div>
+
+<main id="stage">
+
+  <!-- ═══════════════════════ 01 · CONSOLE ═══════════════════════ -->
+  <section id="view-console" class="view active" role="tabpanel" aria-labelledby="tab-console">
+    <div class="console-grid">
+
+      <!-- left rail: engagement context -->
+      <aside class="col left" aria-label="Engagement context">
+        <section class="card keel-accent">
+          <h3>Campaign</h3>
+          <dl class="kv">
+            <dt>Client</dt><dd>ACME Q4</dd>
+            <dt>Mission</dt><dd>WEB-03 · External web</dd>
+            <dt>Window</dt><dd>2026-10-14 → 24</dd>
+            <dt>Operator</dt><dd>operator</dd>
+          </dl>
+          <div class="pill-row">
+            <span class="pill ok">AUTHORIZED</span>
+            <span class="pill">2 HOSTS</span>
+          </div>
+        </section>
+
+        <section class="card">
+          <h3>Phases</h3>
+          <div class="phase-row"><span class="dot done"></span>recon-map<span class="tag">18 endpoints</span></div>
+          <div class="phase-row"><span class="dot run"></span>web-test<span class="tag">sqli · running</span></div>
+          <div class="phase-row"><span class="dot wait"></span>host<span class="tag">pending</span></div>
+          <div class="phase-row"><span class="dot wait"></span>wireless<span class="tag">not in scope</span></div>
+          <div class="phase-row"><span class="dot lock"></span>report<span class="tag lock">gate locked</span></div>
+          <div class="gate-note">Coverage 4 / 9 classes. The report gate opens only when the matrix is complete and no finding is pending.</div>
+        </section>
+
+        <section class="card">
+          <h3>Scope</h3>
+          <dl class="kv">
+            <dt>Hosts</dt><dd>app.example.com<br>api.example.com</dd>
+            <dt>IPs</dt><dd>10.0.0.0/8</dd>
+            <dt>Rate</dt><dd>2 req/s</dd>
+          </dl>
+          <div class="gate-note">scope.json is the written authorization. If it is empty, everything is blocked. There is no override flag.</div>
+        </section>
+
+        <section class="card">
+          <h3>Sessions</h3>
+          <div class="session-row"><span class="sid">01J8Z…</span><span>10:02 · web-test/sqli</span><span class="st ok">live</span></div>
+          <div class="session-row"><span class="sid">01J7Q…</span><span>Oct 18 · recon-map</span><span class="st halt">halted</span></div>
+          <div class="session-row"><span class="sid">01J6M…</span><span>Oct 17 · web-test/authz</span><span class="st ok">ok</span></div>
+        </section>
+      </aside>
+
+      <!-- center: transcript -->
+      <section class="col center" aria-label="Agent transcript">
+        <div class="runhead">
+          <div class="runhead-top">
+            <span class="livedot" aria-hidden="true"></span>
+            <strong>RUN</strong>
+            <span class="sid">01J8Z…</span>
+            <span class="badge">web-test / sqli</span>
+          </div>
+          <div class="runhead-grid">
+            <div class="cell"><span class="k">Target</span><span class="v">app.example.com</span></div>
+            <div class="cell"><span class="k">Provider</span><span class="v">openrouter</span></div>
+            <div class="cell"><span class="k">Model</span><span class="v">vendor/model</span></div>
+            <div class="cell"><span class="k">Egress</span><span class="v">cloud · authorized</span></div>
+            <div class="cell"><span class="k">Prompt</span><span class="v">9c1e…</span></div>
+            <div class="cell"><span class="k">Config</span><span class="v">4a7d…</span></div>
+            <div class="cell"><span class="k">Budget</span><span class="v">6 / 240 req</span></div>
+            <div class="cell"><span class="k">Started</span><span class="v">10:02:11</span></div>
+          </div>
+        </div>
+
+        <div class="transcript" id="transcript">
+
+          <p class="narration"><b>Map is ready.</b> 18 endpoints, 4 with parameters. Starting with SQL injection on <span class="mono">/api/orders</span>, benign marker first.</p>
+
+          <div class="tool">
+            <button class="tool-head" type="button" aria-expanded="false">
+              <span class="caret" aria-hidden="true">▸</span>
+              <span class="tool-name">scope_check</span>
+              <span class="tool-args">app.example.com</span>
+              <span class="tool-status ok">IN SCOPE</span>
+              <span class="tool-ms">41 ms</span>
+            </button>
+            <div class="tool-body">
+<span class="ln"><span class="prompt">$</span> node tools/scope-guard.js check https://app.example.com</span>
+<span class="ln ok">IN SCOPE · exit 0</span>
+<span class="ln"><span class="prompt">scope.json</span> allowed_hosts: app.example.com, api.example.com · allowed_ips: 10.0.0.0/8</span>
+            </div>
+          </div>
+
+          <div class="tool">
+            <button class="tool-head" type="button" aria-expanded="false">
+              <span class="caret" aria-hidden="true">▸</span>
+              <span class="tool-name">memory_recall</span>
+              <span class="tool-args">"spring boot jdbc sqli"</span>
+              <span class="tool-status ok">3 techniques</span>
+              <span class="tool-ms">12 ms</span>
+            </button>
+            <div class="tool-body">
+<span class="ln">RAG-0012  union-based · ORDER BY probe first, then column count</span>
+<span class="ln">RAG-0041  time-based · baseline 3 requests, then SLEEP comparison</span>
+<span class="ln">RAG-0090  WAF bypass · case mixing + inline comments, only if 403</span>
+<span class="ln dim">sanitized lessons · no engagement data</span>
+            </div>
+          </div>
+
+          <div class="tool">
+            <button class="tool-head" type="button" aria-expanded="false">
+              <span class="caret" aria-hidden="true">▸</span>
+              <span class="tool-name">repeater</span>
+              <span class="tool-args">GET /api/orders?id=1'</span>
+              <span class="tool-status warn">200 · SQL error</span>
+              <span class="tool-ms">310 ms</span>
+            </button>
+            <div class="tool-body">
+<span class="ln"><span class="prompt">→</span> GET https://app.example.com/api/orders?id=1%27</span>
+<span class="ln"><span class="prompt">←</span> 200 OK · 1.8 KB · 310 ms</span>
+<span class="ln bad">body: SQLSTATE[42000]: Syntax error ... near "1''"</span>
+<span class="ln warn">marker absent · error reflected by the database, not by the WAF</span>
+<span class="ln dim">evidence: reports/app.example.com/req-8f21.txt</span>
+            </div>
+          </div>
+
+          <article class="finding">
+            <div class="finding-head">
+              <h4>SQL injection — error-based <span class="path">/api/orders?id</span></h4>
+              <span class="chip low">LOW</span>
+            </div>
+            <div class="meta">
+              <span class="verify suspected">verify_level: suspected</span>
+              <span class="ceiling">→ severity ceiling: Low</span>
+              <span class="chip info">CWE-89</span>
+            </div>
+            <p class="note">Database error reflects the injected quote. No marker yet, no data read. This is a hypothesis until an oracle re-derives it live.</p>
+            <div class="actions">
+              <button class="btn btn-sm btn-ghost" type="button">Evidence</button>
+              <button class="btn btn-sm btn-ghost" type="button">Generate POC</button>
+              <span class="faint mono" style="font-size:10.5px;align-self:center">findings.jsonl#a41f</span>
+            </div>
+          </article>
+
+          <div class="approval" id="approval-card" aria-live="polite">
+            <div class="approval-head">
+              <strong id="approval-status">CONFIRM-TIER · APPROVAL REQUIRED</strong>
+              <span class="chip med">single-use</span>
+              <span class="chip info">host-bound</span>
+            </div>
+            <h4>Escalate to time-based verification with sqlmap</h4>
+            <div class="cmd">node tools/run.js sqlmap -u "https://app.example.com/api/orders?id=1" --batch --level 2 --risk 2</div>
+            <dl class="kv">
+              <dt>Scope</dt><dd>IN SCOPE · allowed_hosts: app.example.com</dd>
+              <dt>Tier</dt><dd>confirm · intrusive</dd>
+              <dt>Reason</dt><dd>playbook web/sqli, step 4 — prove the hypothesis with a timing oracle</dd>
+            </dl>
+            <div class="approval-actions">
+              <button class="btn btn-primary" type="button" id="approve">Approve once</button>
+              <button class="btn btn-ghost" type="button" id="skip">Skip</button>
+              <button class="btn btn-ghost" type="button" id="details">Details</button>
+            </div>
+            <p class="approval-note">Approval writes a single-use token to reports/approvals.jsonl. It is bound to this host and this action; it cannot be reused.</p>
+            <div class="approval-details" id="approval-details" hidden>
+              <dl class="kv">
+                <dt>Exact</dt><dd>node tools/run.js sqlmap -u "https://app.example.com/api/orders?id=1" --batch --level 2 --risk 2</dd>
+                <dt>Scope</dt><dd>in scope · app.example.com · allowed_ips 10.0.0.0/8</dd>
+                <dt>Token</dt><dd>single-use · host-bound · expires with the session</dd>
+                <dt>Effect</dt><dd>intrusive timing probes; no writes, no data extraction at level 2</dd>
+              </dl>
+            </div>
+            <div class="resolved" id="approval-resolved"></div>
+          </div>
+
+          <div id="post-approval">
+            <div class="tool">
+              <button class="tool-head" type="button" aria-expanded="false">
+                <span class="caret" aria-hidden="true">▸</span>
+                <span class="tool-name">run_tool</span>
+                <span class="tool-args">sqlmap · level 2 · risk 2</span>
+                <span class="tool-status ok">time-based</span>
+                <span class="tool-ms">24.8 s</span>
+              </button>
+              <div class="tool-body">
+<span class="ln"><span class="prompt">$</span> node tools/run.js sqlmap -u "https://app.example.com/api/orders?id=1" --batch --level 2 --risk 2</span>
+<span class="ln ok">exit 0 · parameter 'id' is vulnerable (time-based blind)</span>
+<span class="ln">baseline 0.31 s · injected 4.82 s · 5/5 oracle re-runs</span>
+              </div>
+            </div>
+
+            <article class="finding med">
+              <div class="finding-head">
+                <h4>SQL injection — time-based blind <span class="path">/api/orders?id</span></h4>
+                <span class="chip med">MEDIUM</span>
+              </div>
+              <div class="meta">
+                <span class="verify triggered">verify_level: triggered</span>
+                <span class="ceiling">→ severity ceiling: Medium</span>
+                <span class="chip info">oracle 5/5</span>
+                <span class="chip info">CWE-89</span>
+              </div>
+              <p class="note">The condition is triggered and reproducible, but no data was read. Promote to High only with an exploited chain and an oracle that proves impact.</p>
+              <div class="actions">
+                <button class="btn btn-sm btn-ghost" type="button">Oracle run</button>
+                <button class="btn btn-sm btn-ghost" type="button">Evidence</button>
+                <span class="faint mono" style="font-size:10.5px;align-self:center">reports/app.example.com/oracle-9f2.json</span>
+              </div>
+            </article>
+
+            <p class="narration"><b>Next class:</b> authz. The report gate stays locked until coverage is complete and no finding is pending.</p>
+          </div>
+
+          <div id="post-skip">
+            Action skipped. The runtime leaves the hypothesis at <span class="mono">suspected</span> and continues with the next class; the gate will ask for it again before the report.
+          </div>
+
+        </div>
+
+        <form class="composer" onsubmit="return false">
+          <span class="sig" aria-hidden="true">›</span>
+          <input type="text" id="composer" placeholder="Ask the runtime, or type / for commands" aria-label="Command input">
+          <span class="slash">/</span>
+          <button class="btn btn-sm btn-primary" type="submit">Send</button>
+        </form>
+      </section>
+
+      <!-- right rail: run state -->
+      <aside class="col right" aria-label="Run state">
+        <section class="card keel-accent">
+          <h3>Run</h3>
+          <dl class="kv">
+            <dt>Target</dt><dd>app.example.com</dd>
+            <dt>Phase</dt><dd>web-test · sqli</dd>
+            <dt>Provider</dt><dd>openrouter</dd>
+            <dt>Model</dt><dd>vendor/model</dd>
+            <dt>Egress</dt><dd class="small">cloud · allow_cloud true</dd>
+            <dt>Temp</dt><dd>0.2</dd>
+            <dt>Prompt</dt><dd class="small">sha256 9c1e4f…</dd>
+            <dt>Config</dt><dd class="small">sha256 4a7d2b…</dd>
+          </dl>
+          <div class="pill-row">
+            <span class="pill ok">KEY PRESENT</span>
+            <span class="pill">sk-…a1b2</span>
+          </div>
+        </section>
+
+        <section class="card">
+          <h3>Budget</h3>
+          <div class="meter-row"><span class="k">Requests</span><span class="v">6 / 240</span></div>
+          <div class="meter"><span style="width:2.5%"></span></div>
+          <div class="meter-row"><span class="k">Wall clock</span><span class="v">0.7 / 90 min</span></div>
+          <div class="meter"><span style="width:0.8%"></span></div>
+          <div class="meter-row"><span class="k">Tokens</span><span class="v">20.3k / 500k</span></div>
+          <div class="meter"><span style="width:4.1%"></span></div>
+          <div class="sep"></div>
+          <div class="meter-row"><span class="k">Cost so far</span><span class="v cost">$0.041 <small>provider-reported</small></span></div>
+          <p class="gate-note">Cost is <span class="mono">null</span> when the provider does not report it. The runtime never invents a price.</p>
+        </section>
+
+        <section class="card" id="approvals-card">
+          <h3>Approvals</h3>
+          <div class="meter-row"><span class="k">Pending</span><span class="v" id="pending-count">1</span></div>
+          <div class="meter-row"><span class="k">Granted</span><span class="v" id="granted-count">0</span></div>
+          <div class="meter-row"><span class="k">Skipped</span><span class="v" id="skipped-count">0</span></div>
+          <div class="sep"></div>
+          <div class="session-row"><span class="sid">sqlmap</span><span>level 2 · risk 2</span><span class="st halt" id="approval-row-state">pending</span></div>
+          <p class="gate-note">Append-only store: reports/approvals.jsonl. A token is non-reusable, non-expired and bound to the right host and action.</p>
+        </section>
+
+        <section class="card">
+          <h3>Provenance</h3>
+          <dl class="kv">
+            <dt>Session</dt><dd class="small">01J8Z…</dd>
+            <dt>Prompt</dt><dd class="small">9c1e4f…</dd>
+            <dt>Config</dt><dd class="small">4a7d2b…</dd>
+            <dt>Events</dt><dd>14 · chained</dd>
+            <dt>Egress</dt><dd class="small">cloud · authorized</dd>
+          </dl>
+          <div class="pill-row">
+            <span class="pill">NO TELEMETRY</span>
+            <span class="pill">NO AUTO-UPDATE</span>
+          </div>
+        </section>
+      </aside>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════ 02 · TERMINAL ═══════════════════════ -->
+  <section id="view-terminal" class="view" role="tabpanel" aria-labelledby="tab-terminal">
+    <div class="term-wrap">
+      <div class="term" role="img" aria-label="Terminal transcript of the same run">
+<span class="fa">$</span> <span class="b">cyboros agent run app.example.com --phase web-test --class sqli --profile openrouter</span>
+
+<span class="cy">┌ cyboros agent ────────────────────────────────────────────────────────────────┐</span>
+<span class="cy">│</span> target   app.example.com             scope   <span class="gr">IN SCOPE</span> (scope.json: 2 hosts)   <span class="cy">│</span>
+<span class="cy">│</span> phase    web-test · sqli             model   vendor/model · openrouter        <span class="cy">│</span>
+<span class="cy">│</span> egress   cloud (authorized)          budget  6/240 req · 0.7/90 min           <span class="cy">│</span>
+<span class="cy">│</span> prompt   9c1e… · config 4a7d…        session 01J8Z…                          <span class="cy">│</span>
+<span class="cy">└───────────────────────────────────────────────────────────────────────────────┘</span>
+
+<span class="mg">▸</span> web-test · sqli  <span class="dim">(map: reports/app.example.com-map.json, 18 endpoints)</span>
+  · <span class="cy">scope_check</span>    app.example.com                        <span class="gr">IN SCOPE</span>
+  · <span class="cy">memory_recall</span>  "spring boot jdbc sqli"                3 techniques (RAG-0012, RAG-0041, RAG-0090)
+  · <span class="cy">repeater</span>       GET /api/orders?id=1<span class="ye">'</span>              200 · <span class="ye">SQL error in body</span>
+
+  finding  <span class="ye">suspected</span> · SQL injection (param id) · <span class="cy">/api/orders</span>
+           verify_level suspected → severity ceiling <span class="ye">Low</span>
+           reports/findings.jsonl#a41f
+
+<span class="ye">⚠ CONFIRM-TIER — approval required</span>
+  action   escalate to time-based verification · sqlmap
+  command  node tools/run.js sqlmap -u "https://app.example.com/api/orders?id=1" --batch --level 2 --risk 2
+  scope    <span class="gr">IN SCOPE</span> (allowed_hosts: app.example.com) · tier <span class="ye">confirm</span>
+  reason   playbook web/sqli, step 4 — prove the hypothesis with a timing oracle
+
+  <span class="cy">[y]</span> approve once   <span class="dim">[n] skip   [d] details   [q] stop</span>
+      </div>
+      <p class="caption"><b>Same run, same session, same evidence.</b> The terminal is the primary surface; the console is a view over the same event stream. The approval prompt is identical in both: single-use, host-bound, and written to an append-only log.</p>
+
+      <div class="term" style="margin-top:14px" role="img" aria-label="NDJSON trace excerpt">
+<span class="fa">$</span> <span class="b">cyboros agent trace 01J8Z… --json | tail -2</span>
+{"seq":6,"ts":"2026-10-19T10:04:02Z","type":"tool_result","tool":"repeater","exit":0,"duration_ms":310}
+{"seq":7,"ts":"2026-10-19T10:04:05Z","type":"approval_required","action":"sqlmap","tier":"confirm","scope":"in_scope","command":"node tools/run.js sqlmap …"}
+<span class="dim"># stdout is data only; progress goes to stderr. The event log is the same one written to reports/agent/sessions/01J8Z…/events.jsonl</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════ 03 · FIRST RUN ═══════════════════════ -->
+  <section id="view-firstrun" class="view" role="tabpanel" aria-labelledby="tab-firstrun">
+    <div class="setup">
+      <div class="setup-head">
+        <h2>From zero to one run</h2>
+        <p>Four steps. Node 22, one key in the environment, one authorization file. No Freebuff, no telemetry, no install step.</p>
+      </div>
+
+      <div class="step">
+        <div class="num" aria-hidden="true">01</div>
+        <div>
+          <h3>Choose a provider profile</h3>
+          <p>The template covers any OpenAI-compatible endpoint: cloud or local. The real file is gitignored.</p>
+          <div class="code">cp runtime/providers.example.json runtime/providers.json</div>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="num" aria-hidden="true">02</div>
+        <div>
+          <h3>Put the key in the environment</h3>
+          <p>The config references the variable name, never the value. The key does not enter the repo, the prompt, or the logs.</p>
+          <div class="code">export OPENROUTER_API_KEY=sk-…a1b2</div>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="num" aria-hidden="true">03</div>
+        <div>
+          <h3>Write the authorization</h3>
+          <p>scope.json is the written authorization. Empty means everything is blocked — fail-closed, no override.</p>
+          <div class="code">node tools/scope-guard.js check https://app.example.com
+<span class="okline">IN SCOPE · exit 0</span></div>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="num" aria-hidden="true">04</div>
+        <div>
+          <h3>Run the preflight, then the run</h3>
+          <p>doctor checks config, key presence (masked), endpoint reachability, scope and external tools. It never guesses.</p>
+          <div class="code">cyboros agent doctor</div>
+          <table class="mini" aria-label="Doctor output">
+            <thead><tr><th>Check</th><th>Result</th><th>Detail</th></tr></thead>
+            <tbody>
+              <tr><td>config</td><td class="mono okline">PASS</td><td class="mono">runtime/providers.json · schema v1</td></tr>
+              <tr><td>profile</td><td class="mono okline">PASS</td><td class="mono">openrouter · egress cloud</td></tr>
+              <tr><td>key</td><td class="mono okline">PASS</td><td class="mono">OPENROUTER_API_KEY sk-…a1b2</td></tr>
+              <tr><td>endpoint</td><td class="mono okline">PASS</td><td class="mono">reachable · 214 ms</td></tr>
+              <tr><td>scope</td><td class="mono okline">PASS</td><td class="mono">2 hosts · 1 CIDR · fail-closed</td></tr>
+              <tr><td>tools</td><td class="mono warnline">WARN</td><td class="mono">sqlmap absent · install-tools.sh</td></tr>
+            </tbody>
+          </table>
+          <div class="code" style="margin-top:10px">cyboros agent run app.example.com --phase web-test --class sqli</div>
+        </div>
+      </div>
+
+      <div class="synth"><b>Synthetic data.</b> Every host in this mockup uses the RFC 2606 <span class="mono">.example</span> domain. No engagement, client or credential data is involved.</div>
+
+      <div class="card" style="margin-top:14px">
+        <h3>What you will not see</h3>
+        <ul class="notlist">
+          <li>No telemetry, no installation identifier, no call to a vendor endpoint other than the provider you configured.</li>
+          <li>No auto-update: the version is the checkout you ran.</li>
+          <li>No hidden prompt: the contract, the phase prompt and their hashes are in the session directory.</li>
+          <li>No out-of-scope action: the guard runs before the tool, not inside the model.</li>
+          <li>No invented cost: <span class="mono">cost</span> stays <span class="mono">null</span> when the provider does not report it.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<script>
+(() => {
+  'use strict';
+  const tabs = [...document.querySelectorAll('.viewtab')];
+  const views = [...document.querySelectorAll('.view')];
+
+  const runBadges = document.getElementById('run-badges');
+  const setupBadges = document.getElementById('setup-badges');
+  const serverSub = document.getElementById('server-sub');
+
+  function show(name, focus) {
+    document.body.dataset.view = name;
+    const setup = name === 'firstrun';
+    runBadges.hidden = setup;
+    setupBadges.hidden = !setup;
+    serverSub.textContent = setup
+      ? 'no session · configure provider, key and scope'
+      : 'session 01J8Z… · app.example.com · web-test / sqli';
+    for (const v of views) v.classList.toggle('active', v.id === 'view-' + name);
+    for (const t of tabs) {
+      const on = t.dataset.view === name;
+      t.classList.toggle('active', on);
+      t.setAttribute('aria-selected', String(on));
+      t.tabIndex = on ? 0 : -1;
+      if (on && focus) t.focus();
+    }
+  }
+
+  for (const t of tabs) {
+    t.addEventListener('click', () => show(t.dataset.view, false));
+    t.addEventListener('keydown', (e) => {
+      if (e.key !== 'ArrowRight' && e.key !== 'ArrowLeft') return;
+      e.preventDefault();
+      const i = tabs.indexOf(t);
+      const next = tabs[(i + (e.key === 'ArrowRight' ? 1 : -1) + tabs.length) % tabs.length];
+      show(next.dataset.view, true);
+    });
+  }
+
+  for (const head of document.querySelectorAll('.tool-head')) {
+    head.addEventListener('click', () => {
+      const tool = head.closest('.tool');
+      const open = tool.classList.toggle('open');
+      head.setAttribute('aria-expanded', String(open));
+    });
+  }
+
+  const card = document.getElementById('approval-card');
+  const status = document.getElementById('approval-status');
+  const resolved = document.getElementById('approval-resolved');
+  const details = document.getElementById('approval-details');
+  const post = document.getElementById('post-approval');
+  const postSkip = document.getElementById('post-skip');
+  const topBadge = document.getElementById('top-approval');
+  const pending = document.getElementById('pending-count');
+  const granted = document.getElementById('granted-count');
+  const skipped = document.getElementById('skipped-count');
+  const rowState = document.getElementById('approval-row-state');
+
+  document.getElementById('approve').addEventListener('click', () => {
+    card.classList.add('granted');
+    status.textContent = 'APPROVED · SINGLE-USE TOKEN';
+    resolved.textContent = 'token 7c2e… · granted 10:04:05 · single-use · host-bound · reports/approvals.jsonl';
+    pending.textContent = '0';
+    granted.textContent = '1';
+    rowState.textContent = 'granted';
+    rowState.className = 'st ok';
+    topBadge.textContent = 'APPROVAL GRANTED';
+    topBadge.className = 'badge badge-ok';
+    post.classList.add('show');
+    postSkip.classList.remove('show');
+  });
+
+  document.getElementById('skip').addEventListener('click', () => {
+    card.classList.add('skipped');
+    status.textContent = 'SKIPPED BY OPERATOR';
+    resolved.textContent = 'skipped 10:04:05 · the hypothesis stays suspected · the gate will ask again before the report';
+    pending.textContent = '0';
+    skipped.textContent = '1';
+    rowState.textContent = 'skipped';
+    rowState.className = 'st';
+    topBadge.textContent = 'APPROVAL SKIPPED';
+    topBadge.className = 'badge';
+    post.classList.remove('show');
+    postSkip.classList.add('show');
+  });
+
+  document.getElementById('details').addEventListener('click', () => {
+    details.hidden = !details.hidden;
+  });
+
+  show('console', false);
+})();
+</script>
+</body>
+</html>

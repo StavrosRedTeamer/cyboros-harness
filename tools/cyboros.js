@@ -618,14 +618,25 @@ function report(db, opts) {
 
 function usage() {
   console.error(
-    'usage: node tools/cyboros.js recon <host> [--takeover] | scan <host|cidr> | enumerate <host> | fuzz <host> [--ports N,N] | status [<host>] | resume | report'
+    'usage: cyboros [--live|--demo|--task <text>]            open the TUI (on a terminal)\n' +
+    '       cyboros recon <host> [--takeover] | scan <host|cidr> | enumerate <host> |\n' +
+    '               fuzz <host> [--ports N,N] | status [<host>] | resume | report'
   );
   process.exit(2);
 }
 
 async function main() {
   const [cmd, ...rest] = process.argv.slice(2);
-  if (!cmd) usage();
+  // No subcommand (or a TUI flag) on a terminal opens the interactive surface:
+  // `cyboros` is the product, `cyboros scan host` is the mechanical pipeline. Without a
+  // TTY the usage still wins, so pipes and tests keep their exit code 2.
+  if (!cmd || String(cmd).startsWith('-')) {
+    if (process.stdin.isTTY && process.stdout.isTTY) {
+      require('../runtime/tui');
+      return;
+    }
+    usage();
+  }
   const db = state.open();
   const opts = { scope: loadScopeSafe() };
   // --ports 80,443 / --ports 53:udp for fuzz

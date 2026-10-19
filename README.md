@@ -8,7 +8,7 @@ and where the lesson of one engagement changes the next.**
 [![CI](https://github.com/stavrosredteamer/cyboros-harness/actions/workflows/ci.yml/badge.svg?branch=master)](https://github.com/stavrosredteamer/cyboros-harness/actions/workflows/ci.yml)
 [![License: Apache-2.0](docs/assets/license-apache-2.0.svg)](LICENSE)
 
-[Apache-2.0](LICENSE) · zero dependencies · offline-capable · 115 tests, hermetic and parallel
+[Apache-2.0](LICENSE) · zero dependencies · offline-capable · 118 tests, hermetic and parallel
 
 [Cyboros](docs/OUROBOROS.md): cyber + ouroboros. The loop is not marketing — every claim on
 that page names the file that proves it. The agent still cannot violate scope, because the
@@ -100,7 +100,7 @@ clean scan.
   On a client network, `npm install` does nothing.
 - **Runs air-gapped.** `local/` drives the same deterministic engine against a local
   model. No API key, no data leaving the engagement laptop.
-- **115 tests, hermetic and parallel by default, no network.** Offline and loopback tests,
+- **118 tests, hermetic and parallel by default, no network.** Offline and loopback tests,
   classified by the runner; `npm test` is the gate, `npm run test:all` includes the live e2e
   set. Tests keep the engine's shared state — the global rate limiter, the run audit, the
   findings head-anchor, the egress-proxy state — in a fixture (`hermetic()` in
@@ -118,7 +118,7 @@ Requires **Node ≥ 22** (the Command Center backend uses `node:sqlite`).
 ```bash
 git clone https://github.com/stavrosredteamer/cyboros-harness.git
 cd cyboros-harness
-npm test                 # 115 tests, no install, no network, 2 workers (--jobs 1 to serialize)
+npm test                 # 118 tests, no install, no network, 2 workers (--jobs 1 to serialize)
 ```
 
 Then write your authorization. `scope.json` **is** the written authorization, and the
@@ -137,7 +137,54 @@ node tools/scope-guard.js check https://target.example   # exit 0 = authorized
 node tools/cyboros.js recon target.example
 node tools/cyboros.js scan target.example
 node tools/cyboros.js status
+npm run tui              # terminal surface: scope.json is real, no model call until --live
 ```
+
+To get `cyboros` as a command — bare `cyboros` opens the TUI, the subcommands keep the
+pipeline — run the launcher once and forget the path:
+
+```bash
+./install-cyboros-launcher.sh   # symlink into ~/.local/bin (idempotent, --uninstall to remove)
+cyboros                         # TUI
+cyboros scan target.example     # same pipeline as node tools/cyboros.js
+```
+
+### Live agent with your own provider
+
+The terminal agent can drive a real model. Copy the provider template — the key lives
+in the environment, never in the file, and an inline `api_key` is refused:
+
+```bash
+cp runtime/providers.example.json runtime/providers.json   # gitignored
+export OPENROUTER_API_KEY=...                              # or any OpenAI-compatible key
+# or, instead of exporting, keep it in ~/.config/cyboros/openrouter.env (chmod 600)
+cyboros target.example        # asks once, at the first message, before any egress
+cyboros --allow-cloud target.example   # the flag also connects at launch
+```
+
+The key is read from the environment, or from `~/.config/cyboros/<profile>.env` when it is
+mode 600; an inline `api_key` in `providers.json` is still refused.
+
+It is one assistant, not two: the same session runs the engagement and answers questions
+about it. Ask `what did we find on this host?` and it reads `findings_query`,
+`sessions_list` or `session_read` instead of scanning; ask it to verify an object and it
+calls `scope_check` then the guarded tools.
+
+The surface is Claude Code's shape: a rounded input box with `>` that redraws as you type,
+a slash-command menu above it (filter as you type, `↑`/`↓` to choose, `Enter` to run, `Tab` to
+insert), `?` for the shortcut panel, `shift+tab` to cycle ask → plan → auto, your message on a
+grey band, `⏺` for the assistant and each tool, one `⎿` with the result tail, `✻` dim for the
+reasoning — in a neutral grey/white palette with one warm accent, not neon. Answers
+are rendered Markdown — bold, inline code, lists, tables whose cells wrap instead of
+overflowing — while they stream. `/thinking off` hides the reasoning, and every turn ends
+with duration, tokens and the cost the provider reports.
+
+Every tool call goes through the guarded surface (`scope_check`, `tools/run.js`,
+`record-finding.js`), and an intrusive binary stops for an in-session approval. Without
+`--allow-cloud`, a cloud profile is refused; `llama` points at a local `127.0.0.1:8080`
+for air-gapped runs. `demo/README.md` has an authorized loopback target (IDOR, BOLA,
+reflected XSS) and the exact commands to rehearse the whole loop offline from the model's
+perspective — the target is local, the model may be cloud.
 
 Install the external tool binaries with `./install-tools.sh` (Parrot/Debian) or
 `install-tools.ps1` (Windows), then verify with `node tools/doctor.js`.

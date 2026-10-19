@@ -1,0 +1,12 @@
+{
+  "_comment": "DEMO AUTHORIZATION — loopback only. It authorizes the synthetic target in demo/target.js and nothing else. Use it with SCOPE_JSON=demo/scope.demo.json for the lab run; do not merge it into a real engagement scope.",
+  "allowed_hosts": [
+    "127.0.0.1",
+    "localhost"
+  ],
+  "allowed_ips": [
+    "127.0.0.1/32",
+    "::1/128"
+  ],
+  "max_requests_per_second": 10
+}

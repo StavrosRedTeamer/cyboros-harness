@@ -9,6 +9,29 @@ grouped by milestone, and `v0.1.0` (2026-09-28) is the first tagged release.
 
 ### Fixed
 
+- **`timings_per_token` non fa più cadere lo streaming sui gateway generici.** Il campo è
+  specifico di llama.cpp: un gateway OpenAI-compatible risponde `400 unsupported_parameter`, il
+  loop ricadeva in silenzio sul non-stream e la TUI perdeva thinking e token live. Ora è opt-in
+  per profilo (`timings_per_token: true`) e l'uso in streaming viaggia in `stream_options`.
+- **`record_finding` dichiara nel contratto le prove che pretende.** Lo schema del tool esponeva
+  solo i campi «editoriali»; `status: confirmed` però richiede un `oracle {type,ref,token}` e una
+  `evidence_quote {file,text}` verificate su disco, e l'agente doveva indovinarle leggendo gli
+  errori (in una run reale ha sprecato sei iterazioni e non ha registrato il finding). Ora
+  entrambe sono nello schema con la ricetta (`oracle.js record`, risposta grezza salvata in
+  `reports/` con `write_file`, quote letterale), e il system prompt live lo ripete.
+- **Il loop-guard non blocca più il retry dopo un errore di validazione.** La seconda
+  `record_finding` con il solo `cvss_vector` corretto veniva scartata come variante della prima,
+  che era fallita. Ora il fuzzy non si applica quando l'output precedente è un errore
+  (`exit ≠ 0` / `ERRORE`): una correzione dopo un rifiuto è progresso, non un loop.
+- **Il loop-guard fuzzy non scambia più due probe diversi per la stessa azione.** Il confronto a
+  bigrammi su `tool + args` trattava `curl -H "X-User: alice" …/orders/42` e
+  `curl -H "X-User: bob" …/orders/42` come una ripetizione: il secondo probe veniva sostituito
+  dall'output del primo e l'enumerazione si bloccava proprio dove serviva (due identità, due
+  oggetti). `local/llm.js` confronta ora anche la forma delle chiavi (aggiungere `oracle` a una
+  `record_finding` è evidenza nuova, non un refuso) e accetta `loop_guard.exempt_tools`;
+  `runtime/live.js` esenta `run_tool` dal fuzzy. Resta il dedup delle azioni identiche, mentre URL,
+  header e campi nuovi sono evidenza nuova. Regressioni coperte in `tools/test-runtime-live.js`;
+  i tre scenari storici restano verdi in `local/test-loop-guard.js`.
 - **La CI è verde su un runner nudo.** `keyringAvailable()` verificava solo che `keyctl show @u`
   rispondesse: in un container il keyring può esistere e negare la lettura, quindi l'identità
   salvata diventava irrecuperabile e `test-agent-forum`/`test-forum-admin` fallivano. La
@@ -92,6 +115,77 @@ grouped by milestone, and `v0.1.0` (2026-09-28) is the first tagged release.
 
 ### Added
 
+- **La chiave può stare in `~/.config/cyboros/<profile>.env` e `--allow-cloud` connette.** La
+  risoluzione è ambiente → file per profilo (mode `600`, `KEY=value` o `export KEY=value`); un file
+  leggibile da altri utenti viene rifiutato con `key_file_permissions`. Serve a non dover fare
+  `source` a mano in ogni shell: `cyboros --allow-cloud` ora implica `--live` e parte già connesso,
+  invece di mostrare «Shell only» con il modello elencato come autorizzato. Il flag resta
+  l'autorizzazione esplicita per l'egress cloud; senza di esso vale il consenso al primo messaggio.
+- **`cyboros` è conversazionale: il consenso cloud si dà al primo messaggio.** Con un profilo in
+  `providers.json` e la chiave in ambiente, la TUI chiede una volta — in un frame che nomina
+  provider, modello ed egress e cosa lascia l'host — se mandare il turno al modello. Il sì vale
+  per la sessione ed è registrato come `cloud_consent`; il no viene ricordato. `cyboros --live`
+  e `--task` continuano a pretendere `--allow-cloud`, e `/live --allow-cloud` è la via esplicita.
+  Spariscono anche gli avvii impliciti del demo: una frase che nomina SQL injection o authz ora è
+  un messaggio per il modello, non un walkthrough sintetico su `app.example.com`; il demo resta
+  dietro `/demo`.
+- **Menu, colori e navigazione come Claude Code.** La TUI ora ha il menu dei comandi: digitando
+  `/` sopra il box compare la lista filtrata con le descrizioni, `↑`/`↓` spostano la selezione,
+  `Enter` esegue il comando evidenziato, `Tab` lo inserisce lasciando il box aperto per gli
+  argomenti, `Esc` chiude. `?` a input vuoto apre il pannello delle scorciatoie, `shift+tab` cicla
+  ask → plan → auto (la hint row lo mostra) e `\` + Enter va a capo. La richiesta di approvazione
+  è un frame unico con le opzioni navigabili con le frecce (numeri e Invio funzionano, `Esc`
+  sceglie l'uscita sicura) e senza TTY resta stampata una volta con exit 1. Palette riscritta su
+  quella di Claude Code — chrome grigio, testo chiaro, un accento caldo per logo/finding/selezioni,
+  verde/giallo/rosso semantici, blu tenue per i comandi — al posto del neon magenta/cyan. I frame
+  a piena larghezza disabilitano l'auto-wrap durante il disegno: senza, ogni redraw era sfasato di
+  una riga e il frame di approvazione lasciava il bordo superiore nel transcript.
+- **`cyboros` apre la TUI.** Il binario dichiarato nel `package.json` non è più solo la pipeline:
+  senza sottocomando (o con un flag della TUI) su un terminale passa a `runtime/tui.js`; con un
+  sottocomando — `cyboros scan host`, `status`, `resume` — resta la pipeline meccanica, e senza TTY
+  l'usage esce ancora `2`, quindi pipe e test non cambiano. `install-cyboros-launcher.sh` crea il
+  symlink idempotente in `~/.local/bin` (stesso schema di `install-cyboros-cc-launcher.sh`).
+  `node:sqlite` è ora caricato pigramente da `tools/state.js`: un `cyboros` che non apre il DB non
+  stampa più l'`ExperimentalWarning` sopra il box.
+- **Interfaccia rifatta sulla forma di Claude Code.** L'ingresso è un box arrotondato ridisegnato a
+  ogni tasto ([`runtime/inputline.js`](runtime/inputline.js): history, tab completion, ctrl+c/d,
+  paste, larghezza CJK) con `>` e placeholder; la riga sotto porta `? for shortcuts` a sinistra e
+  modo/target/costo a destra. Il messaggio inviato diventa una banda grigia con `>`, il transcript
+  usa `⏺` per assistente e tool, un solo `⎿` con la coda indentata e `… +N lines (/details to
+  expand)` per i risultati lunghi, `✻` dim per il reasoning chiuso da `✻ Thought for Ns`, e un
+  footer di turno `✻ Worked for Ns · N tokens · $cost`. Le risposte sono Markdown reso — grassetto,
+  inline code, liste, tabelle con colonne allineate e celle che vanno a capo invece di sbordare,
+  code block — sia in streaming sia a turno completo ([`runtime/render.js`](runtime/render.js)).
+  Readline resta solo fuori da un TTY (`--script`, pipe, `--task`).
+- **Un solo assistente: conversazione e ingaggio nella stessa sessione.** La TUI non è più un
+  loop che parte appena riceve testo. Il system prompt live distingue una domanda (finding,
+  report, sessioni, metodologia) da un'azione sul target: la prima si risolve con i nuovi tool
+  read-only `findings_query`, `sessions_list`, `session_read` (più `read_file`/`kb_search`),
+  la seconda richiede `scope_check` e i tool guardati. Un turno senza target è valido — serve solo
+  per le azioni di rete — e un saluto non avvia più recon. `plan` resta la modalità read-only
+  esplicita.
+- **Reasoning e risposta in streaming, resa tipo Claude Code.** `local/llm.js` estrae
+  `reasoning_content` sia dal path SSE sia da quello JSON e lo espone con `onThinkingDelta` /
+  `onThinkingDone`; la TUI lo stampa dim sotto `✻` mentre arriva, la risposta token per token
+  sotto `⏺`, chiude i blocchi prima di ogni tool call e mostra nel footer durata, token e costo
+  (`stream_options.include_usage` quando il gateway lo supporta). Nuovo `/thinking on|off`.
+- **La TUI può guidare un modello vero, con lo stesso dispatch guardato.** `runtime/live.js`
+  collega `runtime/tui.js` a un provider OpenAI-compatible (`runtime/providers.json`, gitignored):
+  la chiave si legge solo da una env dichiarata (`api_key_env`), un `api_key` inline è rifiutato, e
+  un profilo cloud richiede **sia** `allow_cloud: true` nel file **sia** `--allow-cloud` in riga di
+  comando. Il loop riusa `local/llm.js` (tool loop, retry, trim del contesto) e il dispatch di
+  `local/tools-bridge.js`: `scope_check` è il guard reale, `run_tool` passa da `tools/run.js` (quindi
+  scope + enforce + gating), `record_finding` da `record-finding.js`, `write_file` resta sotto
+  `reports/`. Un binario `intrusive` si ferma su un'approvazione numerata, registrata in
+  `reports/approvals.jsonl`; senza TTY una run `--task` esce `1` senza eseguire il binario. Gli
+  eventi (`run_start`, `tool_call`, `tool_result`, `approval_required`, `provider_call` con usage)
+  finiscono in `reports/agent/sessions/<id>/events.jsonl`. Test ermetici: `tools/test-runtime-live.js`
+  (provider HTTP locale, nessuna rete), con `tools/test-tui.js` a copertura della shell.
+- **Target demo autorizzato per provare il loop attivo.** `demo/target.js` è un negozio sintetico
+  su `127.0.0.1` con tre difetti deliberati — IDOR su `/api/users/:id`, BOLA su `/api/orders/:id`
+  (basta che `X-User` esista) e XSS riflessa su `/search?q=` — e `demo/scope.demo.json` è
+  l'autorizzazione loopback da usare via `SCOPE_JSON`. `demo/README.md` documenta la sequenza
+  completa; la prova attesa (`X-User: bob` su un ordine di alice) resta `triggered`, non `exploited`.
 - **Quattro payload reference nuove, tutte detection-only.** `tools/payloads/nextjs-rsc.md`
   (fingerprint versione, middleware bypass CVE-2025-29927, image optimizer 55173/57752, Server
   Action come endpoint di autorizzazione) non contiene **nessun** flusso RSC serializzato: la

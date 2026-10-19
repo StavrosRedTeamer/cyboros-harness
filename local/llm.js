@@ -87,9 +87,20 @@ class LocalLLM {
     } catch (e) { clearTimeout(to); throw e; }
     if (!r.ok || !r.body) { clearTimeout(to); throw new Error(`HTTP ${r.status}: ${clip(r.body ? await r.text() : '(no body)', 300)}`); }
 
+    // Alcuni gateway ignorano `stream:true` e rispondono JSON: trattalo come un colpo
+    // non-stream invece di restituire un messaggio vuoto.
+    const ctype = String(r.headers.get('content-type') || '');
+    if (!ctype.includes('event-stream')) {
+      const json = await r.json();
+      clearTimeout(to);
+      const m = (json.choices && json.choices[0] && json.choices[0].message) || { role: 'assistant', content: '' };
+      if (m.content && handlers.onToken) handlers.onToken(m.content);
+      return { message: m, timings: json.timings || null, finishReason: json.choices && json.choices[0] && json.choices[0].finish_reason, usage: json.usage || null };
+    }
+
     const reader = r.body.getReader();
     const dec = new TextDecoder();
-    let buf = '', content = '', firstToken = false, finishReason = null, lastTimings = null;
+    let buf = '', content = '', reasoning = '', firstToken = false, finishReason = null, lastTimings = null, streamUsage = null;
     const toolAcc = [];
     try {
       for (;;) {
@@ -108,6 +119,11 @@ class LocalLLM {
           const ch = json.choices && json.choices[0];
           if (ch) {
             const delta = ch.delta || {};
+            const rsn = delta.reasoning_content || delta.reasoning;
+            if (rsn) {
+              reasoning += rsn;
+              if (handlers.onThinkingDelta) handlers.onThinkingDelta(rsn);
+            }
             if (delta.content) {
               if (!firstToken) { firstToken = true; if (handlers.onFirstToken) handlers.onFirstToken(); }
               content += delta.content;
@@ -120,17 +136,19 @@ class LocalLLM {
             lastTimings = json.timings;
             if (handlers.onTimings) handlers.onTimings(normTimings(json.timings));
           }
+          if (json.usage) streamUsage = json.usage;
         }
       }
     } finally { clearTimeout(to); }
 
     const message = { role: 'assistant', content };
+    if (reasoning) message.reasoning_content = reasoning;
     const tcs = toolAcc.filter(Boolean);
     if (tcs.length) {
       tcs.forEach((t, i) => { if (!t.id) t.id = `call_${Date.now()}_${i}`; });
       message.tool_calls = tcs;
     }
-    return { message, timings: lastTimings, finishReason };
+    return { message, timings: lastTimings, finishReason, usage: streamUsage };
   }
 
   _completionBody(messages, tools, grammar) {
@@ -168,7 +186,7 @@ class LocalLLM {
   // attiva, usa il path SSE (_postStream) e invoca onToken/onTimings/onFirstToken in tempo
   // reale. Senza questi parametri il comportamento è IDENTICO a prima (run-local.js, --check,
   // fasi autonome con GBNF): single/multi-shot non-stream, nessun callback nuovo invocato.
-  async runAgent({ system, task, tools, dispatch, onStep, grammar, history, stream, onToken, onTimings, onFirstToken, onTrace }) {
+  async runAgent({ system, task, tools, dispatch, onStep, grammar, history, stream, onToken, onTimings, onFirstToken, onTrace, onUsage, onThinkingDelta, onThinkingDone }) {
     const messages = Array.isArray(history) ? history.slice() : [];
     if (system && !messages.some((m) => m.role === 'system')) messages.push({ role: 'system', content: system });
     messages.push({ role: 'user', content: task });
@@ -185,23 +203,43 @@ class LocalLLM {
     const lgMax = lgCfg.max_repeats ?? 1;            // quante volte si tollera una ripetizione (1 = avviso alla 2ª esecuzione, correzione alla 3ª)
     const lgFuzzy = lgCfg.fuzzy ?? true;             // confronto fuzzy (token-overlap) per i variant-loop
     const lgFuzzyThreshold = lgCfg.fuzzy_threshold ?? 0.85; // dice-bigram >= soglia => stessa azione
+    // Tool la cui stessa struttura può legittimamente cambiare bersaglio o identità (run_tool:
+    // curl su URL diversi, header diversi). Il fuzzy li confonderebbe con un variant-loop e
+    // bloccherebbe l'enumerazione: per loro vale solo la ripetizione ESATTA.
+    const lgExempt = new Set(lgCfg.exempt_tools ?? []);
     const seenActions = new Map();                   // chiave normalizzata -> { count, lastOutput, lastArgs, viaNative }
     const normKey = (tool, args) => tool + '|' + JSON.stringify(args, Object.keys(args || {}).sort ? Object.keys(args || {}).sort() : []);
     // Similarità a bigrammi di caratteri (Dice): robusta ai typo ("passwd" vs "passwdd" ~0.95),
     // a differenza del token-overlap che crolla a un singolo carattere di differenza.
     const bigrams = (s) => { const t = String(s).toLowerCase().replace(/[^a-z0-9_./]+/g, ' '); const b = new Set(); for (let i = 0; i < t.length - 1; i++) b.add(t.slice(i, i + 2)); return b; };
     const dice = (a, b) => { const A = bigrams(a), B = bigrams(b); if (!A.size || !B.size) return 1; let i = 0; for (const g of A) if (B.has(g)) i++; return (2 * i) / (A.size + B.size); };
+    // Aggiungere un campo non è un refuso: un record_finding che guadagna `oracle` dopo la
+    // scoperta dell'oracolo, o un payload che passa da `suspected` a `confirmed`, è evidenza
+    // nuova e deve essere eseguito. Il fuzzy vale solo a parità di forma (stesse chiavi).
+    const argShape = (a) => {
+      if (Array.isArray(a)) return 'array';
+      if (a && typeof a === 'object') return 'object:' + Object.keys(a).sort().join(',');
+      return typeof a;
+    };
+    // Un retry dopo un errore non è un loop: la chiamata precedente è fallita (validazione,
+    // exit ≠ 0) e l'agente ha corretto gli argomenti. Il fuzzy non deve bloccarla.
+    const failedOutput = (out) => /\bexit [1-9]\d*\b/.test(String(out == null ? '' : out))
+      || /^\s*(ERRORE|error:)/im.test(String(out == null ? '' : out));
     const isRepeat = (tool, args) => {
       // fuzzy like-for-like: confronta la chiave del candidate con quelle salvate,
       // STESSA costruzione (tool|args), altrimenti l'overhead di framing abbassa il dice.
       const probe = normKey(tool, args);
+      const probeShape = argShape(args);
       for (const [k, v] of seenActions) {
         let same = false;
         try { same = k === probe; } catch { same = false; }
-        if (!same && lgFuzzy) {
-          // fuzzy SOLO a parità di tool: le varianti da bloccare sono args mutati (typo-hunting),
-          // non l'uso legittimo di un tool diverso su target simili.
-          try { same = k.split('|')[0] === tool && dice(probe, k) >= lgFuzzyThreshold; } catch { same = false; }
+        if (!same && lgFuzzy && !lgExempt.has(tool)) {
+          // fuzzy SOLO a parità di tool e di forma: le varianti da bloccare sono args mutati
+          // (typo-hunting), non l'uso legittimo di un tool diverso su target simili.
+          try {
+            same = k.split('|')[0] === tool && probeShape === argShape(v.args)
+              && dice(probe, k) >= lgFuzzyThreshold && !failedOutput(v.lastOutput);
+          } catch { same = false; }
         }
         if (same) return v;
       }
@@ -214,6 +252,7 @@ class LocalLLM {
     // La grammatica è attiva solo se richiesta E abilitata in config. Si spegne da sola
     // se il server la rifiuta (fallback ai tool nativi + parsing testuale).
     let grammarActive = !!(grammar && this.rt.use_grammar);
+    let reasoningAll = ''; // reasoning del modello, accumulato per il caller (mai rimandato al modello)
 
     for (let iter = 0; iter < maxIters; iter++) {
       // Lo streaming è possibile solo senza grammatica: la GBNF gira sul path testuale
@@ -223,17 +262,26 @@ class LocalLLM {
       let msg;
       if (useStream) {
         const body = this._completionBody(messages, tools, null);
-        body.stream = true; body.timings_per_token = true;
+        body.stream = true;
+        // llama.cpp-specific: many OpenAI-compatible gateways reject it with HTTP 400 and the
+        // run would silently fall back to non-stream. Opt-in, never sent by default.
+        if (this.rt.timings_per_token) body.timings_per_token = true;
+        // OpenAI-compatible: ask for the usage chunk on the stream (the gateway reports cost there).
+        if (this.rt.stream_usage) body.stream_options = { include_usage: true };
         let sres;
         try {
-          sres = await this._postStream(body, { onToken, onTimings, onFirstToken });
+          sres = await this._postStream(body, { onToken, onTimings, onFirstToken, onThinkingDelta, onThinkingDone });
         } catch (e) {
           // fallback: una singola chiamata non-stream (nessun token era ancora uscito).
           const resp = await this._post(this._completionBody(messages, tools, null));
           msg = resp && resp.choices && resp.choices[0] && resp.choices[0].message;
           if (resp && resp.timings && onTimings) onTimings(normTimings(resp.timings));
+          if (resp && resp.usage && onUsage) onUsage(resp.usage);
         }
-        if (sres) msg = sres.message;
+        if (sres) {
+          msg = sres.message;
+          if (sres.usage && onUsage) onUsage(sres.usage);
+        }
       } else {
         let resp;
         try {
@@ -247,8 +295,17 @@ class LocalLLM {
         }
         msg = resp && resp.choices && resp.choices[0] && resp.choices[0].message;
         if (resp && resp.timings && onTimings) onTimings(normTimings(resp.timings));
+        if (resp && resp.usage && onUsage) onUsage(resp.usage);
       }
       if (!msg) throw new Error('Risposta LLM vuota/malformata.');
+      const rsn = msg.reasoning_content || msg.reasoning || '';
+      if (rsn) {
+        reasoningAll += (reasoningAll ? '\n' : '') + rsn;
+        // `onThinkingDone` riceve il testo completo del giro, anche quando i delta sono
+        // gia' passati da onThinkingDelta: la TUI lo usa per chiudere il blocco, non per
+        // ristampare.
+        if (onThinkingDone) onThinkingDone(rsn);
+      }
 
       // onTrace: osservazione PURA, nessun effetto sul loop. Emette cosa ha detto il
       // modello a ogni giro, cosi' un run in un'altra finestra (tail -f) mostra la
@@ -314,9 +371,9 @@ class LocalLLM {
 
       // 3) nessun tool: e' la risposta finale
       if (onTrace) onTrace({ type: 'final', iter, text: stripFinal(text) });
-      return { text: stripFinal(text), messages };
+      return { text: stripFinal(text), messages, reasoning: reasoningAll };
     }
-    return { text: '[max iterazioni tool raggiunte]', messages };
+    return { text: '[max iterazioni tool raggiunte]', messages, reasoning: reasoningAll };
   }
 }
 

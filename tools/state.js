@@ -4,7 +4,6 @@
 // querying, dedup and resume. Findings stay in reports/findings.jsonl (record-finding.js) and
 // C2 sessions in reports/sessions.json (sessions.js): this DB holds ONLY targets/hosts/ports/
 // endpoints/runs. Env override STATE_DB for tests.
-const { DatabaseSync } = require('node:sqlite');
 const fs = require('fs');
 const path = require('path');
 
@@ -72,6 +71,9 @@ CREATE TABLE IF NOT EXISTS endpoints (
 const now = () => new Date().toISOString();
 
 function open(file) {
+  // Lazy: importing node:sqlite prints the ExperimentalWarning. A caller that never
+  // opens the DB (`cyboros` with no subcommand hands over to the TUI) should not see it.
+  const { DatabaseSync } = require('node:sqlite');
   const p = file || DB_PATH();
   fs.mkdirSync(path.dirname(p), { recursive: true });
   const db = new DatabaseSync(p);

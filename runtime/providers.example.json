@@ -1,0 +1,32 @@
+{
+  "_comment": "Template for runtime/providers.json (gitignored). Copy it, pick a default profile, and put the KEY IN THE ENVIRONMENT — api_key inline is refused. The key may also live in ~/.config/cyboros/<profile>.env (mode 600, KEY=value or export KEY=value); the environment wins. Cloud profiles need allow_cloud=true here and --allow-cloud on the run, which also connects at launch. type is openai-compatible for v1 (OpenAI, OpenRouter, Groq, Together, DeepSeek, vLLM, llama.cpp, Ollama, LM Studio).",
+  "version": 1,
+  "default_profile": "openrouter",
+  "allow_cloud": true,
+  "profiles": {
+    "openrouter": {
+      "type": "openai-compatible",
+      "base_url": "https://openrouter.ai/api/v1",
+      "model": "openrouter/auto",
+      "api_key_env": "OPENROUTER_API_KEY",
+      "egress": "cloud",
+      "temperature": 0.2,
+      "max_tokens": 2048,
+      "max_tool_iters": 16,
+      "request_timeout_ms": 120000,
+      "context_char_budget": 60000
+    },
+    "llama": {
+      "type": "openai-compatible",
+      "base_url": "http://127.0.0.1:8080/v1",
+      "model": "local",
+      "api_key_env": "CYBOROS_LOCAL_KEY",
+      "egress": "local",
+      "temperature": 0.2,
+      "max_tokens": 1024,
+      "max_tool_iters": 10,
+      "request_timeout_ms": 300000,
+      "context_char_budget": 24000
+    }
+  }
+}

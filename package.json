@@ -26,6 +26,7 @@
   "homepage": "https://github.com/stavrosredteamer/cyboros-harness#readme",
   "bin": {
     "cyboros": "tools/cyboros.js",
+    "cyboros-tui": "runtime/tui.js",
     "cyboros-doctor": "tools/doctor.js",
     "cyboros-record-finding": "tools/record-finding.js",
     "cyboros-gen-bench": "tools/gen-bench.js",
@@ -33,6 +34,8 @@
   },
   "files": [
     "tools/",
+    "runtime/",
+    "demo/",
     "docs/",
     "local/",
     "skills/",
@@ -55,6 +58,7 @@
     "test:all": "node tools/run-tests.js --e2e",
     "test:list": "node tools/run-tests.js --list",
     "console": "node tools/gui-server.js",
+    "tui": "node runtime/tui.js",
     "radar": "node tools/radar.js run",
     "galaxy": "node tools/attack-galaxy.js",
     "doctor": "node tools/doctor.js",
