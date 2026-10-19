@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 # Install the Cyboros Command Center desktop launcher (WP2/WP9).
 # Idempotent: re-running overwrites the generated files with the current workspace path.
-#   ./install-cyboros-cc-launcher.sh            # install
-#   ./install-cyboros-cc-launcher.sh --uninstall
+#   ./scripts/install-cyboros-cc-launcher.sh            # install
+#   ./scripts/install-cyboros-cc-launcher.sh --uninstall
 set -euo pipefail
 
-WS="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+WS="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 BIN_DIR="${XDG_BIN_HOME:-$HOME/.local/bin}"
 APP_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/applications"
 DESKTOP="$APP_DIR/cyboros-cc.desktop"

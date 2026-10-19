@@ -148,7 +148,7 @@ To get `cyboros` as a command — bare `cyboros` opens the TUI, the subcommands 
 pipeline — run the launcher once and forget the path:
 
 ```bash
-./install-cyboros-launcher.sh   # symlink into ~/.local/bin (idempotent, --uninstall to remove)
+./scripts/install-cyboros-launcher.sh   # symlink into ~/.local/bin (idempotent, --uninstall to remove)
 cyboros                         # TUI
 cyboros scan target.example     # same pipeline as node tools/cyboros.js
 ```

@@ -4,11 +4,11 @@
 # se il repo è stato spostato) e lo copia in ~/Scrivania (o ~/Desktop su sistemi EN),
 # marcandolo eseguibile/affidabile così il doppio click parte senza avvisi.
 #
-#   ./install-command-center-launcher.sh
+#   ./scripts/install-command-center-launcher.sh
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-EDITION="$SCRIPT_DIR"
+EDITION="$(cd "$SCRIPT_DIR/.." && pwd)"
 
 START="$EDITION/start-command-center.sh"
 [[ -f "$START" ]] || { echo "[cyboros] start-command-center.sh mancante in $EDITION" >&2; exit 1; }

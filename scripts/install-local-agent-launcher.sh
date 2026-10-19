@@ -3,10 +3,10 @@
 # Idempotente: rigenera il .desktop con il path REALE del progetto (funziona anche se il
 # repo viene spostato) e lo copia in ~/Scrivania (o ~/Desktop su sistemi EN).
 #
-#   ./install-local-agent-launcher.sh
+#   ./scripts/install-local-agent-launcher.sh
 set -euo pipefail
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 LAUNCH="$SCRIPT_DIR/local/agent-local.sh"
 WRAP="$SCRIPT_DIR/local/open-agent-local-terminal.sh"
 chmod +x "$LAUNCH" "$WRAP" 2>/dev/null || true

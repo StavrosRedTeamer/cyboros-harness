@@ -142,7 +142,7 @@ e legge i dati senza token, con banner che spiega perché le write sono disabili
   circuit breaker), log in `reports/app/cyboros-cc.log` con rotazione, `--read-only`, `--headless`,
   `--web`, `--kiosk`, fallback Chromium app-mode / browser.
 - `tools/app/icons/cyboros-cc.svg` (icona neon-duotone), `cyboros-cc` (launcher),
-  `install-cyboros-cc-launcher.sh` (idempotente, `StartupWMClass`, Actions), `cyboros-cc.desktop`.
+  `scripts/install-cyboros-cc-launcher.sh` (idempotente, `StartupWMClass`, Actions), `cyboros-cc.desktop`.
 - `tools/app/test_cyboros_cc.py`: smoke test stdlib `unittest` in `QT_QPA_PLATFORM=offscreen`
   (finestra costruita, tray creato, supervisore chiama `--instance`).
 
@@ -249,7 +249,7 @@ per `.js/.css/.svg/.json` sotto `tools/gui/`).
 
 ### WP9 — Distribuzione, doc, demo
 
-**Deliverable:** `install-cyboros-cc-launcher.sh` finale + uninstall, README + questo documento aggiornati,
+**Deliverable:** `scripts/install-cyboros-cc-launcher.sh` finale + uninstall, README + questo documento aggiornati,
 `docs/f3-client-runbook.md` (l'app come client desktop di un backend tunnelato), unit systemd
 user opzionale, **script demo 2 minuti**: lancio → wizard → mission → approvazione → dispatch →
 finding → report → bundle.
@@ -353,7 +353,7 @@ mission, routes, panic). Ogni modulo riusa i tool esistenti; nessun guard è sta
 
 | WP | Stato | Note |
 |----|-------|------|
-| 2 Shell desktop | ✅ (🚧 notifiche) | `tools/app/cyboros-cc.py` (tray con colore, supervisore spawn→health→restart con circuit breaker, single instance `QLocalServer`, QSettings geometria, `--read-only/--headless/--web/--kiosk/--keep-server`, fallback Chromium→browser), `tools/app/icons/cyboros-cc.svg`, `cyboros-cc`, `install-cyboros-cc-launcher.sh`, `cyboros-cc.desktop`,  `tools/app/pdf-export.py`, `tools/cc-panic.js`, `tools/app/test_cyboros_cc.py` (8 test offscreen,
+| 2 Shell desktop | ✅ (🚧 notifiche) | `tools/app/cyboros-cc.py` (tray con colore, supervisore spawn→health→restart con circuit breaker, single instance `QLocalServer`, QSettings geometria, `--read-only/--headless/--web/--kiosk/--keep-server`, fallback Chromium→browser), `tools/app/icons/cyboros-cc.svg`, `cyboros-cc`, `scripts/install-cyboros-cc-launcher.sh`, `cyboros-cc.desktop`,  `tools/app/pdf-export.py`, `tools/cc-panic.js`, `tools/app/test_cyboros_cc.py` (8 test offscreen,
   incluso il raise fra due processi). 🚧 **mancano**: notifiche desktop con discreet mode/mute (tray + colore di stato ci sono). |
 | 3 Campagna | ✅ | `tools/cc-campaign.js`, `templates/campaign/{web-app,internal-network,wireless,mobile,red-team-full}.json`, route `/api/cc/campaign*`, pannello Campaign + wizard. Rollup ore da gate-log + run-audit. |
 | 4 Approvazioni | ✅ | `tools/cc-approvals.js` + `tools/request-approval.js`, store append-only, token `{id,host,action_class,command_hash,scope_verdict,ttl,granted_by,note}`, coda in opstate via CAS. Integrazione **additiva e default-off** in `run.js`/`c2-guard.js` (`--approval`, policy `host_ops.require_approval`). Pannello + badge. |
@@ -361,14 +361,14 @@ mission, routes, panic). Ogni modulo riusa i tool esistenti; nessun guard è sta
 | 6 Ledger/grafo/coverage | ✅ (🚧 report studio) | `tools/cc-ledger.js` (unione + chain == `gate.js` + evidence bundle tar.gz + manifest + `export-pdf`), `tools/cc-graph.js`, `tools/cc-coverage.js`, pannelli Ledger/Graph/Coverage. 🚧 **manca**: retest diff e ciclo finding avanzato dentro Reports. |
 | 7 Controllo 360° | ✅ (🚧 install) | route+pannello Control: Config (redatto, validazione scope via `scope-guard`), Team (`fleet.js plan`), Arsenal (`tool-plane` + `doctor --json`), Knowledge (`kb-search.js`), Radar (badge egress dichiarato), Doctor. 🚧 **manca**: install tool su conferma tipizzata. |
 | 8 IA + polish | ✅ (🚧 a11y) | rail a gruppi (Engagement/Attack/Control/Console), command palette estesa, split viste `views-engagement.js`/`views-control.js` (zero-build, handler statico con allowlist `.js/.css/.svg/.json`, basename-only), `prefers-reduced-motion`. 🚧 **manca**: audit tastiera completo e aria-live di dettaglio. |
-| 9 Distribuzione | ✅ | `install-cyboros-cc-launcher.sh` (+`--uninstall`), `scripts/demo-command-center.sh` (2 min, CC_ROOT temporaneo), README + questo doc + `docs/f3-client-runbook.md` (§9 client desktop tunnelato). |
+| 9 Distribuzione | ✅ | `scripts/install-cyboros-cc-launcher.sh` (+`--uninstall`), `scripts/demo-command-center.sh` (2 min, CC_ROOT temporaneo), README + questo doc + `docs/f3-client-runbook.md` (§9 client desktop tunnelato). |
 | 10 War Room | ✅ | `tools/cc-warroom.js` (snapshot read-only: mission + ledger/chain + job runner + sessions + coverage + exposure + scope + budget burn/ETA + attention rail), `GET /api/cc/warroom`, `POST /api/cc/warroom/panic` (token + frase tipizzata, wrapper `cc-panic.js`), vista `views-warroom.js` (polling 5s/2s TV, delta client-side, PANIC drawer, TV mode). Test: `tools/test-cc-warroom.js` (offline) + route loopback in `tools/test-cc-routes.js`. |
 
 **File nuovi WP2..WP9:** `tools/cc-util.js`, `tools/cc-campaign.js`, `tools/cc-approvals.js`,
 `tools/request-approval.js`, `tools/cc-mission.js`, `tools/cc-ledger.js`, `tools/cc-graph.js`,
 `tools/cc-coverage.js`, `tools/cc-router.js`, `tools/cc-panic.js`, `tools/app/*`,
 `templates/campaign/*.json`, `tools/gui/views-engagement.js`, `tools/gui/views-control.js`,
-`cyboros-cc`, `install-cyboros-cc-launcher.sh`, `scripts/demo-command-center.sh`,
+`cyboros-cc`, `scripts/install-cyboros-cc-launcher.sh`, `scripts/demo-command-center.sh`,
 test: `tools/test-cc-{campaign,approvals,mission,routes,panic,warroom}.js`.
 **File WP10:** `tools/cc-warroom.js`, `tools/gui/views-warroom.js`, `tools/test-cc-warroom.js`;
 modificati `tools/cc-router.js` (route war room + panic), `tools/gui-server.js` (snapshot job nel

@@ -3,11 +3,11 @@
 # Idempotente: rigenera il .desktop con il path REALE del progetto (funziona anche
 # se il repo è stato spostato) e lo copia in ~/Scrivania (o ~/Desktop su sistemi EN).
 #
-#   ./install-launcher.sh
+#   ./scripts/install-launcher.sh
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-EDITION="$(cd "$SCRIPT_DIR" && pwd)"
+EDITION="$(cd "$SCRIPT_DIR/.." && pwd)"
 
 LAUNCH="$EDITION/launch-freebuff.sh"
 WRAP="$EDITION/open-freebuff-terminal.sh"

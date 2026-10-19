@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 # Install the `cyboros` command: `cyboros` opens the TUI, `cyboros scan host` still runs the pipeline.
 # Idempotent: re-running overwrites the symlink with the current workspace path.
-#   ./install-cyboros-launcher.sh            # install
-#   ./install-cyboros-launcher.sh --uninstall
+#   ./scripts/install-cyboros-launcher.sh            # install
+#   ./scripts/install-cyboros-launcher.sh --uninstall
 set -euo pipefail
 
-WS="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+WS="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 BIN_DIR="${XDG_BIN_HOME:-$HOME/.local/bin}"
 TARGET="$WS/tools/cyboros.js"
 LINK="$BIN_DIR/cyboros"

@@ -126,7 +126,7 @@ Regole della modalità (`local/plan.js`, testato da `tools/test-local-plan.js`):
 ## Launcher sul desktop (un clic)
 
 ```bash
-./install-local-agent-launcher.sh     # scrive ~/Desktop/cyboros-agente-locale.desktop
+./scripts/install-local-agent-launcher.sh     # scrive ~/Desktop/cyboros-agente-locale.desktop
 ```
 
 Doppio clic su **"Cyboros — Agente Locale"** → si apre konsole con il launcher

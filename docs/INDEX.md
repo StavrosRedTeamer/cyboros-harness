@@ -32,7 +32,7 @@
 - [**Threat model: attacking Cyboros Harness itself**](THREAT-MODEL.md) — Not the target. The target is supposed to be attacked — that is the job. What is · 12,6 KB
 - [**Alternative-tools audit — what the harness should adopt, borrow, or leave alone**](TOOL-ALTERNATIVES-AUDIT.md) — Three concrete gaps, in priority order: · 26,1 KB
 - [**What the published benchmarks measure, and what they leave out**](TOOL-LANDSCAPE.md) — As of mid-2026 there is real, serious work here, and none of it is · 6,3 KB
-- [**Cyboros Command Center — Desktop Edition (piano e work package)**](command-center-desktop.md) — Obiettivo. Portare il Command Center da dashboard web a programma desktop (`cyboros-cc`) · 25,6 KB
+- [**Cyboros Command Center — Desktop Edition (piano e work package)**](command-center-desktop.md) — Obiettivo. Portare il Command Center da dashboard web a programma desktop (`cyboros-cc`) · 25,7 KB
 - [**Community scout #2 — web, HN e community, 2026-10-04 → 2026-10-09**](community-scout-2026-10-09.md) — OpenAPI/GraphQL SDL/WSDL/.proto. Pipeline a due stadi — cattura una volta, genera (anche · 30,1 KB
 - [**Community scout — Reddit pentest/redteam, ottobre 2026**](community-scout-2026-10.md) — *supervised*, guardia obbligatoria al confine di esecuzione, finding legati a ricevute · 23,1 KB
 - [**Egress gateway & anonymized egress (red-team OPSEC)**](egress-opsec.md) — To force third-party HTTP(S) binaries through the scope allowlist, start the proxy first: · 2,4 KB
