@@ -329,9 +329,12 @@ async function main() {
   });
   await okAsync('CLI: required mancante -> exit≠0 elencando; opzionali -> exit 0', async () => {
     const planeCfg = path.join(T, 'plane.json');
+    // `nmap` è required nella mappa built-in e sul runner CI non è installato: senza
+    // l'override il gate uscirebbe 1 per un requisito della macchina, non per la proprietà
+    // sotto test (un opzionale mancante non deve bloccare).
     fs.writeFileSync(planeCfg, JSON.stringify({
       recon: { 'zz-missing-required-x': { required: true }, 'zz-missing-optional-x': { required: false } },
-      scan: { bash: { required: false } },
+      scan: { nmap: { required: false }, bash: { required: false } },
     }));
     const outF = path.join(T, 'tp-out.json');
     const env = Object.assign({}, process.env, { TOOL_PLANE_CONFIG: planeCfg, TOOL_PLANE_OUT: outF });

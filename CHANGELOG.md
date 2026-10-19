@@ -9,6 +9,13 @@ grouped by milestone, and `v0.1.0` (2026-09-28) is the first tagged release.
 
 ### Fixed
 
+- **La CI è verde su un runner nudo.** `keyringAvailable()` verificava solo che `keyctl show @u`
+  rispondesse: in un container il keyring può esistere e negare la lettura, quindi l'identità
+  salvata diventava irrecuperabile e `test-agent-forum`/`test-forum-admin` fallivano. La
+  disponibilità è ora un roundtrip reale (add/search/pipe/unlink); i test che non riguardano la
+  custodia forzano un backend esplicito e quello del keyring si salta quando non è utilizzabile.
+  `test-cap-privs` e `test-sb2` isolano i requisiti della macchina (soglia porte, `nmap`), che sul
+  runner non sono soddisfatti.
 - **`npm test` torna verde su un clone pulito.** Il test del corpus di `kb-search` chiamava
   `corpusFiles(true)` sul workspace e pretendeva un file in `reports/`: quella cartella è
   gitignored, quindi su un clone pulito — cioè nel gate di release e in CI — `test-repo-vet`
@@ -41,6 +48,11 @@ grouped by milestone, and `v0.1.0` (2026-09-28) is the first tagged release.
 
 ### Changed
 
+- **La matrice Node della CI non è più decorativa.** Mancava `actions/setup-node`: entrambi i job
+  giravano sul Node preinstallato nell'immagine e `tests (node 24)` eseguiva la 22. Ora il job
+  installa la versione della matrice; la suite è verde su 22.23.3 e 24.22.0.
+- **Il repository GitHub si chiama `cyboros-harness`.** README, `package.json` e SARIF puntavano
+  già lì: il rename rende validi clone URL, homepage e issue tracker.
 - **Il bootstrap del forum è uscito dal prompt.** `AGENTS.md` entra verbatim nel system prompt di
   ogni sessione: il paragrafo operativo del forum (541 byte) ora vive in `ops/harness.md` §Forum e
   il contratto ne tiene solo il puntatore. L'assemblato scende da 20.269 a ~19.900 caratteri, sotto

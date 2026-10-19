@@ -26,6 +26,11 @@ const T = fixture('forum-admin-test-');
 process.env.FORUM_STATE = path.join(T, 'forum-state');
 process.env.FORUM_KEYDIR = path.join(T, 'keys-main');
 process.env.FORUM_HOST = '127.0.0.1';
+// La custodia della chiave non è il soggetto di questa suite: il soggetto è il confine HTTP
+// (ruolo, replay, catena). Un backend esplicito la rende indipendente dall'host: sul runner il
+// kernel keyring può esistere e negare la lettura, e senza passphrase `pick()` sceglierebbe un
+// backend che i processi figli non possono aprire. La fixture è mkdtemp e muore col test.
+process.env.FORUM_KEYSTORE = 'plaintext';
 
 let server = null;
 let PORT = 0;

@@ -251,6 +251,10 @@ async function boot() {
     // keypair() restituisce il KeyObject (serve a sign()): per il check del segreto serve il JWK,
     // che è la forma in cui la chiave viene persistita e su cui si cerca la fuga.
     const privJwk = kp.priv.export({ format: 'jwk' });
+    // Il backend non è il soggetto di questo check (lo è l'output del wrapper): plaintext
+    // esiste ovunque, così il test non dipende dal kernel keyring dell'host.
+    const savedBackend = process.env.FORUM_KEYSTORE;
+    process.env.FORUM_KEYSTORE = 'plaintext';
     forum.saveIdentity('af-runtimecheck01', privJwk);
     const secretBits = [privJwk.d, privJwk.x].filter(Boolean).map(String);
     assert.ok(secretBits.length, 'il keyfile di prova non contiene materiale chiave');
@@ -262,6 +266,8 @@ async function boot() {
       });
       out.push(String(r.stdout || ''), String(r.stderr || ''));
     }
+    if (savedBackend === undefined) delete process.env.FORUM_KEYSTORE;
+    else process.env.FORUM_KEYSTORE = savedBackend;
     const joined = out.join('\n');
     for (const bit of secretBits) {
       assert.ok(!joined.includes(bit), 'materiale chiave presente nell\'output del wrapper');
@@ -292,7 +298,13 @@ async function boot() {
     const kp = generateKeypair();
     const kpJwk = kp.priv;   // forum.generateKeypair() restituisce già JWK, non KeyObject
     const savedKey = process.env.FORUM_KEYDIR;
+    const savedBackend = process.env.FORUM_KEYSTORE;
+    const savedPass = process.env.FORUM_KEYSTORE_PASSPHRASE;
     process.env.FORUM_KEYDIR = path.join(SUB, 'perm');
+    // passphrase, non keyring: questo check riguarda ciò che finisce su disco e deve valere
+    // anche su un host dove `keyctl` esiste ma non è utilizzabile (il runner CI).
+    process.env.FORUM_KEYSTORE = 'passphrase';
+    process.env.FORUM_KEYSTORE_PASSPHRASE = 'passphrase-di-prova';
     try {
       saveIdentity('af-testtesttest', kpJwk);
       assert.ok(fs.existsSync(KEY_FILE()));
@@ -305,6 +317,8 @@ async function boot() {
       assert.ok(!raw.includes(kpJwk.x), 'il keyfile contiene la pubblica raw (accettabile ma non necessaria)');
     } finally {
       process.env.FORUM_KEYDIR = savedKey;
+      if (savedBackend === undefined) delete process.env.FORUM_KEYSTORE; else process.env.FORUM_KEYSTORE = savedBackend;
+      if (savedPass === undefined) delete process.env.FORUM_KEYSTORE_PASSPHRASE; else process.env.FORUM_KEYSTORE_PASSPHRASE = savedPass;
     }
   });
 
@@ -312,6 +326,10 @@ async function boot() {
   const keystore = require('./forum-keystore');
   for (const backend of ['linux-keyring', 'passphrase', 'plaintext']) {
     await okAsync(`backend ${backend}: roundtrip + nessuna chiave in chiaro sul disco`, async () => {
+      if (backend === 'linux-keyring' && !keystore.keyringAvailable()) {
+        console.log('  SKIP backend linux-keyring: keyctl c\'è ma il keyring non è utilizzabile su questo host');
+        return;
+      }
       const dir = path.join(SUB, backend);
       const saved = process.env.FORUM_KEYDIR;
       const savedBackend = process.env.FORUM_KEYSTORE;

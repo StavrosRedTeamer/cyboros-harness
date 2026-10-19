@@ -57,12 +57,21 @@ function keyctl(args, input) {
     timeout: 5000,
   });
 }
+// `keyctl show` non basta: dice che il keyring esiste, non che si può usare. Su alcuni
+// container (CI compresa) `show` risponde ma `pipe` nega la lettura, e un'identità scritta
+// lì diventa irrecuperabile dopo il processo. La disponibilità è quindi una prova reale:
+// scrivi una chiave di prova, rileggila, cancellala.
 function keyringAvailable() {
+  const desc = `dsh-forum-probe-${process.pid}-${crypto.randomBytes(6).toString('hex')}`;
   try {
-    keyctl(['show', '@u']);
-    return true;
+    keyctl(['add', 'user', desc, 'ok', '@u']);
+    const id = keyctl(['search', '@u', 'user', desc]).trim();
+    if (!/^\d+$/.test(id)) return false;
+    return keyctl(['pipe', id]).trim() === 'ok';
   } catch {
-    return false; // keyctl assente, keyring non montato, o negato in container
+    return false; // keyctl assente, keyring non montato, o lettura negata in container
+  } finally {
+    keyringDelete(desc);
   }
 }
 // Il key serial è volatile: cercarlo per descrizione è l'unico modo per riaverlo dopo un riavvio

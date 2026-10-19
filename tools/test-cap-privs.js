@@ -177,7 +177,11 @@ ok('resolveBin: trova un eseguibile lungo il PATH, e null se non esiste', () => 
 
 // --- classificazione dello stato -----------------------------------------------------------
 ok('check: uno strumento assente non e\' un fallimento, ma un tool-plane', () => {
+  // `sysctl: {}` isola la proprietà dai requisiti della MACCHINA: senza, su un host dove
+  // `net.ipv4.ip_unprivileged_port_start` non è 0 (il runner CI) `res.ok` è false per la
+  // soglia porte e il test fallisce pur essendo corretto il comportamento sui binari.
   const res = check({ manifest: writeManifest(manifest({
+    sysctl: {},
     bins: { 'tool-che-non-esiste': { caps: ['cap_net_raw'], mode: 'network', why: 'x' } },
   })) });
   const e = res.entries.find((x) => x.key === 'tool-che-non-esiste');
