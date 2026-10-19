@@ -5,6 +5,9 @@
 **A penetration-testing harness where a finding is only a finding if code can prove it —
 and where the lesson of one engagement changes the next.**
 
+[![CI](https://github.com/stavrosredteamer/cyboros-harness/actions/workflows/ci.yml/badge.svg?branch=master)](https://github.com/stavrosredteamer/cyboros-harness/actions/workflows/ci.yml)
+[![License: Apache-2.0](docs/assets/license-apache-2.0.svg)](LICENSE)
+
 [Apache-2.0](LICENSE) · zero dependencies · offline-capable · 115 tests, hermetic and parallel
 
 [Cyboros](docs/OUROBOROS.md): cyber + ouroboros. The loop is not marketing — every claim on
