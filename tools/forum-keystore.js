@@ -61,17 +61,34 @@ function keyctl(args, input) {
 // container (CI compresa) `show` risponde ma `pipe` nega la lettura, e un'identità scritta
 // lì diventa irrecuperabile dopo il processo. La disponibilità è quindi una prova reale:
 // scrivi una chiave di prova, rileggila, cancellala.
+//
+// Il verdetto è memoizzato per-processo: la sonda costa 2-3 spawn sincroni di `keyctl` (ognuno
+// con timeout 5s) e la disponibilità del keyring non cambia nel corso di un processo. Senza
+// cache un singolo `keyringReport()` la rieseguirebbe più volte (available + pick).
+let _probeCache;
 function keyringAvailable() {
+  if (_probeCache !== undefined) return _probeCache;
+  _probeCache = probeKeyring();
+  return _probeCache;
+}
+// Il cleanup usa il serial che `keyctl add` stampa su stdout, NON una seconda `search`: così
+// non dipende da operazioni che potrebbero essere negate separatamente. Su un host dove `add`
+// riesce ma `search` è negato, ri-cercare per descrizione lascerebbe la chiave di prova orfana
+// nel keyring a ogni chiamata, fino a esaurire la quota utente (~200 chiavi / ~20 KB).
+function probeKeyring() {
   const desc = `dsh-forum-probe-${process.pid}-${crypto.randomBytes(6).toString('hex')}`;
+  let id = null;
   try {
-    keyctl(['add', 'user', desc, 'ok', '@u']);
-    const id = keyctl(['search', '@u', 'user', desc]).trim();
+    id = keyctl(['add', 'user', desc, 'ok', '@u']).trim();
     if (!/^\d+$/.test(id)) return false;
     return keyctl(['pipe', id]).trim() === 'ok';
   } catch {
     return false; // keyctl assente, keyring non montato, o lettura negata in container
   } finally {
-    keyringDelete(desc);
+    // best-effort: se anche `unlink` è negato non c'è altro da fare, ma non ri-cerchiamo.
+    if (id && /^\d+$/.test(id)) {
+      try { keyctl(['unlink', id, '@u']); } catch { /* unlink negato: nulla da recuperare */ }
+    }
   }
 }
 // Il key serial è volatile: cercarlo per descrizione è l'unico modo per riaverlo dopo un riavvio
