@@ -17,7 +17,7 @@ $ DEMO_FAST=1 DEMO_PACE=3 ./tools/demo.sh
 ```
 
 `DEMO_FAST=1` runs the real guard tests (`--only guard`, 4 tests) instead of the
-full 94-test gate. `DEMO_PACE=3` holds each step for three seconds.
+full 115-test gate. `DEMO_PACE=3` holds each step for three seconds.
 
 **Run it and read the output before recording anything.** The GIF is only worth
 making if the thing it shows is the thing you are willing to be known for.
