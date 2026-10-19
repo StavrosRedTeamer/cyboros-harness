@@ -2,10 +2,13 @@
 
 All notable changes to this project are documented here. Dates are commit dates.
 
-The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); entries are
-grouped by milestone, and `v0.1.0` (2026-09-28) is the first tagged release.
+The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project
+uses [Semantic Versioning](https://semver.org/) (pre-1.0: a minor bump may carry breaking
+changes). `v0.1.0` (2026-09-28) is the first tagged release; the latest is `v0.2.0` (2026-10-20).
 
 ## [Unreleased]
+
+## [0.2.0] — 2026-10-20
 
 ### Fixed
 

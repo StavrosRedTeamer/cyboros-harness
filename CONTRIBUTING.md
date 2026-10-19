@@ -87,6 +87,31 @@ Please do not rewrite history to make older commits conform — the rule applies
 The pull request template asks what changed, how you verified it, which commands you ran, and
 whether you touched the engagement rules or the generated index.
 
+## Releasing
+
+The project uses [Semantic Versioning](https://semver.org/). It is pre-1.0, so a minor
+bump (`0.x`) may carry a breaking change; patch bumps are fixes only.
+
+Distribution is by git — clone or a GitHub Release — not the public npm registry:
+`package.json` keeps `"private": true` on purpose, so an accidental `npm publish` of
+offensive tooling is refused. Keep it that way unless the project deliberately decides to
+publish.
+
+To cut a release:
+
+1. Pick the version from the accumulated `## [Unreleased]` block in
+   [`CHANGELOG.md`](CHANGELOG.md): any `### Added` or breaking `### Changed` → minor;
+   fixes only → patch.
+2. Rename `## [Unreleased]` to `## [X.Y.Z] — YYYY-MM-DD` (the commit date) and add a fresh
+   empty `## [Unreleased]` above it; update the version line near the top of the changelog.
+3. Bump `version` in [`package.json`](package.json) to match.
+4. `npm test` must be green (it is the CI gate), then `npm run doctor`.
+5. Commit the changelog + version bump together, then tag the commit:
+   `git tag -a vX.Y.Z -m "vX.Y.Z"` and `git push origin master --follow-tags`.
+6. Optional: promote the tag to a GitHub Release with the changelog section as notes
+   (`gh release create vX.Y.Z --notes-file <section>` or the web UI). The tag alone is a
+   valid release; the Release page is just a nicer front door.
+
 ## Reporting a vulnerability
 
 Not in a public issue. See [SECURITY.md](SECURITY.md).
