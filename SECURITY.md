@@ -4,6 +4,18 @@ Cyboros Harness is offensive-security tooling. It executes reconnaissance and
 exploitation techniques against targets you point it at. That shapes both what
 this file is about and who should read it.
 
+## Supported versions
+
+This project is pre-1.0 and ships from a single line of development. Guardrail and
+security fixes land on `master`; there are no maintained release branches yet, so the
+supported version is **the latest commit on `master`**. Pin a commit for
+reproducibility if you must, but take guardrail fixes from the tip.
+
+| Version | Supported |
+|---|---|
+| `master` (latest) | ✅ |
+| Older commits / tags | ⚠️ update to the latest `master` for guardrail fixes |
+
 ## Reporting a vulnerability in the harness
 
 Report privately, not in a public issue. Use GitHub's

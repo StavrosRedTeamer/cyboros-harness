@@ -37,6 +37,11 @@ bottleneck is not generation. It is **proof**.
 
 So this harness moves the policy out of the prompt and into the runtime.
 
+> **Evaluating Cyboros for a security team or an organization?** Start with
+> [`docs/ADOPTION.md`](docs/ADOPTION.md) — a due-diligence page on authorization,
+> client-data governance, auditability and the tool's own security posture, each
+> answer naming the file that proves it.
+
 ## Two ideas
 
 **1. The agent is not the policy. The runtime is.**
