@@ -170,4 +170,30 @@ ok('ref inesistente, ref doppio, opzione ignota, repo non git: exit 2', () => {
   assert.match(noRepo.stderr, /non è un repository git/, noRepo.stderr);
 });
 
+ok('--remote verifica il ref SU origin, non il branch locale', () => {
+  // Lo stato normale di un rilascio: il branch locale è avanti di commit non ancora pushati.
+  // `--remote master` deve verificare ciò che sta su origin, non il lavoro in corso.
+  const origin = fixture('vt-origin');
+  git(['init', '-q', '--bare', origin]);
+  const work = makeRepo('v-fixture-1');
+  git(['remote', 'add', 'origin', origin], work);
+  git(['push', '-q', 'origin', 'HEAD:refs/heads/master'], work);
+  const remoteSha = git(['rev-parse', 'HEAD'], work).trim();
+
+  write(work, 'README.md', 'solo locale\n');
+  git(['add', '-A'], work);
+  git(['commit', '-qm', 'solo locale'], work);
+  const localSha = git(['rev-parse', 'HEAD'], work).trim();
+  assert.notStrictEqual(localSha, remoteSha, 'la fixture deve avere un commit locale non pushato');
+
+  const r = runCli([TOOL, '--repo', work, '--remote', 'master'], { cwd: work, timeout: 120000 });
+  assert.strictEqual(r.status, 0, `--remote master deve verificare origin, non il locale\n${r.stdout}${r.stderr}`);
+  assert.match(r.stdout, new RegExp(`ref\\s+master → ${remoteSha.slice(0, 7)}`), r.stdout);
+  assert.ok(!r.stdout.includes(localSha.slice(0, 7)), `ha verificato il commit locale ${localSha}:\n${r.stdout}`);
+
+  const missing = runCli([TOOL, '--repo', work, '--remote', 'non-esiste'], { cwd: work });
+  assert.strictEqual(missing.status, 2, `ref assente su origin: atteso exit 2\n${missing.stdout}${missing.stderr}`);
+  assert.match(missing.stderr, /non esiste su/, missing.stderr);
+});
+
 summary('verify-tag');

@@ -20,6 +20,8 @@
 //   node tools/verify-tag.js                          # l'ultimo tag (git describe --tags --abbrev=0)
 //   node tools/verify-tag.js v0.1.0                   # un ref esplicito (tag o branch)
 //   node tools/verify-tag.js --remote                 # clona da origin invece che dal repo locale
+//   node tools/verify-tag.js --remote master          # il ref si risolve SU origin: i commit locali
+//                                                     # non pushati non contano e non fanno fallire
 //   node tools/verify-tag.js --repo <path> --ref <r>  # un altro checkout (fixture, un secondo clone)
 //   node tools/verify-tag.js --keep                   # non cancellare il clone (utile per ispezionarlo)
 //   node tools/verify-tag.js --timeout 600000         # timeout per singolo check (default 600s)
@@ -57,6 +59,21 @@ function git(args, cwd, timeout) {
   return spawnSync('git', args, { cwd, encoding: 'utf8', timeout: timeout || 60000, maxBuffer: 64 * 1024 * 1024 });
 }
 const short = (sha) => String(sha || '').slice(0, 7).trim();
+
+// SHA di un ref SU ORIGIN. Con `--remote` il commit atteso non può venire dal repo locale:
+// `master` lì è il branch di lavoro, spesso avanti di commit che su origin non esistono — ed è
+// il caso normale, perché un ref si verifica prima di pusharlo. Risolvere in locale confrontava
+// il clone remoto con un commit che il remoto non ha, e `--remote master` falliva sempre.
+function remoteSha(url, ref, cwd) {
+  const r = git(['ls-remote', url, `refs/heads/${ref}`, `refs/tags/${ref}`, `refs/tags/${ref}^{}`], cwd, 60000);
+  if (r.status !== 0) return { error: `ls-remote di ${url} fallito: ${String(r.stderr || '').trim() || `exit ${r.status}`}` };
+  const rows = String(r.stdout || '').split('\n').filter(Boolean).map((l) => l.split('\t'));
+  const find = (name) => { const row = rows.find(([, n]) => n === name); return row ? row[0] : ''; };
+  // Un tag annotato ha due righe: conta il commit peeled, che è quello su cui atterra il clone.
+  const sha = find(`refs/heads/${ref}`) || find(`refs/tags/${ref}^{}`) || find(`refs/tags/${ref}`);
+  if (!sha) return { error: `"${ref}" non esiste su ${url}` };
+  return { sha };
+}
 
 // ---- i quattro gate della checklist di release --------------------------------
 // `summary` estrae la riga che conta dall'output del gate: un exit code dice pass/fail, non quanto.
@@ -128,24 +145,30 @@ function main() {
     }
     ref = String(d.stdout).trim();
   }
-  const want = git(['rev-parse', '--verify', '--quiet', `${ref}^{commit}`], o.repo);
-  if (want.status !== 0 || !String(want.stdout).trim()) {
-    console.error(`verify-tag: "${ref}" non esiste in ${o.repo} (o non è un commit)`); return 2;
-  }
-  const sha = String(want.stdout).trim();
-
   let src = o.repo;
+  let cloneRef = ref;
+  let sha;
   if (o.remote) {
     const url = git(['remote', 'get-url', 'origin'], o.repo);
     if (url.status !== 0 || !String(url.stdout).trim()) {
       console.error(`verify-tag: --remote ma nessun remote "origin" in ${o.repo}`); return 2;
     }
     src = String(url.stdout).trim();
+    cloneRef = ref.replace(/^origin\//, '');
+    const rs = remoteSha(src, cloneRef, o.repo);
+    if (rs.error) { console.error(`verify-tag: ${rs.error}`); return 2; }
+    sha = rs.sha;
+  } else {
+    const want = git(['rev-parse', '--verify', '--quiet', `${ref}^{commit}`], o.repo);
+    if (want.status !== 0 || !String(want.stdout).trim()) {
+      console.error(`verify-tag: "${ref}" non esiste in ${o.repo} (o non è un commit)`); return 2;
+    }
+    sha = String(want.stdout).trim();
   }
 
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'verify-tag-'));
   console.log('verify-tag — il tag è verde solo se lo è in un clone pulito\n');
-  const clone = git(['-c', 'advice.detachedHead=false', 'clone', '--quiet', '--no-hardlinks', '--branch', ref, src, dir], o.repo, 300000);
+  const clone = git(['-c', 'advice.detachedHead=false', 'clone', '--quiet', '--no-hardlinks', '--branch', cloneRef, src, dir], o.repo, 300000);
   if (clone.status !== 0) {
     console.error(`verify-tag: clone di "${ref}" da ${src} fallito:\n${String(clone.stderr || '').trim()}`);
     fs.rmSync(dir, { recursive: true, force: true });
@@ -157,7 +180,7 @@ function main() {
   const head = git(['rev-parse', 'HEAD'], dir);
   const headSha = String(head.stdout).trim();
   const clean = git(['status', '--porcelain'], dir);
-  console.log(`  ref    ${ref} → ${short(sha)}`);
+  console.log(`  ref    ${ref} → ${short(sha)}${o.remote ? ` (${src})` : ''}`);
   console.log(`  clone  ${dir} (da ${src})`);
   console.log(`  HEAD   ${short(headSha)}${headSha === sha ? '' : ` ≠ ${short(sha)}`}${String(clean.stdout).trim() ? ' · albero NON pulito' : ''}\n`);
   if (headSha !== sha) {
