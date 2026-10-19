@@ -247,6 +247,7 @@ yourself; going through the proxy is the supported path.
 
 ## Documentation
 
+- [`docs/ADOPTION.md`](docs/ADOPTION.md) — **for security teams and organizations**: a due-diligence page on authorization, client-data governance, auditability and the tool's own security posture — every answer naming the file that proves it
 - [`docs/OUROBOROS.md`](docs/OUROBOROS.md) — the loop, and the artifact behind every claim
 - [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — guard → model → tool, and why
 - [`docs/METHODOLOGY.md`](docs/METHODOLOGY.md) — how this is measured: three metrics, contamination, the severity ceiling (written to apply to any harness)

@@ -4,7 +4,7 @@
 > dimensione, avanzamento delle checkbox dei piani). Non si modifica a mano: rigeneralo.
 > `tools/test-repo-invariants.js` fallisce se è rimasto indietro rispetto ai file.
 
-**Superficie viva:** 35 documenti · **piani:** 11 · **archivio:** 3 file superati.
+**Superficie viva:** 36 documenti · **piani:** 11 · **archivio:** 3 file superati.
 
 ## Root del repo
 
@@ -13,7 +13,7 @@
 - [**Changelog**](../CHANGELOG.md) — All notable changes to this project are documented here. Dates are commit dates. · 61,9 KB
 - [**Contributor Covenant Code of Conduct**](../CODE_OF_CONDUCT.md) — We as members, contributors, and leaders pledge to make participation in our community a · 5,8 KB
 - [**Contributing**](../CONTRIBUTING.md) — This repository is a penetration-testing harness built around one claim: a finding is only a · 4,5 KB
-- [**Cyboros Harness**](../README.md) — A penetration-testing harness where a finding is only a finding if code can prove it — · 15,4 KB
+- [**Cyboros Harness**](../README.md) — A penetration-testing harness where a finding is only a finding if code can prove it — · 15,6 KB
 - [**Security Policy**](../SECURITY.md) — Cyboros Harness is offensive-security tooling. It executes reconnaissance and · 4,1 KB
 - [**Prompt di sessione — benchmark gen-bench**](../bench-session-prompt.md) — Sei Cyboros. Questa sessione è una run di benchmark, non un engagement. · 5,1 KB
 - [**Cyboros — Web Red Team Methodology & Rules of Engagement**](../knowledge.md) — Shared brain for every Cyboros agent — read before acting. Detail lives in docs/ (map at bottom); · 16,2 KB
@@ -22,6 +22,7 @@
 
 ## `docs/` — riferimento
 
+- [**Adopting Cyboros in an organization**](ADOPTION.md) — A due-diligence page for the security lead, the legal reviewer and the procurement · 10,3 KB
 - [**Architecture**](ARCHITECTURE.md) — The whole design follows from one decision: the model decides what to try; the · 11,2 KB
 - [**Glossary**](GLOSSARY.md) — The harness uses a small set of terms with exact meanings. They are load-bearing: · 3,3 KB
 - [**Launch plan**](LAUNCH-PLAN.md) — Most AI pentest agents are built to *find* things. The bottleneck in this field · 13,8 KB
