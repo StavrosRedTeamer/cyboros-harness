@@ -35,6 +35,7 @@
   "files": [
     "tools/",
     "runtime/",
+    "!runtime/providers.json",
     "demo/",
     "docs/",
     "local/",
