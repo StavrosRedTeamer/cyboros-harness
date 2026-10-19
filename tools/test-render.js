@@ -16,7 +16,7 @@
 
 const assert = require('assert');
 const { ok, summary } = require('./testkit');
-const { renderMarkdown, createStream, inline } = require('../runtime/render');
+const { renderMarkdown, createStream, inline, thinkingLine, formatTokens, todoLines } = require('../runtime/render');
 const { layoutBox, layoutMenu, layoutSelect, layoutPlain, wrapRows, strWidth } = require('../runtime/inputline');
 
 const clean = (s) => String(s).replace(/\x1b\[[0-9;]*m/g, '');
@@ -162,6 +162,38 @@ ok('wrapRows keeps source offsets stable across a break', () => {
   assert.ok(rows.length >= 2, 'wrapped');
   for (const r of rows) assert.ok(strWidth(r.text) <= 11, 'row fits');
   assert.strictEqual(rows[0].start, 0, 'first row starts at zero');
+});
+
+ok('formatTokens is compact and never lies about scale', () => {
+  assert.strictEqual(formatTokens(0), '0');
+  assert.strictEqual(formatTokens(950), '950');
+  assert.strictEqual(formatTokens(1200), '1.2k');
+  assert.strictEqual(formatTokens(20300), '20k');
+  assert.strictEqual(formatTokens(-5), '0', 'no negative token count');
+});
+
+ok('the thinking line carries the verb, the time, the tokens and the interrupt hint', () => {
+  const full = thinkingLine({ verb: 'Simmering', secs: 5, tokens: 1234, interruptible: true });
+  assert.strictEqual(full, 'Simmering… (5s · ↑ 1.2k tokens · esc to interrupt)');
+  const early = thinkingLine({ verb: 'Probing', secs: 2, tokens: 0, interruptible: true });
+  assert.ok(!early.includes('tokens'), 'a zero token count is dropped, not shown as 0');
+  assert.ok(early.includes('esc to interrupt'), 'the interrupt hint stays');
+  const quiet = thinkingLine({ verb: 'Thinking', secs: 9, tokens: 500, interruptible: false });
+  assert.ok(!quiet.includes('esc to interrupt'), 'no hint when the turn cannot be interrupted');
+});
+
+ok('the todo panel marks done, active and pending distinctly', () => {
+  const lines = todoLines([
+    { text: 'Map the surface', status: 'done' },
+    { text: 'Probe for SQLi', status: 'active' },
+    { text: 'Report gate', status: 'pending' },
+  ], { color: false });
+  assert.strictEqual(lines.length, 3, 'one line per item');
+  assert.ok(lines[0].startsWith('☒ ') && lines[0].includes('Map the surface'), 'done is a filled box');
+  assert.ok(lines[1].startsWith('◐ ') && lines[1].includes('Probe for SQLi'), 'active is a half moon');
+  assert.ok(lines[2].startsWith('☐ ') && lines[2].includes('Report gate'), 'pending is an empty box');
+  const unknown = todoLines([{ text: 'x' }], { color: false });
+  assert.ok(unknown[0].startsWith('☐ '), 'a missing status falls back to pending');
 });
 
 summary();

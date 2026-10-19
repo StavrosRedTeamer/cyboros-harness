@@ -8,6 +8,31 @@ changes). `v0.1.0` (2026-09-28) is the first tagged release; the latest is `v0.2
 
 ## [Unreleased]
 
+### Added
+
+- **La TUI mostra il piano come la checklist di Claude Code (`/todos`).** `TodoWrite` di Claude
+  Code diventa qui il piano dell'engagement: un riquadro `Update Todos` con `☒` fatto, `◐` in
+  corso, `☐` da fare (ascii `[x]`/`[~]`/`[ ]` senza colore). Il walkthrough scriptato lo semina e
+  lo aggiorna mentre avanza; `/todos` lo mostra su richiesta, e senza una run attiva ricade sulla
+  scala delle fasi (`recon-map → report`) con la fase corrente «in corso». Reso puro e testabile
+  in `runtime/render.js` (`todoLines`), coperto in `tools/test-render.js` e `tools/test-tui.js`.
+- **`esc` interrompe il turno in corso.** Lo spinner lo dichiarava senza che il tasto facesse
+  nulla; ora c'è un watcher raw-mode transitorio installato solo durante un turno (no-op senza
+  TTY, così script e pipe non cambiano). Nel walkthrough scriptato `esc` ferma la run all'istante
+  e stampa `⎿ Interrupted by user`; nel loop live corre contro la richiesta al provider e
+  restituisce subito il prompt (la richiesta in volo non è annullabile — l'agent loop non ha un
+  hook di abort — ma il rendering si ferma). L'approval cede e riprende la tastiera così i due
+  lettori di stdin non si contendono il terminale.
+
+### Changed
+
+- **Lo spinner «thinking» è quello di Claude Code.** Da `✻ Thinking… 5s` a
+  `✻ Simmering… (5s · ↑ 1.2k tokens · esc to interrupt)`: verbo che ruota da un pool che mescola
+  la verbosità di Claude Code con i verbi che l'harness fa davvero (Enumerating, Probing,
+  Triangulating…), secondi trascorsi, conteggio token live e il suggerimento di interruzione. Il
+  conteggio a zero sparisce invece di mostrarsi `0`. Formattazione pura in `runtime/render.js`
+  (`thinkingLine`, `formatTokens`).
+
 ## [0.2.0] — 2026-10-20
 
 ### Fixed

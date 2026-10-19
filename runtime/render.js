@@ -315,4 +315,60 @@ function createStream(opts = {}) {
   };
 }
 
-module.exports = { renderMarkdown, createStream, wrap, len, visible, inline, paint, S };
+// ── the "thinking" status line ─────────────────────────────────────────────
+// Claude Code's spinner is a rotating verb, the elapsed time, an optional token
+// counter and the interrupt hint — "✻ Simmering… (5s · ↑ 1.2k tokens · esc to
+// interrupt)". This owns the text; the TUI owns the pulsing glyph in front of it.
+// The verb pool mixes Claude Code's whimsy with the words this harness actually
+// does, so a pentest run reads like one.
+const THINKING_VERBS = [
+  'Thinking', 'Pondering', 'Cogitating', 'Ruminating', 'Percolating',
+  'Simmering', 'Noodling', 'Mulling', 'Deliberating', 'Reasoning',
+  'Enumerating', 'Probing', 'Correlating', 'Triangulating', 'Reconnoitring',
+  'Fingerprinting', 'Profiling', 'Sifting', 'Pivoting', 'Marshalling',
+];
+
+function formatTokens(n) {
+  const v = Math.max(0, Math.round(Number(n) || 0));
+  if (v < 1000) return String(v);
+  if (v < 10000) return (v / 1000).toFixed(1).replace(/\.0$/, '') + 'k';
+  return Math.round(v / 1000) + 'k';
+}
+
+// Returned WITHOUT the leading glyph (the animator pulses that) and without
+// colour (the caller dims the whole thing): "Simmering… (5s · ↑ 1.2k tokens · esc
+// to interrupt)". `tokens` is dropped when zero so an early turn is not noisy.
+function thinkingLine(opts = {}) {
+  const verb = opts.verb || THINKING_VERBS[0];
+  const secs = Math.max(0, Math.round(opts.secs || 0));
+  const bits = [`${secs}s`];
+  const tok = Math.round(Number(opts.tokens) || 0);
+  if (tok > 0) bits.push(`↑ ${formatTokens(tok)} tokens`);
+  if (opts.interruptible) bits.push('esc to interrupt');
+  return `${verb}… (${bits.join(' · ')})`;
+}
+
+// ── the todo / plan panel ──────────────────────────────────────────────────
+// Claude Code renders TodoWrite as a checklist: a filled box for done, a half
+// moon for the one in progress, an empty box for the rest. Here the checklist is
+// the engagement plan — phases and classes — so the operator sees coverage the
+// way they see the model's own task list. One styled string per item; the TUI
+// hangs them off `⎿` the way it hangs a tool result.
+const TODO_GLYPH = { done: '☒', active: '◐', pending: '☐' };
+
+function todoLines(items, opts = {}) {
+  const color = !!opts.color;
+  return (items || []).map((it) => {
+    const status = it && it.status ? it.status : 'pending';
+    const glyph = TODO_GLYPH[status] || TODO_GLYPH.pending;
+    const text = String(it && it.text != null ? it.text : '');
+    if (status === 'done') return `${paint(S.dim, glyph, color)} ${paint(S.dim, text, color)}`;
+    if (status === 'active') return `${paint(S.cyan, glyph, color)} ${paint(S.bold, text, color)}`;
+    return `${glyph} ${text}`;
+  });
+}
+
+module.exports = {
+  renderMarkdown, createStream, wrap, len, visible, inline, paint, S,
+  THINKING_VERBS, formatTokens, thinkingLine, todoLines, TODO_GLYPH,
+};
