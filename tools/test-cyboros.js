@@ -134,6 +134,55 @@ function fakeRunBin(bin) {
     db2.close();
   })();
 }).then(() => {
+  // ---- resume overlaps scan ‖ enumerate: the two independent phases interleave ----
+  // A tracing runBin records the order spawns START. scan does `await naabu` then `nmap`, so
+  // nmap only starts after naabu resolves; enumerate launches `ffuf` synchronously. If the two
+  // phases overlap, ffuf's start is recorded before nmap's; if they ran sequentially, scan would
+  // finish (nmap started) before enumerate's ffuf ever started.
+  const db3 = state.open(path.join(tmpDir, 'state3.db'));
+  const startOrder = [];
+  const delays = { naabu: 25, nmap: 5, ffuf: 5, arjun: 5 }; // naabu slow enough to expose ordering
+  const tracingRunBin = async (bin, args, o) => {
+    startOrder.push(bin);
+    await new Promise((r) => setTimeout(r, delays[bin] || 1));
+    return fakeRunBin(bin, args, o);
+  };
+  return (async () => {
+    // seed a run with recon already done, so resume goes straight to scan ‖ enumerate
+    await cyboros.recon(db3, 'overlap.example.com', { runBin: tracingRunBin, tmpDir });
+    const res = await cyboros.resume(db3, { runBin: tracingRunBin, tmpDir, noauthScript: '' });
+    assert.strictEqual(res.resumed, true);
+    assert.deepStrictEqual(res.results, { recon: 'skipped', scan: 'done', enumerate: 'done' }, JSON.stringify(res.results));
+    const iFfuf = startOrder.indexOf('ffuf');
+    const iNmap = startOrder.indexOf('nmap');
+    assert.ok(iFfuf >= 0 && iNmap >= 0, 'both phases spawned their tools: ' + JSON.stringify(startOrder));
+    assert.ok(iFfuf < iNmap, 'scan ‖ enumerate overlap: ffuf must start before nmap, got ' + JSON.stringify(startOrder));
+    assert.strictEqual(state.lastRun(db3).status, 'done', 'overlapped resume finishes the run');
+    db3.close();
+  })();
+}).then(() => {
+  // ---- a failed phase in the parallel group rejects resume and leaves the run 'running' ----
+  const db4 = state.open(path.join(tmpDir, 'state4.db'));
+  // scan fails (nmap + port pre-scan error), enumerate succeeds; allSettled lets enumerate still
+  // record 'done' while resume rejects and the run stays open for a later retry.
+  const failingScanRunBin = async (bin, args, o) => {
+    if (bin === 'naabu' || bin === 'rustscan' || bin === 'nmap') throw new Error('scan boom');
+    return fakeRunBin(bin, args, o);
+  };
+  return (async () => {
+    await cyboros.recon(db4, 'fail.example.com', { runBin: failingScanRunBin, tmpDir });
+    const run = state.lastRun(db4);
+    await assert.rejects(
+      cyboros.resume(db4, { runBin: failingScanRunBin, tmpDir, noauthScript: '' }),
+      /scan boom/,
+      'resume rejects when a parallel phase throws'
+    );
+    assert.strictEqual(state.getPhase(db4, run.id, 'scan').status, 'failed', 'scan phase recorded failed');
+    assert.strictEqual(state.getPhase(db4, run.id, 'enumerate').status, 'done', 'enumerate still completed (allSettled)');
+    assert.strictEqual(state.lastRun(db4).status, 'running', 'run stays running for a later resume');
+    db4.close();
+  })();
+}).then(() => {
   // ---- defaultRunBin fail-closed (scope-check + no-host), no subprocess spawned ----
   const scopeFile = path.join(tmpDir, 'scope.json');
   fs.writeFileSync(scopeFile, JSON.stringify({ allowed_hosts: ['example.com'], allowed_ips: [], max_requests_per_second: 100 }));

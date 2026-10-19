@@ -551,18 +551,38 @@ async function resume(db, opts) {
   if (run.status === 'done') return { resumed: false, reason: 'last run already done', run: run.id };
   if (!run.target) return { resumed: false, reason: 'last run has no target', run: run.id };
   const results = {};
-  for (const name of PHASES) {
-    const ph = state.getPhase(db, run.id, name);
-    if (ph && ph.status === 'done') {
-      results[name] = 'skipped';
-      continue;
-    }
-    const phaseOpts = Object.assign({}, opts, { runId: run.id });
-    if (name === 'recon') await recon(db, run.target, phaseOpts);
-    else if (name === 'scan') await scan(db, run.target, phaseOpts);
-    else await enumerate(db, run.target, phaseOpts);
-    results[name] = 'done';
+  const phaseOpts = Object.assign({}, opts, { runId: run.id });
+
+  // recon first, as a barrier: it discovers the host list and runs httpx liveness. It is the
+  // cheap/fast phase, and keeping it ahead preserves the natural ordering of a run.
+  const reconPh = state.getPhase(db, run.id, 'recon');
+  if (reconPh && reconPh.status === 'done') results.recon = 'skipped';
+  else { await recon(db, run.target, phaseOpts); results.recon = 'done'; }
+
+  // scan (ports via nmap) and enumerate (web dirs/params) are independent: they re-derive from
+  // the target, never read each other's output, and write disjoint tables (ports vs endpoints).
+  // Overlap them so the two slow spawns (nmap / ffuf) progress concurrently. The pace gate stays
+  // a true global ceiling — it is per-spawn and non-blocking (pace.waitAsync) — and node:sqlite
+  // writes are synchronous and atomic, so interleaving on the single JS thread is safe.
+  // allSettled (not all) lets each phase record its own done/failed row even when its sibling
+  // throws: no floating promise is left writing to the db after resume has returned.
+  const parallel = [
+    { name: 'scan', fn: () => scan(db, run.target, phaseOpts) },
+    { name: 'enumerate', fn: () => enumerate(db, run.target, phaseOpts) },
+  ];
+  const toRun = [];
+  for (const p of parallel) {
+    const ph = state.getPhase(db, run.id, p.name);
+    if (ph && ph.status === 'done') results[p.name] = 'skipped';
+    else toRun.push(p);
   }
+  const settled = await Promise.allSettled(toRun.map((p) => p.fn()));
+  settled.forEach((s, i) => { results[toRun[i].name] = s.status === 'fulfilled' ? 'done' : 'failed'; });
+  const failed = settled.find((s) => s.status === 'rejected');
+  // A failed phase leaves the run 'running' (not finished) so a later resume retries just it;
+  // same contract as the old sequential loop, which also aborted without finishing the run.
+  if (failed) throw failed.reason;
+
   state.finishRun(db, run.id, 'done');
   return { resumed: true, run: run.id, target: run.target, results };
 }
