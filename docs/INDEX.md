@@ -4,7 +4,7 @@
 > dimensione, avanzamento delle checkbox dei piani). Non si modifica a mano: rigeneralo.
 > `tools/test-repo-invariants.js` fallisce se è rimasto indietro rispetto ai file.
 
-**Superficie viva:** 39 documenti · **piani:** 11 · **archivio:** 3 file superati.
+**Superficie viva:** 39 documenti · **piani:** 12 · **archivio:** 3 file superati.
 
 ## Root del repo
 
@@ -36,7 +36,7 @@
 - [**Alternative-tools audit — what the harness should adopt, borrow, or leave alone**](TOOL-ALTERNATIVES-AUDIT.md) — Three concrete gaps, in priority order: · 26,1 KB
 - [**What the published benchmarks measure, and what they leave out**](TOOL-LANDSCAPE.md) — As of mid-2026 there is real, serious work here, and none of it is · 6,3 KB
 - [**Upgrading an installation**](UPGRADING.md) — Two things move independently: the code (checkout or image) and the data · 4,3 KB
-- [**Cyboros Command Center — Desktop Edition (piano e work package)**](command-center-desktop.md) — Obiettivo. Portare il Command Center da dashboard web a programma desktop (`cyboros-cc`) · 25,7 KB
+- [**Cyboros Command Center — Desktop Edition (piano e work package)**](command-center-desktop.md) — Obiettivo. Portare il Command Center da dashboard web a programma desktop (`cyboros-cc`) · 27,2 KB
 - [**Community scout #2 — web, HN e community, 2026-10-04 → 2026-10-09**](community-scout-2026-10-09.md) — OpenAPI/GraphQL SDL/WSDL/.proto. Pipeline a due stadi — cattura una volta, genera (anche · 30,1 KB
 - [**Community scout — Reddit pentest/redteam, ottobre 2026**](community-scout-2026-10.md) — *supervised*, guardia obbligatoria al confine di esecuzione, finding legati a ricevute · 23,1 KB
 - [**Egress gateway & anonymized egress (red-team OPSEC)**](egress-opsec.md) — To force third-party HTTP(S) binaries through the scope allowlist, start the proxy first: · 2,4 KB
@@ -61,6 +61,7 @@
 - [**F3 — Arsenale completo + root: Implementation Plan**](superpowers/plans/2026-09-30-f3-arsenal-and-root.md) — Goal: portare il Poco F3 (client *e* target mobile della harness) alla parità con l'arsenale · 23,8 KB · 0/40 check
 - [**Simulazione del forum con admin abliterato — piano**](superpowers/plans/2026-10-01-forum-admin.md) — Data: 2026-10-01 · Stato: F0–F3 fatti (server, wrapper, runtime dell'agente); F4–F5 aperti · 4,3 KB
 - [**Cyboros Harness Rebrand Implementation Plan**](superpowers/plans/2026-10-13-cyboros-rebrand-plan.md) — Goal: Il repository si presenta, si invoca e si arma come Cyboros Harness — nome, binari, · 58,5 KB · 79/84 check
+- [**Reinsert Pro Theme, Guide and Chat into the Identity-era Console — Implementation Plan**](superpowers/plans/2026-10-21-gui-pro-theme-chat-reinsertion.md) — Goal: Bring the professional theme overlay, the interactive guide, and the OpenAI-style Chat view — all built on branch `feat/gui-pro-theme-guide` (co · 23,1 KB · 0/33 check
 - [**Stavros Radar — Design Specification**](superpowers/specs/2026-09-08-stavros-radar-design.md) — Status: Approved · 7,6 KB
 - [**Ondata 7 — Integrità e promozione della prova (design spec)**](superpowers/specs/2026-09-28-findings-integrity-design.md) — Data: 2026-09-28 · Repo: stavrosredteamer · Stato: design, in attesa di revisione · 12,7 KB
 - [**Forum agentico con admin — design spec (F0)**](superpowers/specs/2026-10-01-forum-admin-design.md) — Data: 2026-10-01 · Repo: stavrosredteamer · Stato: congelato per F1–F2 · 4,8 KB

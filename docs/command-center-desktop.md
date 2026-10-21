@@ -378,6 +378,28 @@ ctx del router), `tools/cc-mission.js` (pass-through `counters`/`caps` per burn/
 `tools/run.js` (`--approval`), `tools/c2-guard.js` (policy token), `tools/gui/index.html`,
 `tools/gui/app.js` (renderTab + palette), `tools/gui/app.css` (rail/panel), `docs/f3-client-runbook.md`.
 
+### Stato (sessione 2026-10-21) — tema pro, guida interattiva, chat
+
+Riportate sul ramo principale (piano `superpowers/plans/2026-10-21-gui-pro-theme-chat-reinsertion.md`)
+tre viste che vivevano solo sul branch sperimentale `feat/gui-pro-theme-guide`:
+
+- **Tema**: toggle `#btn-theme` in topbar, persistito in `localStorage['cyboros-theme']`
+  (default **`pro`**, alternativa `cyberdeck`); overlay in `tools/gui/app.pro.css`, applicato
+  via `data-theme` su `<html>`.
+- **Guida interattiva**: pulsante `#btn-guide` (o tasto **`?`**/**F1**), `tools/gui/guide.js` —
+  zero-dipendenze, overlay con indice ricercabile e tour spotlight sul chrome reale; non parla
+  mai col backend (nessuna egress nuova).
+- **Chat**: vista `tools/gui/views-chat.js` sopra `/api/chat` e `/api/chat/profiles`
+  (`tools/console/chat.js` + `tools/console/routes/chat.js`), superficie conversazionale stile
+  OpenAI sugli stessi provider dell'agente (`runtime/providers.json`): nessun tool, nessun
+  guard, solo conversazione. Profili locali (llama su loopback) di default; i profili cloud
+  compaiono solo se `allow_cloud` è attivo in config e la chiave è presente. **Role-gated**:
+  lettura profili aperta a `viewer`+, l'avvio conversazione (`POST /api/chat`) richiede
+  `operator`+, lo stesso cancello di scrittura delle altre route.
+
+La vista **Users/admin** (ruoli, account, audit) non nasce da questo piano: è il lavoro identity
+già atterrato in `tools/gui/views-admin.js`, documentato in `docs/IDENTITY.md` — non duplicato qui.
+
 **Prossimo passo concreto** per chi riprende: implementare le notifiche desktop + discreet mode in
 `cyboros-cc.py` (WP2), il retest diff in Reports (WP6), l'install con conferma tipizzata (WP7) e l'audit
 tastiera (WP8).
