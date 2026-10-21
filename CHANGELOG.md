@@ -79,6 +79,15 @@ changes). `v0.1.0` (2026-09-28) is the first tagged release; the latest is `v0.2
   conteggio a zero sparisce invece di mostrarsi `0`. Formattazione pura in `runtime/render.js`
   (`thinkingLine`, `formatTokens`).
 
+### Fixed
+
+- **Il demo del Command Center non può più leggere i dati veri dell'operatore.** `CC_ROOT` da solo
+  non bastava: graph, ledger e coverage leggono ognuno la propria variabile (`STATE_DB`,
+  `ARTIFACT_LEDGER_FILE`, `AUDIT_DIR`, `SESSIONS_JSON`, `LOOT_JSONL`…), che senza override punta
+  al repo — così i pannelli mostravano host di clienti reali. Ora `scripts/demo-command-center.sh`
+  redirige ogni variabile nella root usa-e-getta e si rifiuta di partire se una è rimasta fuori
+  (fail closed).
+
 ## [0.2.0] — 2026-10-20
 
 ### Fixed

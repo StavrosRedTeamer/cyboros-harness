@@ -381,7 +381,7 @@ ctx del router), `tools/cc-mission.js` (pass-through `counters`/`caps` per burn/
 ### Stato (sessione 2026-10-21) — tema pro, guida interattiva, chat
 
 Riportate sul ramo principale (piano `superpowers/plans/2026-10-21-gui-pro-theme-chat-reinsertion.md`)
-tre viste che vivevano solo sul branch sperimentale `feat/gui-pro-theme-guide`:
+tre viste che vivevano solo sul branch sperimentale `feat/gui-pro-theme-guide` (ritirato dopo il merge, insieme a `tui-claude-code-fidelity`: ora esiste solo `master`):
 
 - **Tema**: toggle `#btn-theme` in topbar, persistito in `localStorage['cyboros-theme']`
   (default **`pro`**, alternativa `cyberdeck`); overlay in `tools/gui/app.pro.css`, applicato

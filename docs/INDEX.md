@@ -10,7 +10,7 @@
 
 - [**AGENTS.md — Cyboros Harness**](../AGENTS.md) — Operatore AI per operazioni di pentest autorizzate (web/host, wireless, mobile). · 5,5 KB
 - [**Benchmark**](../BENCHMARK.md) — Public security benchmarks are in the model's training data. "Solved" on OWASP Juice · 15,6 KB
-- [**Changelog**](../CHANGELOG.md) — All notable changes to this project are documented here. Dates are commit dates. · 67,3 KB
+- [**Changelog**](../CHANGELOG.md) — All notable changes to this project are documented here. Dates are commit dates. · 67,8 KB
 - [**Contributor Covenant Code of Conduct**](../CODE_OF_CONDUCT.md) — We as members, contributors, and leaders pledge to make participation in our community a · 5,8 KB
 - [**Contributing**](../CONTRIBUTING.md) — This repository is a penetration-testing harness built around one claim: a finding is only a · 5,8 KB
 - [**Cyboros Harness**](../README.md) — A penetration-testing harness where a finding is only a finding if code can prove it — · 20,9 KB
@@ -61,7 +61,7 @@
 - [**F3 — Arsenale completo + root: Implementation Plan**](superpowers/plans/2026-09-30-f3-arsenal-and-root.md) — Goal: portare il Poco F3 (client *e* target mobile della harness) alla parità con l'arsenale · 23,8 KB · 0/40 check
 - [**Simulazione del forum con admin abliterato — piano**](superpowers/plans/2026-10-01-forum-admin.md) — Data: 2026-10-01 · Stato: F0–F3 fatti (server, wrapper, runtime dell'agente); F4–F5 aperti · 4,3 KB
 - [**Cyboros Harness Rebrand Implementation Plan**](superpowers/plans/2026-10-13-cyboros-rebrand-plan.md) — Goal: Il repository si presenta, si invoca e si arma come Cyboros Harness — nome, binari, · 58,5 KB · 79/84 check
-- [**Reinsert Pro Theme, Guide and Chat into the Identity-era Console — Implementation Plan**](superpowers/plans/2026-10-21-gui-pro-theme-chat-reinsertion.md) — Goal: Bring the professional theme overlay, the interactive guide, and the OpenAI-style Chat view — all built on branch `feat/gui-pro-theme-guide` (co · 23,1 KB · 0/33 check
+- [**Reinsert Pro Theme, Guide and Chat into the Identity-era Console — Implementation Plan**](superpowers/plans/2026-10-21-gui-pro-theme-chat-reinsertion.md) — Goal: Bring the professional theme overlay, the interactive guide, and the OpenAI-style Chat view — all built on branch `feat/gui-pro-theme-guide` (co · 23,6 KB · 0/33 check
 - [**Stavros Radar — Design Specification**](superpowers/specs/2026-09-08-stavros-radar-design.md) — Status: Approved · 7,6 KB
 - [**Ondata 7 — Integrità e promozione della prova (design spec)**](superpowers/specs/2026-09-28-findings-integrity-design.md) — Data: 2026-09-28 · Repo: stavrosredteamer · Stato: design, in attesa di revisione · 12,7 KB
 - [**Forum agentico con admin — design spec (F0)**](superpowers/specs/2026-10-01-forum-admin-design.md) — Data: 2026-10-01 · Repo: stavrosredteamer · Stato: congelato per F1–F2 · 4,8 KB

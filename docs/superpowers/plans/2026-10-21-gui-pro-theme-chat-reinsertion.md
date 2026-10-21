@@ -2,6 +2,11 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
+> **Stato (2026-10-21): completato e branch ritirato.** Il lavoro è su `master`; `feat/gui-pro-theme-guide`
+> non esiste più (locale e `origin`), quindi i commit citati qui sotto sono riferimenti storici, non
+> qualcosa da recuperare. L'unica parte del branch che non era già stata reimplementata — l'isolamento
+> fail-closed di `scripts/demo-command-center.sh` — è stata portata su `master` prima della rimozione.
+
 **Goal:** Bring the professional theme overlay, the interactive guide, and the OpenAI-style Chat view — all built on branch `feat/gui-pro-theme-guide` (commit `4ec6db8`) — into the current `master` working tree, which has since diverged with an unrelated identity/role/config rewrite of the same GUI (`tools/console/*`, `tools/identity.js`, `tools/config.js`, login/users).
 
 **Architecture:** `master` and `feat/gui-pro-theme-guide` are sibling branches off the same `v0.2.0` release (`de9be27`); neither has the other's work, and a textual merge is not possible because `tools/gui-server.js` was gutted from ~955 lines to a 239-line composition root on `master`. This plan re-implements the branch's three features *on top of* the new `tools/console/` architecture: the theme (CSS+JS) and guide (JS) are additive and copy over with only wiring changes; the Chat view's backend (~120 lines that lived inline in the old `gui-server.js`) becomes a new `tools/console/chat.js` module + `tools/console/routes/chat.js` route family, and its frontend is ported from the old token-in-`sessionStorage` auth to the new cookie-based `api()`/role model.
