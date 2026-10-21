@@ -184,6 +184,13 @@ function auditLines() {
   assert.strictEqual((await call(port, 'DELETE', '/api/users/alice', { cookie: rootCookie })).status, 200);
   assert.strictEqual((await call(port, 'GET', '/api/overview', { cookie: aliceCookie })).status, 401, 'a removed user loses the session');
 
+  // ── chat: conversation, not an engagement action — but still gated by role ──
+  assert.strictEqual((await call(port, 'GET', '/api/chat/profiles', { cookie: viewCookie })).status, 200, 'viewer may read chat profiles');
+  assert.strictEqual((await call(port, 'POST', '/api/chat', { cookie: viewCookie, body: { messages: [{ role: 'user', content: 'hi' }] } })).status, 403, 'viewer cannot start a chat');
+  assert.strictEqual((await call(port, 'POST', '/api/chat', { body: { messages: [{ role: 'user', content: 'hi' }] } })).status, 401, 'anonymous cannot start a chat');
+  const opChat = await call(port, 'POST', '/api/chat', { cookie: opaCookie, body: { messages: [{ role: 'user', content: 'hi' }] } });
+  assert.strictEqual(opChat.status, 500, 'operator passes the role gate and reaches the handler (no provider config in this sandbox, so it fails past auth, not at it)');
+
   // ── the machine token: operator, never admin ────────────────────────────
   assert.strictEqual((await call(port, 'GET', '/api/overview', { token: SERVICE_TOKEN })).status, 200, 'service token reads');
   assert.strictEqual((await call(port, 'GET', '/api/users', { token: SERVICE_TOKEN })).status, 403, 'service token cannot manage accounts');
