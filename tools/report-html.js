@@ -8,6 +8,7 @@
 const fs = require('fs');
 const path = require('path');
 const state = require('./state');
+const { dataPaths } = require('./config');
 const { buildChains } = require('./chain');
 const { calculate } = require('./cvss');
 const { lookupCwe, lookupMaxEpss, normCve } = require('./epss');
@@ -70,7 +71,7 @@ function loadJsonl(file) {
 }
 
 function loadFindings(file) {
-  return loadJsonl(file || process.env.FINDINGS_JSONL || path.join(__dirname, '..', 'reports', 'findings.jsonl'));
+  return loadJsonl(file || process.env.FINDINGS_JSONL || dataPaths().findings);
 }
 
 // searchsploit.jsonl records -> { CVE: [record, ...] }
@@ -178,42 +179,42 @@ function fmtCost(c) {
 }
 function accountingSection(acc) {
   if (!acc || !acc.session || !acc.session.invocations) {
-    return '<p class="muted">Nessun dato di usage: fornisci i token via <code>--tokens in,out</code> / <code>RUN_TOKENS_IN/OUT</code> (vedi tools/accounting.js).</p>';
+    return '<p class="muted">No usage data recorded: token counts are included only when the operator supplies them (<code>--tokens in,out</code> / <code>RUN_TOKENS_IN/OUT</code>).</p>';
   }
   const s = acc.session;
   const parts = [];
-  parts.push(`<p class="cov-flow"><strong>${s.invocations}</strong> invocazioni · <strong>${s.tokens}</strong> token (${s.tokens_in} in / ${s.tokens_out} out) · costo ${s.cost != null ? `<strong>${fmtCost(s.cost)}</strong>` : '<em>non noto</em>'}</p>`);
-  const table = (title, rows) => `<h3>${title}</h3><table><thead><tr><th>Chiave</th><th class="num">Inv.</th><th class="num">Token in</th><th class="num">Token out</th><th class="num">Token</th><th class="num">Costo</th></tr></thead><tbody>${rows.map(([k, v]) => `<tr><td>${htmlEscape(k)}</td><td class="num">${v.invocations}</td><td class="num">${v.tokens_in}</td><td class="num">${v.tokens_out}</td><td class="num">${v.tokens}</td><td class="num">${fmtCost(v.cost)}</td></tr>`).join('\n')}</tbody></table>`;
+  parts.push(`<p class="cov-flow"><strong>${s.invocations}</strong> invocations · <strong>${s.tokens}</strong> tokens (${s.tokens_in} in / ${s.tokens_out} out) · cost ${s.cost != null ? `<strong>${fmtCost(s.cost)}</strong>` : '<em>not recorded</em>'}</p>`);
+  const table = (title, rows) => `<h3>${title}</h3><table><thead><tr><th>Key</th><th class="num">Runs</th><th class="num">Tokens in</th><th class="num">Tokens out</th><th class="num">Tokens</th><th class="num">Cost</th></tr></thead><tbody>${rows.map(([k, v]) => `<tr><td>${htmlEscape(k)}</td><td class="num">${v.invocations}</td><td class="num">${v.tokens_in}</td><td class="num">${v.tokens_out}</td><td class="num">${v.tokens}</td><td class="num">${fmtCost(v.cost)}</td></tr>`).join('\n')}</tbody></table>`;
   const byAction = Object.entries(acc.actions && acc.actions.per_bin ? acc.actions.per_bin : {})
     .sort((a, b) => b[1].tokens - a[1].tokens);
-  if (byAction.length) parts.push(table('Per azione (bin)', byAction));
+  if (byAction.length) parts.push(table('By action (tool)', byAction));
   const byAgent = Object.entries(acc.agents && acc.agents.per_agent ? acc.agents.per_agent : {})
     .sort((a, b) => b[1].tokens - a[1].tokens);
-  if (byAgent.length) parts.push(table('Per agente', byAgent));
-  parts.push('<p class="muted">Costo = solo se fornito dall\'operatore (env/cli): mai calcolato, mai chiamate a API di pricing. La colonna usage è ADDITIVA sui record nuovi; la hash-chain A3 dei findings non è mai riscritta.</p>');
+  if (byAgent.length) parts.push(table('By agent', byAgent));
+  parts.push('<p class="muted">Cost is reported only when the operator supplies it: never estimated, never fetched from a pricing API. Usage is additive on new records; the findings hash chain is never rewritten.</p>');
   return parts.join('\n');
 }
 
 // B2 — «Copertura & accuratezza» auto-generated section (candidates → verified → discarded
 // FPs → untested areas WITH cause). Data comes from coverage.buildMatrix + findings statuses.
 function coverageSection(coverage) {
-  if (!coverage || !coverage.hosts || !coverage.hosts.length) return '<p class="muted">Nessun dato di copertura disponibile (serve reports/&lt;host&gt;-map.json + findings).</p>';
+  if (!coverage || !coverage.hosts || !coverage.hosts.length) return '<p class="muted">No coverage data available yet (a target map and findings are required).</p>';
   const t = coverage.totals;
   const parts = [];
-  parts.push(`<p class="cov-flow"><strong>${t.candidatesTotal}</strong> candidati → <strong>${t.verified}</strong> verificati/confermati · <strong>${t.fpDiscarded}</strong> FP/inconclusivi scartati · <strong>${t.untestedTotal}</strong> aree non testate</p>`);
+  parts.push(`<p class="cov-flow"><strong>${t.candidatesTotal}</strong> candidates → <strong>${t.verified}</strong> verified or confirmed · <strong>${t.fpDiscarded}</strong> false positives / inconclusive discarded · <strong>${t.untestedTotal}</strong> untested areas</p>`);
   for (const h of coverage.hosts) {
     parts.push(`<section class="target cov-host">
       <h3>${htmlEscape(h.summary.host)}</h3>
       <table>
-        <thead><tr><th>Classe</th><th class="num">Candidati</th><th class="num">Findings</th><th>Stato</th><th>Causa (se nota)</th></tr></thead>
+        <thead><tr><th>Class</th><th class="num">Candidates</th><th class="num">Findings</th><th>Status</th><th>Cause (if known)</th></tr></thead>
         <tbody>
           ${h.matrix.rows.map((r) => `<tr><td>${htmlEscape(r.class)}</td><td class="num">${r.candidates || 0}</td><td class="num">${r.findings || 0}</td><td>${htmlEscape(r.status)}${r.skip_reason ? ' <span class="tag">skip_reason</span>' : ''}</td><td class="muted">${htmlEscape(r.skip_reason || '')}</td></tr>`).join('\n')}
         </tbody>
       </table>
-      ${h.summary.untested.length ? `<p class="muted">Non testate: ${h.summary.untested.map((u) => `${htmlEscape(u.class)} (${htmlEscape(u.cause)})`).join(' · ')}</p>` : '<p class="muted">Nessuna classe rimasta non testata per questo host.</p>'}
+      ${h.summary.untested.length ? `<p class="muted">Untested: ${h.summary.untested.map((u) => `${htmlEscape(u.class)} (${htmlEscape(u.cause)})`).join(' · ')}</p>` : '<p class="muted">No untested class remains for this host.</p>'}
     </section>`);
   }
-  parts.push('<p class="muted">Legenda stati: tested = sonda eseguita (esito negativo = risultato valido) · confirmed = finding registrato · n-a = nessuna superficie candidata · missed = NON testato. Gli scarti contano gli status false-positive e inconclusive.</p>');
+  parts.push('<p class="muted">Status legend: tested = the probe ran (a negative result is still a result) · confirmed = a finding was recorded · n-a = no candidate surface · missed = NOT tested. “Discarded” counts the false-positive and inconclusive statuses.</p>');
   return parts.join('\n');
 }
 
@@ -226,7 +227,7 @@ function chainsSection(chains) {
 }
 
 function reconSection(targets) {
-  if (!targets || !targets.length) return '<p class="muted">No recon data in state.db yet (run cyboros.js recon/scan/enumerate).</p>';
+  if (!targets || !targets.length) return '<p class="muted">No reconnaissance data recorded yet.</p>';
   return targets.map((t) => `<section class="target">
     <h3>${htmlEscape(t.target)}</h3>
     ${t.hosts.map((h) => `<div class="host">
@@ -277,7 +278,7 @@ function buildHtml(data) {
 <body>
 <div class="wrap">
   <h1>Cyboros Red Team Report</h1>
-  <p class="muted">Generated ${htmlEscape(generatedAt)} &middot; authorized targets only (scope.json)</p>
+  <p class="muted">Generated ${htmlEscape(generatedAt)} &middot; authorized targets only</p>
 
   <div class="kpis">
     <div class="kpi"><b>${s.total}</b><span>findings</span></div>
@@ -294,19 +295,19 @@ function buildHtml(data) {
     <tbody>${findingsRows(findings, d.sploitByCve || {})}</tbody>
   </table>` : '<p class="muted">No findings recorded yet.</p>'}
 
-  <h2>Copertura &amp; accuratezza</h2>
+  <h2>Coverage &amp; accuracy</h2>
   ${coverageSection(d.coverage)}
 
-  <h2>Costi &amp; usage (F8)</h2>
+  <h2>Cost &amp; usage</h2>
   ${accountingSection(d.accounting)}
 
   <h2>Attack chains</h2>
   ${chainsSection(d.chains)}
 
-  <h2>Reconnaissance (state.db)</h2>
+  <h2>Reconnaissance</h2>
   ${reconSection(d.targets)}
 
-  <footer>Auto-generated by tools/report-html.js. Markdown report remains the source of truth; this is a consolidated view. Contains ${s.withCvss}/${s.total} findings with CVSS and ${s.withEpss}/${s.total} with EPSS.</footer>
+  <footer>Auto-generated report. The Markdown report remains the source of truth; this is a consolidated view. ${s.withCvss}/${s.total} findings carry CVSS and ${s.withEpss}/${s.total} carry EPSS.</footer>
 </div>
 </body>
 </html>
@@ -319,17 +320,19 @@ function main() {
   const findingsFile = opt('--findings');
   const stateFile = opt('--state');
   const sploitFile = opt('--sploit');
-  const outFile = opt('--out') || path.join(__dirname, '..', 'reports', 'report.html');
+  // One resolution for the whole run: the engagement this report belongs to.
+  const P = dataPaths();
+  const outFile = opt('--out') || path.join(P.reports, 'report.html');
   const hostFilter = opt('--host');
   const reportsDir = opt('--reports-dir'); // B2: injectable map-file dir (tests/rollups)
-  const findingsFileUsed = findingsFile || process.env.FINDINGS_JSONL || path.join(__dirname, '..', 'reports', 'findings.jsonl');
+  const findingsFileUsed = findingsFile || process.env.FINDINGS_JSONL || P.findings;
 
   // Gate check: report generation requires the report gate to have PASSed in gate-log.md.
   // This is the deterministic enforcement boundary (same as dsh-sec-enforce reportGate).
   // SCOPED BY HOST: a pass recorded for another engagement is not a pass for this report.
   // Prima bastava `l.includes('cyboros/report') && l.includes('pass')` su QUALSIASI riga: il
   // report di un host poteva uscire grazie al gate passato da un ingaggio diverso.
-  const gateLog = path.join(__dirname, '..', 'reports', 'gate-log.md');
+  const gateLog = P.gateLog;
   const skipGate = argv.includes('--skip-gate');
   const gateHost = hostFilter;
   if (!skipGate) {

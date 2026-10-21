@@ -93,20 +93,23 @@ async function req(port, pathname, opts) {
   assert.strictEqual(inst.body.tokenRequired, true);
   assert.strictEqual(inst.body.pid, s1.child.pid);
 
-  // ── data reads stay loopback-trusted (unchanged exposure) ────────────────
-  assert.strictEqual((await req(port, '/api/overview')).status, 200);
-  assert.strictEqual((await req(port, '/api/scope')).status, 200);
+  // ── data reads are authenticated: no anonymous session, no client data ───
+  const anonRead = await req(port, '/api/overview');
+  assert.strictEqual(anonRead.status, 401, 'read without a credential → 401');
+  assert.strictEqual(anonRead.body.authRequired, true);
+  assert.strictEqual((await req(port, '/api/overview', { token })).status, 200);
+  assert.strictEqual((await req(port, '/api/scope', { token })).status, 200);
 
   // ── writes: refused without / with a wrong token ─────────────────────────
   const noTok = await req(port, '/api/term/input', { method: 'POST', body: { name: 'freebuff', data: '' } });
-  assert.strictEqual(noTok.status, 403, 'POST without token refused');
-  assert.strictEqual(noTok.body.tokenRequired, true);
+  assert.strictEqual(noTok.status, 401, 'POST without a credential → 401');
+  assert.strictEqual(noTok.body.authRequired, true);
   const badTok = await req(port, '/api/term/input', { method: 'POST', token: 'f'.repeat(48), body: { name: 'freebuff', data: '' } });
-  assert.strictEqual(badTok.status, 403, 'POST with a wrong token refused');
+  assert.strictEqual(badTok.status, 401, 'POST with a wrong token → 401');
   const del = await req(port, '/api/pipeline/runs/1', { method: 'DELETE' });
-  assert.strictEqual(del.status, 403, 'DELETE is gated too');
+  assert.strictEqual(del.status, 401, 'DELETE is gated too');
   const stream = await req(port, '/api/term/stream?name=freebuff');
-  assert.strictEqual(stream.status, 403, 'interactive stream gated (header-less)');
+  assert.strictEqual(stream.status, 401, 'interactive stream gated (header-less)');
 
   // ── with the token: accepted (this endpoint is a harmless no-op) ─────────
   const okTok = await req(port, '/api/term/input', { method: 'POST', token, body: { name: 'freebuff', data: '' } });

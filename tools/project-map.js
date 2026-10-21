@@ -182,10 +182,19 @@ const AREAS = [
     modules: [
       'cc-approvals', 'cc-arsenal', 'cc-campaign', 'cc-coverage', 'cc-graph', 'cc-instance',
       'cc-ledger', 'cc-mission', 'cc-panic', 'cc-router', 'cc-util', 'cc-warroom',
-      'gui-server', 'gui/app', 'gui/views-control', 'gui/views-engagement', 'gui/views-warroom',
+      // The backend as a composition: entry point, request pipeline, then one module
+      // per responsibility (transport, gate, route families, jobs, terminals, models).
+      'gui-server',
+      'console/app', 'console/http', 'console/gate', 'console/files',
+      'console/routes/index', 'console/routes/public', 'console/routes/accounts',
+      'console/routes/state', 'console/routes/streams',
+      'console/jobs', 'console/terminals',
+      'console/scope', 'console/findings', 'console/pipeline', 'console/engagement',
+      'gui/app', 'gui/views-control', 'gui/views-engagement', 'gui/views-warroom',
+      'gui/login', 'gui/views-admin', 'identity', 'users', 'config', 'init',
       'portal', 'backfill-findings-tab',
     ],
-    files: ['docs/command-center-desktop.md', 'cyboros-cc'],
+    files: ['docs/command-center-desktop.md', 'cyboros-cc', 'docs/IDENTITY.md'],
   },
   {
     id: 'forum', name: 'Forum agentico', accent: '#c77dff',

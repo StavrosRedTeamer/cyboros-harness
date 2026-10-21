@@ -59,6 +59,36 @@ assert.ok(html.includes('Leaked-secret authorization bypass'));
 assert.ok(html.includes('OpenSSH 8.2'));
 assert.ok(html.includes('verified'));
 
+// The report is a client document: every string in it is product text, in English, and
+// names no engagement file. This is the regression for the sections that were written in
+// Italian (coverage, cost/usage) and for the internal paths the footer and empty states
+// used to carry.
+const localised = R.buildHtml({
+  generatedAt: '2026-08-18T00:00:00.000Z',
+  findings: [],
+  targets: [{ target: 'target.com', hosts: [], endpoints: [] }],
+  chains: [],
+  coverage: {
+    hosts: [{
+      matrix: { rows: [{ class: 'upload', candidates: 3, findings: 1, status: 'tested' }] },
+      summary: { host: 'target.com', candidatesTotal: 3, verified: 1, fpDiscarded: 0, untested: [{ class: 'jwt', cause: 'out of scope' }] },
+    }],
+    totals: { candidatesTotal: 3, verified: 1, fpDiscarded: 0, untestedTotal: 1 },
+  },
+  accounting: {
+    session: { invocations: 2, tokens: 30, tokens_in: 20, tokens_out: 10, cost: null },
+    actions: { per_bin: { nmap: { invocations: 1, tokens_in: 12, tokens_out: 8, tokens: 20, cost: null } } },
+    agents: { per_agent: { scout: { invocations: 1, tokens_in: 8, tokens_out: 2, tokens: 10, cost: null } } },
+  },
+});
+for (const heading of ['Coverage &amp; accuracy', 'Cost &amp; usage', 'Candidates', 'By agent', 'Untested:']) {
+  assert.ok(localised.includes(heading), 'English report heading missing: ' + heading);
+}
+for (const marker of ['Nessun', 'Copertura', 'candidati', 'verificati', 'Legenda', 'Per agente', 'Per azione', 'Costo', 'invocazioni',
+  'state.db', 'scope.json', '-map.json', 'tools/report-html.js']) {
+  assert.ok(!localised.includes(marker), 'non-English or internal text in the client report: ' + marker);
+}
+
 // collectFromState reads targets/hosts/ports from a temp STATE_DB
 const tmpDb = path.join(os.tmpdir(), 'cyboros-report-' + process.pid + '.db');
 try { fs.unlinkSync(tmpDb); } catch {}

@@ -23,10 +23,9 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 
-const WS_ROOT = path.join(__dirname, '..');
 
 function resolveLedgerFile(cli) {
-  return cli.ledger || process.env.ARTIFACT_LEDGER_FILE || path.join(WS_ROOT, 'reports', 'tmp', 'artifact-ledger.jsonl');
+  return cli.ledger || process.env.ARTIFACT_LEDGER_FILE || path.join(require('./config').dataPaths().tmp, 'artifact-ledger.jsonl');
 }
 
 function readEntries(file) {

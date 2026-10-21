@@ -40,6 +40,7 @@ const path = require('path');
 const os = require('os');
 const crypto = require('crypto');
 const { lookupMaxBestEpss, normCve, normCwe } = require('./epss');
+const { dataPaths } = require('./config');
 const { claimingReality, validateOracle } = require('./oracle');
 const { validateQuote } = require('./evidence-quote');
 const chain = require('./chain-log');
@@ -61,8 +62,8 @@ function severityAllowedAt(level, severity) {
   // severe than the level's ceiling, i.e. its index is >= the ceiling's index.
   return SEV.indexOf(severity) >= SEV.indexOf(cap);
 }
-const OUT = () => process.env.FINDINGS_JSONL || path.join(__dirname, '..', 'reports', 'findings.jsonl');
-const LOOT = () => process.env.LOOT_JSONL || path.join(__dirname, '..', 'reports', 'loot.jsonl');
+const OUT = () => process.env.FINDINGS_JSONL || dataPaths().findings;
+const LOOT = () => process.env.LOOT_JSONL || dataPaths().loot;
 // Free-text fields that may carry captured request/response evidence; scrubbed before disk.
 const REDACT_FIELDS = ['poc', 'impact', 'remediation', 'reference', 'notes'];
 
@@ -392,7 +393,7 @@ const sha256Hex = chain.sha256Hex;
 // the new head hash lands in an append-only side log; verifyHeadAnchor() re-hashes the
 // anchored seq line so regeneration/truncation/wipe is detectable. Fail-loud, not fail-silent.
 const ANCHOR_FILE = () => process.env.FINDINGS_HEAD_ANCHOR_FILE
-  || path.join(__dirname, '..', 'reports', 'tmp', 'findings-head-anchor.jsonl');
+  || path.join(dataPaths().tmp, 'findings-head-anchor.jsonl');
 
 function appendHeadAnchor(headSha256, seq) {
   return chain.appendHeadAnchor({

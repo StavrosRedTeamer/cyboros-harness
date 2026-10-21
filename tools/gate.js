@@ -25,13 +25,29 @@
 'use strict';
 const fs = require('fs');
 const path = require('path');
+const { dataPaths } = require('./config');
 
 // GATE_WS: workspace-root override per i test (fixture in mkdtemp, MAI il workspace reale);
-// default = package root (i tool idratati nel workspace risolvono qui in produzione).
-const WS = () => process.env.GATE_WS || path.join(__dirname, '..');
-const REPORTS = () => path.join(WS(), 'reports');
+// default = the configured data root, so a `--config` start gates the engagement it serves
+// and not the checkout. The path helpers below are the ONE place a gate file is resolved.
+const WS = () => process.env.GATE_WS || dataPaths().dataRoot;
+const REPORTS = () => (process.env.GATE_WS ? path.join(WS(), 'reports') : dataPaths().reports);
 // GATE_LOG_FILE: override per i test (fixture in mkdtemp, MAI il gate-log reale).
 const GATE_LOG = () => process.env.GATE_LOG_FILE || path.join(REPORTS(), 'gate-log.md');
+
+// A check names its file relative to the engagement (e.g. 'reports/tmp/run-audit.jsonl').
+// Resolve it against the configured layout — reports need not be `<root>/reports` — while a
+// GATE_WS fixture keeps the flat behaviour the gate tests rely on.
+function wsPath(file) {
+  if (path.isAbsolute(file)) return file;
+  if (process.env.GATE_WS) return path.resolve(path.join(process.env.GATE_WS, file));
+  const P = dataPaths();
+  if (file === 'scope.json') return P.scope;
+  if (file === 'auth.json') return P.auth;
+  if (file === 'reports') return P.reports;
+  if (file.startsWith('reports/')) return path.join(P.reports, file.slice('reports/'.length));
+  return path.join(P.dataRoot, file);
+}
 const MODE = 'cyboros';
 
 // ─── Gate definitions (structural checks, never model judgement) ───
@@ -158,10 +174,8 @@ function rowsForHost(host) {
 }
 
 function readText(file) {
-  try {
-    const full = path.isAbsolute(file) ? file : path.resolve(path.join(WS(), file));
-    return fs.readFileSync(full, 'utf8');
-  } catch { return ''; }
+  try { return fs.readFileSync(wsPath(file), 'utf8'); }
+  catch { return ''; }
 }
 
 function gateLog() {
@@ -171,7 +185,7 @@ function gateLog() {
 // ─── Check runners ───
 
 function checkFile(file) {
-  const full = path.resolve(path.join(WS(), file));
+  const full = wsPath(file);
   const ok = fs.existsSync(full);
   return { ok, detail: ok ? `${file} exists` : `${file} missing` };
 }

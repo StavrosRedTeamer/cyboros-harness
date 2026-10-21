@@ -28,7 +28,7 @@ const KEV_URL = 'https://www.cisa.gov/sites/default/files/feeds/known_exploited_
 const TTL_HOURS = { epss: 24, nvd: 24 * 7, kev: 24 };
 
 function defaultCacheDir() {
-  return process.env.TI_CACHE_DIR || path.join(__dirname, '..', 'reports', 'cache', 'threatintel');
+  return process.env.TI_CACHE_DIR || path.join(require('./config').dataPaths().reports, 'cache', 'threatintel');
 }
 
 function readJson(file) {

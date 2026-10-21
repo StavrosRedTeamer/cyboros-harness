@@ -27,7 +27,7 @@ const fs = require('fs');
 const path = require('path');
 const chain = require('./chain-log');
 
-const FINDINGS = () => process.env.FINDINGS_JSONL || path.join(__dirname, '..', 'reports', 'findings.jsonl');
+const FINDINGS = () => process.env.FINDINGS_JSONL || require('./config').dataPaths().findings;
 
 function readLines(file) {
   try { return fs.readFileSync(file, 'utf8').split('\n').filter(Boolean); } catch { return []; }

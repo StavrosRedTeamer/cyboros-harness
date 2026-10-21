@@ -78,7 +78,7 @@ async function main() {
     for (let i = 0; i < 100; i++) assert.strictEqual(JSON.stringify(m.confidenceOf(f)), first);
   });
 
-  console.log('SB3/B2: sezione «Copertura & accuratezza»');
+  console.log('SB3/B2: report section «Coverage & accuracy»');
   ok('coverageSummary: candidati→verificati→FP scartati→untested+causa', () => {
     const m = require(RH);
     const { buildMatrix } = require(path.join(WS, 'tools', 'coverage.js'));
@@ -127,10 +127,10 @@ async function main() {
       coverage: { hosts: covHosts, totals: { candidatesTotal: 10, verified: 2, fpDiscarded: 1, untestedTotal: covHosts[0].summary.untested.length } },
       generatedAt: new Date().toISOString(),
     });
-    assert.ok(html.includes('Copertura &amp; accuratezza'));
-    assert.ok(html.includes('<strong>10</strong> candidati'), 'candidati totali');
-    assert.ok(html.includes('<strong>2</strong> verificati'));
-    assert.ok(html.includes('<strong>1</strong> FP/inconclusivi scartati'));
+    assert.ok(html.includes('Coverage &amp; accuracy'));
+    assert.ok(html.includes('<strong>10</strong> candidates'), 'candidates total');
+    assert.ok(html.includes('<strong>2</strong> verified or confirmed'));
+    assert.ok(html.includes('<strong>1</strong> false positives / inconclusive discarded'));
     assert.ok(html.includes('probe interrotta: WAF block (rate)'), 'causa skip_reason mostrata');
     // confidence accanto al CVSS: oob+3 runs+independent → clamp 100% high
     assert.ok(html.includes('conf-high'));

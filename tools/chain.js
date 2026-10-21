@@ -120,7 +120,7 @@ if (require.main === module) {
     console.log('usage: node tools/chain.js [--file reports/findings.jsonl] [--host <host>]');
     process.exit(0);
   }
-  const file = flagValue('--file') || path.join(__dirname, '..', 'reports', 'findings.jsonl');
+  const file = flagValue('--file') || require('./config').dataPaths().findings;
   const hostFilter = flagValue('--host');
   if (!fs.existsSync(file)) {
     console.error(JSON.stringify({ error: 'findings file not found: ' + file }));

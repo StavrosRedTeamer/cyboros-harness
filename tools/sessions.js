@@ -6,7 +6,7 @@ const fs = require('fs');
 const path = require('path');
 
 function regPath(file) {
-  return file || process.env.SESSIONS_JSON || path.join(__dirname, '..', 'reports', 'sessions.json');
+  return file || process.env.SESSIONS_JSON || require('./config').dataPaths().sessions;
 }
 function loadRegistry(file) {
   try {

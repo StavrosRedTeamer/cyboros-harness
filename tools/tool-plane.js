@@ -21,7 +21,7 @@ const fs = require('fs');
 const path = require('path');
 const { spawnSync } = require('child_process');
 
-const OUT = process.env.TOOL_PLANE_OUT || path.join(__dirname, '..', 'reports', 'tmp', 'tool-plane.json');
+const OUT = process.env.TOOL_PLANE_OUT || path.join(require('./config').dataPaths().tmp, 'tool-plane.json');
 const IS_WIN = process.platform === 'win32';
 
 // Ondata 3 — E12 TOOL_REQUIRES_KEY (additive, mai fallback silenziosi):

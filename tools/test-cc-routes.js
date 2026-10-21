@@ -1,7 +1,8 @@
 // test-tags: loopback
 // Loopback E2E for the additive Command Center routes (cc-router.js) served by gui-server.js.
-// Asserts: data reads work without a token, writes are 403 without it, /api/cc/* responds, and
-// the WP8 static allowlist serves only known asset extensions. All state points at a mkdtemp.
+// Asserts: reads and writes need a credential (401 anonymous, 200 with the service token), the
+// write refusal carries the auth shape, /api/cc/* responds, and the WP8 static allowlist serves
+// only known asset extensions. All state points at a mkdtemp.
 // Run: node tools/test-cc-routes.js
 'use strict';
 const assert = require('assert');
@@ -83,34 +84,38 @@ async function req(port, method, p, body, withToken) {
   const port = await waitFor(waitPort, 10000);
   assert.ok(port > 0, 'server printed its port');
 
-  // reads need no token (loopback-trusted, like the rest of the dashboard)
-  const campaign = await req(port, 'GET', '/api/cc/campaign');
+  // reads are authenticated too (the console has no anonymous data surface)
+  const anonCampaign = await req(port, 'GET', '/api/cc/campaign');
+  assert.strictEqual(anonCampaign.status, 401, 'read without a credential → 401');
+  assert.strictEqual(anonCampaign.json.authRequired, true);
+
+  const campaign = await req(port, 'GET', '/api/cc/campaign', null, true);
   assert.strictEqual(campaign.status, 200, 'GET campaign');
   assert.ok(Array.isArray(campaign.json.templates) && campaign.json.templates.includes('web-app'));
 
-  const proc = await req(port, 'GET', '/api/cc/coverage');
+  const proc = await req(port, 'GET', '/api/cc/coverage', null, true);
   assert.strictEqual(proc.status, 200, 'GET coverage');
 
-  const graph = await req(port, 'GET', '/api/cc/graph');
+  const graph = await req(port, 'GET', '/api/cc/graph', null, true);
   assert.strictEqual(graph.status, 200, 'GET graph');
 
-  const mission = await req(port, 'GET', '/api/cc/mission');
+  const mission = await req(port, 'GET', '/api/cc/mission', null, true);
   assert.strictEqual(mission.status, 200, 'GET mission');
   assert.ok(mission.json.headline, 'mission headline present');
 
-  const led = await req(port, 'GET', '/api/cc/ledger');
+  const led = await req(port, 'GET', '/api/cc/ledger', null, true);
   assert.strictEqual(led.status, 200, 'GET ledger');
 
-  const warroom = await req(port, 'GET', '/api/cc/warroom');
+  const warroom = await req(port, 'GET', '/api/cc/warroom', null, true);
   assert.strictEqual(warroom.status, 200, 'GET warroom');
   assert.ok(Array.isArray(warroom.json.attention), 'warroom exposes its attention rail');
   assert.ok(warroom.json.headline, 'warroom composes the mission headline');
   assert.strictEqual(warroom.json.scope.fail_closed, false, 'scope fixture is not fail-closed');
 
-  // writes require the session token
+  // writes require a credential (401 without one, role-checked once authenticated)
   const noTok = await req(port, 'POST', '/api/cc/approvals/request', { host: 'lab.local', action_class: 'c2', command: 'nmap lab.local' });
-  assert.strictEqual(noTok.status, 403, 'write without token → 403');
-  assert.strictEqual(noTok.json.tokenRequired, true);
+  assert.strictEqual(noTok.status, 401, 'write without a credential → 401');
+  assert.strictEqual(noTok.json.authRequired, true);
 
   const apReq = await req(port, 'POST', '/api/cc/approvals/request', { host: 'lab.local', action_class: 'c2', command: 'nmap lab.local' }, true);
   assert.strictEqual(apReq.status, 200, 'write with token → 200');
@@ -121,7 +126,7 @@ async function req(port, method, p, body, withToken) {
 
   const granted = await req(port, 'POST', '/api/cc/approvals/grant', { id: apReq.json.id }, true);
   assert.strictEqual(granted.status, 200, 'grant');
-  const list = await req(port, 'GET', '/api/cc/approvals?all=1');
+  const list = await req(port, 'GET', '/api/cc/approvals?all=1', null, true);
   assert.ok(list.json.rows.some((r) => r.id === apReq.json.id && r.status === 'granted'));
 
   // dispatch refuses a tool outside the allowlist even with a token
@@ -132,7 +137,7 @@ async function req(port, method, p, body, withToken) {
   // tested here; the wrapper itself is exercised offline in test-cc-panic.js (running it
   // for real from a test could touch live process registries).
   const panicNoTok = await req(port, 'POST', '/api/cc/warroom/panic', { confirm: 'PANIC' });
-  assert.strictEqual(panicNoTok.status, 403, 'panic without token → 403');
+  assert.strictEqual(panicNoTok.status, 401, 'panic without a credential → 401');
   const panicNoConfirm = await req(port, 'POST', '/api/cc/warroom/panic', { confirm: 'nope' }, true);
   assert.strictEqual(panicNoConfirm.status, 400, 'panic without typed confirmation refused');
   assert.strictEqual(panicNoConfirm.json.expected, 'PANIC');
@@ -140,7 +145,7 @@ async function req(port, method, p, body, withToken) {
   // Host focus: a write (campaign.host), so it needs the token and an active campaign, and
   // it answers with the NEW snapshot so the board does not need a second round trip.
   const focusNoTok = await req(port, 'POST', '/api/cc/warroom/focus', { host: 'lab.local' });
-  assert.strictEqual(focusNoTok.status, 403, 'focus without token → 403');
+  assert.strictEqual(focusNoTok.status, 401, 'focus without a credential → 401');
   const focusNoCampaign = await req(port, 'POST', '/api/cc/warroom/focus', { host: 'lab.local' }, true);
   assert.strictEqual(focusNoCampaign.status, 400, 'focus without an active campaign refused');
 

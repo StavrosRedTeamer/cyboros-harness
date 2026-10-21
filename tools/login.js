@@ -79,7 +79,7 @@ if (require.main === module) {
     console.error('usage: node login.js <identity>');
     process.exit(2);
   }
-  const p = path.join(__dirname, '..', 'auth.json');
+  const p = require('./config').dataPaths().auth;
   const auth = fs.existsSync(p) ? JSON.parse(fs.readFileSync(p, 'utf8')) : { identities: {} };
   const id = (auth.identities || {})[name];
   if (!id || !id.login) {

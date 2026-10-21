@@ -36,12 +36,11 @@
 const fs = require('fs');
 const path = require('path');
 const budget = require('./budget'); // riuso: loadStateOrCreate / saveState / atomicWriteJson
-
-const ROOT = path.join(__dirname, '..');
+const { dataPaths } = require('./config');
 
 function resolveStateFile(cli) {
   return cli.state || process.env.OPSTATE_FILE || process.env.BUDGET_STATE_FILE ||
-    path.join(ROOT, 'operation-state.json');
+    dataPaths().operationState;
 }
 
 function nowIso() { return new Date().toISOString(); }
@@ -222,7 +221,7 @@ function main() {
     // C4w/F8 (Ondata 4): aggregati di sessione dal run-audit. Read-only senza --record;
     // con --record appende UNA transizione (append-only, mai riscritture) con i totali.
     const accounting = require('./accounting');
-    const auditFile = cli.audit || process.env.RUN_AUDIT_FILE || path.join(ROOT, 'reports', 'tmp', 'run-audit.jsonl');
+    const auditFile = cli.audit || process.env.RUN_AUDIT_FILE || path.join(dataPaths().tmp, 'run-audit.jsonl');
     const agg = accounting.aggregateAll(accounting.loadAuditLines(auditFile));
     if (cli.record) {
       if (!cli.owner) {

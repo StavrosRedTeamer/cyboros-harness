@@ -8,7 +8,7 @@ and where the lesson of one engagement changes the next.**
 [![CI](https://github.com/stavrosredteamer/cyboros-harness/actions/workflows/ci.yml/badge.svg?branch=master)](https://github.com/stavrosredteamer/cyboros-harness/actions/workflows/ci.yml)
 [![License: Apache-2.0](docs/assets/license-apache-2.0.svg)](LICENSE)
 
-[Apache-2.0](LICENSE) · zero dependencies · offline-capable · 118 tests, hermetic and parallel
+[Apache-2.0](LICENSE) · zero dependencies · offline-capable · 122 tests, hermetic and parallel
 
 [Cyboros](docs/OUROBOROS.md): cyber + ouroboros. The loop is not marketing — every claim on
 that page names the file that proves it. The agent still cannot violate scope, because the
@@ -109,7 +109,7 @@ clean scan.
   On a client network, `npm install` does nothing.
 - **Runs air-gapped.** `local/` drives the same deterministic engine against a local
   model. No API key, no data leaving the engagement laptop.
-- **118 tests, hermetic and parallel by default, no network.** Offline and loopback tests,
+- **122 tests, hermetic and parallel by default, no network.** Offline and loopback tests,
   classified by the runner; `npm test` is the gate, `npm run test:all` includes the live e2e
   set. Tests keep the engine's shared state — the global rate limiter, the run audit, the
   findings head-anchor, the egress-proxy state — in a fixture (`hermetic()` in
@@ -127,7 +127,7 @@ Requires **Node ≥ 22** (the Command Center backend uses `node:sqlite`).
 ```bash
 git clone https://github.com/stavrosredteamer/cyboros-harness.git
 cd cyboros-harness
-npm test                 # 118 tests, no install, no network, 2 workers (--jobs 1 to serialize)
+npm test                 # 122 tests, no install, no network, 2 workers (--jobs 1 to serialize)
 ```
 
 Then write your authorization. `scope.json` **is** the written authorization, and the
@@ -198,6 +198,25 @@ perspective — the target is local, the model may be cloud.
 Install the external tool binaries with `./install-tools.sh` (Parrot/Debian) or
 `install-tools.ps1` (Windows), then verify with `node tools/doctor.js`.
 
+### Deploying it for a team
+
+The code and the engagement data are separate directories: one
+`cyboros.config.json`, validated at startup (every problem in one message, exit 2,
+no silent fallback), and a data directory holding accounts, scope, reports and the
+audit trail. First run writes only into that directory:
+
+```bash
+node tools/init.js --dir /srv/cyboros --admin alice   # prints the admin password once
+CYBOROS_CONFIG=/srv/cyboros/cyboros.config.json node tools/gui-server.js
+node tools/config.js --print                          # effective config, token redacted
+```
+
+A container definition is in the tree (`Dockerfile`, `docker-compose.yml`) with the
+image holding code only and config plus data bind-mounted. See
+[`docs/DEPLOY.md`](docs/DEPLOY.md) for the settings table, the environment overrides
+and the reverse-proxy notes, and [`docs/UPGRADING.md`](docs/UPGRADING.md) for the
+upgrade procedure covering identity data and the append-only audit trail.
+
 The full operator surface — gateway launchers, the desktop Command Center, the local
 runner — is documented in [`docs/command-center-desktop.md`](docs/command-center-desktop.md)
 and the harness contract in [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
@@ -207,6 +226,14 @@ and the harness contract in [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
 The Command Center is a desktop app over the same engine (`cyboros-cc`, PyQt6, falling
 back to Chromium in app-mode). It is a **surface, not a gate**: it bypasses no guard, and
 every write it performs is a wrapper over an existing tool.
+
+It has **accounts**: every request is authenticated, and every action is authorized by
+role — `viewer` reads, `operator` runs the engagement, `admin` manages accounts. The
+audit trail records the signed-in identity as `actor`, never a name a request body
+claims. Accounts are one validated `users.json` (mode 0600); the first admin is a CLI
+step, and the terminal is not a read-only view. See
+[`docs/IDENTITY.md`](docs/IDENTITY.md) — including the one-function seam where an OIDC
+backend plugs in without touching a route handler.
 
 Campaign → mission → approval → execution → verification → report → evidence bundle. The
 approval inbox is where the consent tokens live: a confirm-tier action cannot start
@@ -221,7 +248,7 @@ only the processes the harness owns.
 
 | | |
 |---|---|
-| `tools/` | the engine: 162 modules, scope guards, repeater, oracle, pipeline, C2, wifi, GUI, tests |
+| `tools/` | the engine: 183 modules, scope guards, repeater, oracle, pipeline, C2, wifi, GUI, tests |
 | `local/fleet/` | 28 agent definitions (orchestrator + specialists) |
 | `local/` | standalone runner against a local model — no cloud, no Freebuff |
 | `workflows/` | 20 reusable `enum-*` / `attack-*` pipelines |
@@ -253,6 +280,9 @@ yourself; going through the proxy is the supported path.
 ## Documentation
 
 - [`docs/ADOPTION.md`](docs/ADOPTION.md) — **for security teams and organizations**: a due-diligence page on authorization, client-data governance, auditability and the tool's own security posture — every answer naming the file that proves it
+- [`docs/IDENTITY.md`](docs/IDENTITY.md) — roles, accounts, sessions, the audit actor, and how to plug an OIDC/SSO backend in
+- [`docs/DEPLOY.md`](docs/DEPLOY.md) — config surface and precedence, first run, container, reverse proxy, honest limits
+- [`docs/UPGRADING.md`](docs/UPGRADING.md) — the upgrade procedure: what each data format guarantees, backups, rollback
 - [`docs/OUROBOROS.md`](docs/OUROBOROS.md) — the loop, and the artifact behind every claim
 - [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — guard → model → tool, and why
 - [`docs/METHODOLOGY.md`](docs/METHODOLOGY.md) — how this is measured: three metrics, contamination, the severity ceiling (written to apply to any harness)
@@ -261,7 +291,7 @@ yourself; going through the proxy is the supported path.
 - [`docs/THREAT-MODEL.md`](docs/THREAT-MODEL.md) — our own attack surface, written down before someone else finds it
 - [`docs/GLOSSARY.md`](docs/GLOSSARY.md) — canonical terminology for levels, status and guards
 - [`knowledge.md`](knowledge.md) — engagement rules and toolbox (the contract)
-- [`docs/project-map.html`](docs/project-map.html) — where everything lives: the 162 modules
+- [`docs/project-map.html`](docs/project-map.html) — where everything lives: the 183 modules
   grouped into the 16 areas the harness is thought in (guard, recon, web, host, wireless, mobile,
   opsec, proof, memory, console), the guard chain, the suite gates. Generated by
   `node tools/project-map.js`, so it cannot drift; it also answers the question a flat `tools/`

@@ -358,7 +358,7 @@ function buildRedteamDomain(opts) {
 // Falls back to a synthetic state when files are missing (offline, no network).
 function stateFromHost(host, opts) {
   opts = opts || {};
-  const reports = opts.reportsDir || path.join(__dirname, '..', 'reports');
+  const reports = opts.reportsDir || require('./config').dataPaths().reports;
   const state = new Set(['surface(sqlli_probe)']); // placeholder removed below
   state.clear();
   let candidates = {};

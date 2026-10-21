@@ -23,16 +23,17 @@ const path = require('path');
 const crypto = require('crypto');
 
 const GENESIS = '0'.repeat(64);
-const DEFAULT_DIR = path.join(__dirname, '..', 'artifacts', 'audit');
 
-function auditDir() {
-  return process.env.AUDIT_DIR || DEFAULT_DIR;
+function auditDir(dir) {
+  return dir || process.env.AUDIT_DIR || require('./config').dataPaths().audit;
 }
 
-function auditFile(ts) {
+// `dir` lets a caller keep its trail with its workspace (CC_ROOT): a console run
+// against an isolated root must not append to the real installation's audit trail.
+function auditFile(ts, dir) {
   const d = ts ? new Date(ts) : new Date();
   const day = d.toISOString().slice(0, 10);
-  return path.join(auditDir(), `${day}.jsonl`);
+  return path.join(auditDir(dir), `${day}.jsonl`);
 }
 
 function sha256Hex(s) {
@@ -64,15 +65,16 @@ function readLines(file) {
   try { return fs.readFileSync(file, 'utf8').split(/\r?\n/).filter(Boolean); } catch { return []; }
 }
 
-function append(entry) {
+function append(entry, opts) {
   if (!entry || typeof entry !== 'object' || Array.isArray(entry))
     return { ok: false, error: 'entry must be an object' };
   let line;
   try { line = JSON.stringify(entry); } catch (e) { return { ok: false, error: 'entry not serializable: ' + e.message }; }
-  const file = auditFile(entry.ts);
+  const dir = auditDir(opts && opts.dir);
+  const file = auditFile(entry.ts, dir);
   try {
-    fs.mkdirSync(auditDir(), { recursive: true, mode: 0o700 });
-    fs.chmodSync(auditDir(), 0o700);
+    fs.mkdirSync(dir, { recursive: true, mode: 0o700 });
+    fs.chmodSync(dir, 0o700);
   } catch (e) { return { ok: false, error: 'cannot create audit dir: ' + e.message }; }
   const existing = readLines(file);
   const chainState = verifyAuditChain(existing);

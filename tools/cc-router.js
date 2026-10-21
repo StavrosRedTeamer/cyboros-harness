@@ -1,8 +1,9 @@
 #!/usr/bin/env node
 // Command Center — additive router for /api/cc/* (WP3..WP7, zero-dep).
 //
-// gui-server.js calls handle() for every /api/cc/ request AFTER its own Host/Origin + token
-// guards have run, so nothing here can bypass hardening. Every write goes through the existing
+// The console router (tools/console/routes/index.js) calls handle() for every /api/cc/
+// request AFTER the Host/Origin, identity and role gates have run, so nothing here can
+// bypass hardening. Every write goes through the existing
 // tool wrappers (run.js / workflow.js / cyboros.js / budget.js / gate.js / report-html.js).
 // All modules are required lazily so a plain dashboard start does not pay for node:sqlite etc.
 'use strict';
@@ -32,6 +33,11 @@ async function handle(req, res, ctx) {
   const send = ctx.sendJson;
   const body = () => ctx.bodyJson(req);
   const lazy = (m) => require('./' + m);
+  // The actor is the authenticated principal, never a field from the request body:
+  // otherwise any client could attribute an approval to someone else. gui-server
+  // enforces the role before this router runs; when it does not supply an actor
+  // (unit callers), the request body is still not trusted further than a label.
+  const actor = ctx.actor || (ctx.readOnly ? 'read-only' : 'operator');
 
   // ── campaign (WP3) ────────────────────────────────────────────────────────
   if (url === '/api/cc/campaign' && req.method === 'GET') {
@@ -62,20 +68,20 @@ async function handle(req, res, ctx) {
       return send(res, 200, r);
     }
     if (action === 'activate') {
-      const r = cc.activate(b.campaign, { actor: b.actor || 'operator' });
+      const r = cc.activate(b.campaign, { actor });
       return send(res, r.ok ? 200 : 400, r);
     }
     if (action === 'update') {
       const patch = b.patch || {};
-      const r = cc.update(b.id || null, patch, { actor: b.actor || 'operator' });
+      const r = cc.update(b.id || null, patch, { actor });
       return send(res, r.ok ? 200 : 400, r);
     }
     if (action === 'archive') {
-      const r = cc.archive(b.id || null, { actor: b.actor || 'operator' });
+      const r = cc.archive(b.id || null, { actor });
       return send(res, r.ok ? 200 : 400, r);
     }
     if (action === 'resign') {
-      const r = cc.resign(b.actor || 'operator');
+      const r = cc.resign(actor);
       return send(res, r.ok ? 200 : 400, r);
     }
     return send(res, 404, { error: 'unknown campaign action' });
@@ -93,10 +99,10 @@ async function handle(req, res, ctx) {
     const action = url.split('/').pop();
     let r;
     if (action === 'request') r = A.request({ host: b.host, actionClass: b.action_class, command: b.command, reason: b.reason, by: b.by, ttl: b.ttl });
-    else if (action === 'grant') r = A.grant(b.id, { actor: b.actor, note: b.note });
-    else if (action === 'deny') r = A.deny(b.id, { actor: b.actor, note: b.note });
-    else if (action === 'revoke') r = A.revoke(b.id, { actor: b.actor, note: b.note });
-    else if (action === 'consume') r = A.consume(b.id, { host: b.host, actionClass: b.action_class, command: b.command, actor: b.actor });
+    else if (action === 'grant') r = A.grant(b.id, { actor, note: b.note });
+    else if (action === 'deny') r = A.deny(b.id, { actor, note: b.note });
+    else if (action === 'revoke') r = A.revoke(b.id, { actor, note: b.note });
+    else if (action === 'consume') r = A.consume(b.id, { host: b.host, actionClass: b.action_class, command: b.command, actor });
     else if (action === 'expire') r = A.expire();
     else return send(res, 404, { error: 'unknown approvals action' });
     return send(res, r.ok ? 200 : 400, r);
@@ -126,7 +132,7 @@ async function handle(req, res, ctx) {
       const command = b.command || spec.argv.join(' ');
       const v = A.requireToken(scope, { id: b.approval || spec.approval, host: spec.host || b.host, command });
       if (!v.ok) return send(res, 403, { error: v.reason, approvalRequired: true });
-      if (spec.approval || b.approval) A.consume(spec.approval || b.approval, { host: spec.host || b.host, actor: 'app', command });
+      if (spec.approval || b.approval) A.consume(spec.approval || b.approval, { host: spec.host || b.host, actor, command });
     }
     const name = String(b.name || path.basename(spec.argv[0], '.js')).slice(0, 40);
     const id = ctx.runJob(name, spec.argv, {});

@@ -42,13 +42,14 @@
 const fs = require('fs');
 const path = require('path');
 
-const ROOT = path.join(__dirname, '..');
+const ROOT = path.join(__dirname, '..');   // code artifacts (tools/budget.json, tools/budgets.json)
+const { dataPaths } = require('./config');
 
 function resolvePaths(cli) {
   return {
     config: cli.config || process.env.BUDGET_CONFIG_FILE || path.join(ROOT, 'tools', 'budget.json'),
-    state: cli.state || process.env.BUDGET_STATE_FILE || path.join(ROOT, 'operation-state.json'),
-    audit: cli.audit || process.env.RUN_AUDIT_FILE || path.join(ROOT, 'reports', 'tmp', 'run-audit.jsonl'),
+    state: cli.state || process.env.BUDGET_STATE_FILE || dataPaths().operationState,
+    audit: cli.audit || process.env.RUN_AUDIT_FILE || path.join(dataPaths().tmp, 'run-audit.jsonl'),
     countersDir: cli.countersDir || process.env.BUDGET_COUNTERS_DIR || null, // default: dirname(audit), risolto dopo
     classes: cli.classes || process.env.BUDGET_CLASSES_FILE || path.join(ROOT, 'tools', 'budgets.json'),
     tokens: process.env.DSH_TOKEN_USAGE_FILE || null,

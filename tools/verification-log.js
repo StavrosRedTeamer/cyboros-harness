@@ -27,10 +27,15 @@ const path = require('path');
 const chain = require('./chain-log');
 const { validateOracle, WS_ROOT } = require('./oracle');
 const { validateQuote } = require('./evidence-quote');
+const { dataPaths } = require('./config');
 
-const FILE = () => process.env.VERIFICATIONS_JSONL || path.join(WS_ROOT(), 'reports', 'verifications.jsonl');
+// DSH_WS_ROOT is the documented fixture/embedder override (oracle.js); when it is set the
+// side log lives in THAT workspace, exactly like the oracle receipts it refers to. Otherwise
+// the configured engagement layout decides.
+const reportsRoot = () => (process.env.DSH_WS_ROOT ? path.join(WS_ROOT(), 'reports') : dataPaths().reports);
+const FILE = () => process.env.VERIFICATIONS_JSONL || path.join(reportsRoot(), 'verifications.jsonl');
 const ANCHOR = () => process.env.VERIFICATIONS_HEAD_ANCHOR_FILE
-  || path.join(WS_ROOT(), 'reports', 'tmp', 'verifications-head-anchor.jsonl');
+  || path.join(reportsRoot(), 'tmp', 'verifications-head-anchor.jsonl');
 const ANCHOR_KIND = 'verifications-head-anchor';
 const OUTCOMES = ['verified', 'failed'];
 

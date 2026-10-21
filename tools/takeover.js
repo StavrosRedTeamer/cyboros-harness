@@ -25,8 +25,8 @@ const fs = require('fs');
 const path = require('path');
 const dns = require('dns').promises;
 
-const WS = path.join(__dirname, '..');
-const TMP_DIR = () => env('TMP_DIR') || path.join(WS, 'reports', 'tmp');
+const dataPaths = () => require('./config').dataPaths();
+const TMP_DIR = () => env('TMP_DIR') || dataPaths().tmp;
 
 // ---- takeover fingerprints (provider → body marker / CNAME shape) -------------
 // Pure data + pure matchers: fully unit-testable offline. Sources: can-i-take-over-xyz public
@@ -102,7 +102,7 @@ function defaultResolver(resolverIp) {
 }
 function paceFromScope() {
   try {
-    const scope = JSON.parse(fs.readFileSync(path.join(WS, 'scope.json'), 'utf8'));
+    const scope = JSON.parse(fs.readFileSync(dataPaths().scope, 'utf8'));
     const rps = Number(scope.max_requests_per_second) || 1;
     return Math.max(50, Math.ceil(1000 / rps)); // ≤ scope rate; 50ms floor for resolver sanity
   } catch { return 1000; }
@@ -293,7 +293,7 @@ async function scan(domain, opts) {
     sources: opts.subsFile ? [opts.subsFile] : defaultSubsFiles(domain).map((p) => path.basename(p)),
     findings, hygiene: { dmarc: h.dmarc, spf: h.spf, spf_lax: h.spf_lax, axfr: h.axfr, wildcard: wild },
   };
-  const outDir = env('REPORTS_DIR') || path.join(WS, 'reports');
+  const outDir = env('REPORTS_DIR') || dataPaths().reports;
   try {
     fs.mkdirSync(outDir, { recursive: true });
     const f = path.join(outDir, `takeover-${sanitizeHost(domain)}.json`);

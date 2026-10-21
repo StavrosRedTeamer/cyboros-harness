@@ -29,6 +29,7 @@
     "cyboros-tui": "runtime/tui.js",
     "cyboros-doctor": "tools/doctor.js",
     "cyboros-record-finding": "tools/record-finding.js",
+    "cyboros-users": "tools/users.js",
     "cyboros-gen-bench": "tools/gen-bench.js",
     "cyboros-mcp-guard-proxy": "tools/mcp-guard-proxy.js"
   },

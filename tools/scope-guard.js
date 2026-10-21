@@ -38,6 +38,7 @@ const path = require('path');
 const dns = require('dns');
 const net = require('net');
 const { domainToASCII } = require('url');
+const { dataPaths } = require('./config');
 
 // ---------------------------------------------------------------------------
 // Scope loading + dual-schema normalization
@@ -45,7 +46,9 @@ const { domainToASCII } = require('url');
 
 function loadScope(scopePath) {
   // SCOPE_JSON env override: lets tests (and multi-project setups) point at another file.
-  const p = scopePath || process.env.SCOPE_JSON || path.join(__dirname, '..', 'scope.json');
+  // Default: the configured authorization file (tools/config.js), so a console started
+  // with --config and a CLI invoked in the same tree answer about the SAME file.
+  const p = scopePath || process.env.SCOPE_JSON || dataPaths().scope;
   let raw;
   try { raw = fs.readFileSync(p, 'utf8'); }
   catch { return normalizeScope({}); } // no scope file => fail-closed (nothing authorized yet)
@@ -514,8 +517,8 @@ function validatePlan(plan, opts) {
 // Tests NEVER use real DNS: always inject opts.resolver.
 // ---------------------------------------------------------------------------
 
-const PINS_FILE = () => process.env.SCOPE_PINS_FILE || path.join(__dirname, '..', 'reports', 'tmp', 'dns-pins.json');
-const DIVERGENCE_LOG = () => process.env.SCOPE_DIVERGENCE_LOG || path.join(__dirname, '..', 'reports', 'tmp', 'dns-divergence.log');
+const PINS_FILE = () => process.env.SCOPE_PINS_FILE || path.join(dataPaths().tmp, 'dns-pins.json');
+const DIVERGENCE_LOG = () => process.env.SCOPE_DIVERGENCE_LOG || path.join(dataPaths().tmp, 'dns-divergence.log');
 
 function defaultLookup(host) {
   return dns.promises.lookup(host).then((r) => r.address);

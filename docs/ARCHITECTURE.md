@@ -154,6 +154,41 @@ falsifiable in the process — it means "a reality claim whose proof does not ho
 its previous definition (`status === 'pending'`) could never be, since the record validator admits
 only `confirmed|inconclusive|verified` and requires the field.
 
+## The console is a composition
+
+The Command Center backend grew inside one file that served static assets, routed every
+API family, gated identity, ran jobs and owned the terminal PTYs. That is fine for a
+prototype and hostile to the next change: every new endpoint had to be threaded through
+code it had nothing to do with. It is now a composition root (`tools/gui-server.js`: read
+the config, build the modules, own the process) plus one module per responsibility, all
+under `tools/console/`:
+
+| Module | Owns | Never does |
+|---|---|---|
+| `tools/console/app.js` | the request pipeline and its order | any policy of its own |
+| `tools/console/http.js` | reply shapes, body cap, Host/Origin allowlist, static shell | authorization, data |
+| `tools/console/gate.js` | authenticate → authorize → audit, one refusal shape | routing, data |
+| `tools/console/routes/index.js` | dispatch: cc router, then the families below, in one visible order | routing policy of its own |
+| `tools/console/routes/public.js` · `accounts.js` · `state.js` · `streams.js` | one route family each: handshake and sign-in, accounts, engagement state, streaming and terminals | transport, auth internals |
+| `tools/console/jobs.js` | background jobs, their buffers and SSE viewers | which job to start |
+| `tools/console/terminals.js` | PTY sessions, replay, viewer fan-out, auto-restart | HTTP routing |
+| `tools/console/scope.js` | the authorization file: validate, back up, write, check | routing |
+| `tools/console/findings.js` · `pipeline.js` · `engagement.js` | read models over engine output | writes outside their own file |
+| `tools/console/files.js` | tolerant JSON/JSONL reads, the 0600 atomic write | policy decisions |
+
+The order in `app.js` *is* the security model, so it is stated once, top to bottom:
+static shell → generated report (data-gated) → `/api` only → Host/Origin → public routes
+(handshake, login) → gate → route families → uniform 404/405. A family cannot skip the
+gate because it only receives a `principal` that the pipeline resolved.
+
+The seam is one context object built in `gui-server.js`: modules receive their
+dependencies (identity, job runner, terminal manager, read models, paths) explicitly and
+read nothing else. Consequences worth relying on: swapping the identity or job backend is
+a different constructor call in the composition root; adding an endpoint touches one
+family file plus its read model; and the terminal/streaming side cannot reach into the
+data routes. Behaviour is unchanged by the split — the RBAC matrix, the cc-route suite and
+the config/startup checks all run against the same HTTP surface as before.
+
 ## Deliberate non-goals
 
 Worth stating, because they look like omissions:

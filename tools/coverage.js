@@ -26,10 +26,11 @@ const fs = require('fs');
 const path = require('path');
 const { env } = require('./env');
 
-const REPORTS = path.join(__dirname, '..', 'reports');
+const { dataPaths } = require('./config');
+const REPORTS = dataPaths().reports;
 // Override per i test (fixture in mkdtemp): la produzione resta reports/.
 const reportsDir = () => process.env.COVERAGE_REPORTS_DIR || REPORTS;
-const FINDINGS = path.join(REPORTS, 'findings.jsonl');
+const FINDINGS = dataPaths().findings;
 const REGISTRY_FILE = () => env('TEST_REGISTRY') || path.join(__dirname, 'test-registry.json');
 
 // Vulnerability classes tracked by the harness. FONTE UNICA: tools/test-registry.json — lo stesso

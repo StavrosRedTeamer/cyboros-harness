@@ -1,0 +1,25 @@
+{
+  "_comment": "Copy to cyboros.config.json (or point CYBOROS_CONFIG at it). Every setting below is optional; the values shown are the defaults. Relative paths resolve against data_root; data_root resolves against this file's directory. Environment variables override this file (docs/DEPLOY.md). node tools/config.js --print shows the effective result.",
+  "version": 1,
+  "data_root": ".",
+  "http": {
+    "host": "127.0.0.1",
+    "port": 8787,
+    "allowed_hosts": []
+  },
+  "paths": {
+    "scope": "scope.json",
+    "users": "users.json",
+    "reports": "reports",
+    "audit": "artifacts/audit",
+    "operation_state": "operation-state.json"
+  },
+  "identity": {
+    "session_ttl_hours": 12,
+    "idle_minutes": 120,
+    "provider": null
+  },
+  "service_token": "auto",
+  "service_token_role": "operator",
+  "read_only": false
+}

@@ -107,7 +107,7 @@ function extractHostFromLine(line) {
 // ---- audit trail (same evidence convention as run.js) ----
 function audit(entry) {
   try {
-    const dir = path.join(__dirname, '..', 'reports', 'tmp');
+    const dir = require('./config').dataPaths().tmp;
     fs.mkdirSync(dir, { recursive: true });
     fs.appendFileSync(path.join(dir, 'run-audit.jsonl'), JSON.stringify(entry) + '\n');
   } catch {}
@@ -447,7 +447,7 @@ async function enumerate(db, host, opts) {
       out.noauth = { skipped: 'not installed (CYBOROS_NOAUTH_FINDER / vendor/tools/noauth_finder/)' };
     } else {
       try {
-        const auditDir = path.join(__dirname, '..', 'reports', 'tmp');
+        const auditDir = require('./config').dataPaths().tmp;
         fs.mkdirSync(auditDir, { recursive: true });
         const rawFile = path.join(auditDir, 'noauth-' + sanitize(target) + '.log');
         const cmd = noauthCommand(noauthScript, target);
@@ -517,7 +517,7 @@ async function fuzz(db, target, opts) {
 }
 
 function fuzzOutRoot(target) {
-  return env('FUZZ_OUT') || path.join(__dirname, '..', 'reports', 'tmp', 'fuzz-' + sanitize(target));
+  return env('FUZZ_OUT') || path.join(require('./config').dataPaths().tmp, 'fuzz-' + sanitize(target));
 }
 
 // ---- status / resume / report ----
@@ -599,7 +599,7 @@ function report(db, opts) {
     })),
     endpoints: state.listEndpoints(db, t.id),
   }));
-  const findingsFile = opts.findingsFile || process.env.FINDINGS_JSONL || path.join(__dirname, '..', 'reports', 'findings.jsonl');
+  const findingsFile = opts.findingsFile || process.env.FINDINGS_JSONL || require('./config').dataPaths().findings;
   let findings = [];
   try {
     findings = fs.readFileSync(findingsFile, 'utf8').split(/\r?\n/).filter(Boolean).map((l) => {

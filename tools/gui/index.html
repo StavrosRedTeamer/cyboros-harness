@@ -17,8 +17,10 @@
     </div>
   </div>
   <div class="badges">
+    <span id="cc-user" class="chip" aria-live="polite" title="signed-in operator">…</span>
     <button id="btn-cmdk" class="btn btn-ghost" title="Command palette (Ctrl/⌘-K)" aria-haspopup="dialog"><kbd>⌘K</kbd> commands</button>
     <button id="btn-refresh" class="btn" title="refresh all">⟳ refresh</button>
+    <button id="btn-logout" class="btn btn-ghost" title="end this session" disabled>sign out</button>
   </div>
 </header>
 
@@ -40,6 +42,7 @@
   <button class="tab" data-tab="scope" role="tab" id="tabbtn-scope" aria-controls="tab-scope" aria-selected="false" tabindex="-1">Scope</button>
   <button class="tab" data-tab="arsenal" role="tab" id="tabbtn-arsenal" aria-controls="tab-arsenal" aria-selected="false" tabindex="-1">Arsenal</button>
   <button class="tab" data-tab="control" role="tab" id="tabbtn-control" aria-controls="tab-control" aria-selected="false" tabindex="-1">Control</button>
+  <button class="tab" data-tab="users" role="tab" id="tabbtn-users" aria-controls="tab-users" aria-selected="false" tabindex="-1">Users</button>
   <span class="navgroup" aria-hidden="true">Console</span>
   <button class="tab" data-tab="reports" role="tab" id="tabbtn-reports" aria-controls="tab-reports" aria-selected="false" tabindex="-1">Reports</button>
   <button class="tab" data-tab="freebuff" role="tab" id="tabbtn-freebuff" aria-controls="tab-freebuff" aria-selected="false" tabindex="-1">Freebuff</button>
@@ -62,6 +65,7 @@
   <section id="tab-scope" class="tabpane" role="tabpanel" aria-labelledby="tabbtn-scope"></section>
   <section id="tab-arsenal" class="tabpane" role="tabpanel" aria-labelledby="tabbtn-arsenal"></section>
   <section id="tab-control" class="tabpane" role="tabpanel" aria-labelledby="tabbtn-control"></section>
+  <section id="tab-users" class="tabpane" role="tabpanel" aria-labelledby="tabbtn-users"></section>
   <section id="tab-reports" class="tabpane" role="tabpanel" aria-labelledby="tabbtn-reports"></section>
   <section id="tab-freebuff" class="tabpane" role="tabpanel" aria-labelledby="tabbtn-freebuff"></section>
 </main>
@@ -95,6 +99,7 @@
 <script src="views-engagement.js"></script>
 <script src="views-control.js"></script>
 <script src="views-warroom.js"></script>
+<script src="views-admin.js"></script>
 <script src="app.js"></script>
 </body>
 </html>

@@ -1,0 +1,33 @@
+# Cyboros Console — reference deployment.
+#
+#   mkdir -p deploy/config deploy/data
+#   cp cyboros.config.example.json deploy/config/cyboros.config.json
+#   # first admin (writes users.json through the same code the image runs):
+#   CYBOROS_USERS_FILE=deploy/data/users.json node tools/users.js add admin --role admin --generate
+#   docker compose up -d
+#
+# Code comes from the image; config and engagements are host directories. The port
+# is published on loopback on purpose: to expose the console further, put a TLS
+# reverse proxy in front of it and add its hostname to http.allowed_hosts.
+services:
+  console:
+    build: .
+    image: cyboros-console:0.2.0
+    container_name: cyboros-console
+    restart: unless-stopped
+    read_only: true
+    tmpfs:
+      - /tmp
+    ports:
+      - "127.0.0.1:8787:8787"
+    environment:
+      CYBOROS_CONFIG: /config/cyboros.config.json
+      # Override the host/port inside the container without editing the config:
+      # GUI_HOST: 0.0.0.0
+      # GUI_PORT: "8787"
+      TZ: UTC
+    volumes:
+      - ./deploy/config:/config:ro
+      - ./deploy/data:/data
+    security_opt:
+      - no-new-privileges:true

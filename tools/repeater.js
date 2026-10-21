@@ -52,7 +52,7 @@ const BODY_CAP = 2048; // enough to confirm a leaked row / error string / reflec
 // from credentials (survives token expiry mid-run).
 async function resolveIdentity(name) {
   if (!name) return [];
-  const p = path.join(__dirname, '..', 'auth.json');
+  const p = require('./config').dataPaths().auth;
   const auth = fs.existsSync(p) ? JSON.parse(fs.readFileSync(p, 'utf8')) : { identities: {} };
   const id = (auth.identities || {})[name];
   if (!id) {

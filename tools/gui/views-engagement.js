@@ -89,7 +89,7 @@ function renderMission() {
       statTile({ label: 'coverage gaps', value: h.coverage_remaining, tone: h.coverage_remaining ? 'med' : 'ok' }),
       statTile({ label: 'budget', value: h.budget_halted ? 'HALT' : 'ok', tone: h.budget_halted ? 'crit' : 'ok' }),
     ]);
-    if (h.scope_fail_closed) tiles.appendChild(el('div', { class: 'hint err' }, 'scope.json is empty — everything is blocked (fail-closed)'));
+    if (h.scope_fail_closed) tiles.appendChild(el('div', { class: 'hint err' }, 'no authorized target yet — every action is blocked (fail-closed)'));
 
     const cards = (m.actions || []).slice(0, 40).map((a) => el('div', { class: 'cc-card' + (a.blocked ? ' blocked' : '') }, [
       el('div', { class: 'cc-row' }, [el('strong', null, a.label), ccBadge(a.source, 'info'), ccBadge(a.tier, a.tier === 'confirm' ? 'warn' : 'ok')]),

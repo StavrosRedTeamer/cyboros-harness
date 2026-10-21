@@ -30,13 +30,16 @@ const TYPES = ['oob', 'http-diff', 'console', 'script'];
 const GENESIS = '0'.repeat(64); // prev_sha256 of the first chained finding line
 const TOKEN_RE = /^[\x21-\x7E]{8,256}$/; // printable non-space ASCII, 8..256 chars
 
-const WS_ROOT = () => process.env.DSH_WS_ROOT || path.join(__dirname, '..');
+const WS_ROOT = () => process.env.DSH_WS_ROOT || require('./config').dataPaths().dataRoot;
 const ORACLE_LOG_REL = 'reports/tmp/oracle-log.jsonl';
 const ORACLE_LOG = () => process.env.ORACLE_LOG || path.join(WS_ROOT(), ORACLE_LOG_REL);
 const ARTIFACTS_DIR = () => process.env.ORACLE_ARTIFACTS || path.join(WS_ROOT(), 'artifacts', 'oracle');
 // OOB files written by tools/oob.js — consumed strictly READ-ONLY here.
-const OOB_MARKERS = () => process.env.OOB_MARKERS || path.join(WS_ROOT(), 'reports', 'oob', 'markers.jsonl');
-const OOB_HITS = () => process.env.OOB_HITS || path.join(WS_ROOT(), 'reports', 'oob', 'hits.jsonl');
+// Same workspace as the oracle receipts: DSH_WS_ROOT is the fixture/embedder override,
+// otherwise the configured reports directory.
+const reportsRoot = () => (process.env.DSH_WS_ROOT ? path.join(WS_ROOT(), 'reports') : require('./config').dataPaths().reports);
+const OOB_MARKERS = () => process.env.OOB_MARKERS || path.join(reportsRoot(), 'oob', 'markers.jsonl');
+const OOB_HITS = () => process.env.OOB_HITS || path.join(reportsRoot(), 'oob', 'hits.jsonl');
 
 // True when the finding claims reality (needs oracle + evidence quote). Kept in sync with the
 // record-finding.js taxonomy; exported so gate.js and tests share ONE definition.

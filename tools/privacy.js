@@ -10,7 +10,7 @@ const { env } = require('./env');
 const fs = require('fs');
 const path = require('path');
 
-const MAP_FILE = () => process.env.TOKEN_MAP || path.join(__dirname, '..', 'reports', 'tmp', 'token-map.json');
+const MAP_FILE = () => process.env.TOKEN_MAP || path.join(require('./config').dataPaths().tmp, 'token-map.json');
 const ENABLED = () => env('PRIVACY') === '1';
 
 function loadMap() {

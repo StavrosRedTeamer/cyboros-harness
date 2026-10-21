@@ -92,10 +92,10 @@ function opts_cwd_safe() {
   return process.cwd();
 }
 
-const WS_ROOT = path.join(__dirname, '..');
-const LOG_DIR = process.env.WORKFLOW_LOG_DIR || path.join(WS_ROOT, 'reports', 'tmp', 'workflow');
-const COVERAGE_FILE = process.env.COVERAGE_WORKFLOW_FILE || path.join(WS_ROOT, 'reports', 'tmp', 'coverage-workflow.json');
-const EVIDENCE_FILE = process.env.EVIDENCE_INDEX_FILE || path.join(WS_ROOT, 'evidence-index.md');
+const { dataPaths } = require('./config');
+const LOG_DIR = process.env.WORKFLOW_LOG_DIR || path.join(dataPaths().tmp, 'workflow');
+const COVERAGE_FILE = process.env.COVERAGE_WORKFLOW_FILE || path.join(dataPaths().tmp, 'coverage-workflow.json');
+const EVIDENCE_FILE = process.env.EVIDENCE_INDEX_FILE || dataPaths().evidenceIndex;
 // Dialect allowlist: every step must invoke a wrapper that enforces its own scope/tier gate.
 // run.js covers third-party binaries; the sibling wrappers are the same discipline for their
 // mode (repeater = HTTP tampering + rate/pacing, cyboros = recon pipeline, ad/wifi/mobile =

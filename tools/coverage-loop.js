@@ -26,8 +26,8 @@ const path = require('path');
 const coverage = require('./coverage');
 const tm = require('./target-model');
 
-const WS = path.join(__dirname, '..');
-const reportsDir = () => process.env.COVERAGE_REPORTS_DIR || path.join(WS, 'reports');
+const { dataPaths } = require('./config');
+const reportsDir = () => process.env.COVERAGE_REPORTS_DIR || dataPaths().reports;
 const findingsFile = () => process.env.FINDINGS_JSONL || path.join(reportsDir(), 'findings.jsonl');
 
 // Which vuln classes each discovered surface makes RELEVANT (i.e. worth testing). Kept

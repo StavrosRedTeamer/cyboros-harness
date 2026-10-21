@@ -4,16 +4,16 @@
 > dimensione, avanzamento delle checkbox dei piani). Non si modifica a mano: rigeneralo.
 > `tools/test-repo-invariants.js` fallisce se è rimasto indietro rispetto ai file.
 
-**Superficie viva:** 36 documenti · **piani:** 11 · **archivio:** 3 file superati.
+**Superficie viva:** 39 documenti · **piani:** 11 · **archivio:** 3 file superati.
 
 ## Root del repo
 
 - [**AGENTS.md — Cyboros Harness**](../AGENTS.md) — Operatore AI per operazioni di pentest autorizzate (web/host, wireless, mobile). · 5,5 KB
 - [**Benchmark**](../BENCHMARK.md) — Public security benchmarks are in the model's training data. "Solved" on OWASP Juice · 15,6 KB
-- [**Changelog**](../CHANGELOG.md) — All notable changes to this project are documented here. Dates are commit dates. · 62,1 KB
+- [**Changelog**](../CHANGELOG.md) — All notable changes to this project are documented here. Dates are commit dates. · 65,6 KB
 - [**Contributor Covenant Code of Conduct**](../CODE_OF_CONDUCT.md) — We as members, contributors, and leaders pledge to make participation in our community a · 5,8 KB
 - [**Contributing**](../CONTRIBUTING.md) — This repository is a penetration-testing harness built around one claim: a finding is only a · 5,8 KB
-- [**Cyboros Harness**](../README.md) — A penetration-testing harness where a finding is only a finding if code can prove it — · 15,9 KB
+- [**Cyboros Harness**](../README.md) — A penetration-testing harness where a finding is only a finding if code can prove it — · 17,7 KB
 - [**Security Policy**](../SECURITY.md) — Cyboros Harness is offensive-security tooling. It executes reconnaissance and · 4,5 KB
 - [**Prompt di sessione — benchmark gen-bench**](../bench-session-prompt.md) — Sei Cyboros. Questa sessione è una run di benchmark, non un engagement. · 5,1 KB
 - [**Cyboros — Web Red Team Methodology & Rules of Engagement**](../knowledge.md) — Shared brain for every Cyboros agent — read before acting. Detail lives in docs/ (map at bottom); · 16,2 KB
@@ -22,9 +22,11 @@
 
 ## `docs/` — riferimento
 
-- [**Adopting Cyboros in an organization**](ADOPTION.md) — A due-diligence page for the security lead, the legal reviewer and the procurement · 10,3 KB
-- [**Architecture**](ARCHITECTURE.md) — The whole design follows from one decision: the model decides what to try; the · 11,2 KB
+- [**Adopting Cyboros in an organization**](ADOPTION.md) — A due-diligence page for the security lead, the legal reviewer and the procurement · 12,0 KB
+- [**Architecture**](ARCHITECTURE.md) — The whole design follows from one decision: the model decides what to try; the · 13,8 KB
+- [**Deploying the console**](DEPLOY.md) — A deployment is two things: code (this repository, or the container image) and a · 6,5 KB
 - [**Glossary**](GLOSSARY.md) — The harness uses a small set of terms with exact meanings. They are load-bearing: · 3,3 KB
+- [**Identity and access control**](IDENTITY.md) — The Command Center has accounts. Every `/api` request — read or write — is · 7,0 KB
 - [**Launch plan**](LAUNCH-PLAN.md) — Most AI pentest agents are built to *find* things. The bottleneck in this field · 13,8 KB
 - [**Measuring whether an AI pentest agent's findings are real**](METHODOLOGY.md) — An agent that reports everything it can think of scores 100% recall and is · 7,3 KB
 - [**L'anello — perché questo harness si chiama Cyboros**](OUROBOROS.md) — Cyboros = cyber + ouroboros. La metafora è vera qui perché è già nel codice: l'harness · 2,4 KB
@@ -33,6 +35,7 @@
 - [**Threat model: attacking Cyboros Harness itself**](THREAT-MODEL.md) — Not the target. The target is supposed to be attacked — that is the job. What is · 12,6 KB
 - [**Alternative-tools audit — what the harness should adopt, borrow, or leave alone**](TOOL-ALTERNATIVES-AUDIT.md) — Three concrete gaps, in priority order: · 26,1 KB
 - [**What the published benchmarks measure, and what they leave out**](TOOL-LANDSCAPE.md) — As of mid-2026 there is real, serious work here, and none of it is · 6,3 KB
+- [**Upgrading an installation**](UPGRADING.md) — Two things move independently: the code (checkout or image) and the data · 4,3 KB
 - [**Cyboros Command Center — Desktop Edition (piano e work package)**](command-center-desktop.md) — Obiettivo. Portare il Command Center da dashboard web a programma desktop (`cyboros-cc`) · 25,7 KB
 - [**Community scout #2 — web, HN e community, 2026-10-04 → 2026-10-09**](community-scout-2026-10-09.md) — OpenAPI/GraphQL SDL/WSDL/.proto. Pipeline a due stadi — cattura una volta, genera (anche · 30,1 KB
 - [**Community scout — Reddit pentest/redteam, ottobre 2026**](community-scout-2026-10.md) — *supervised*, guardia obbligatoria al confine di esecuzione, finding legati a ricevute · 23,1 KB

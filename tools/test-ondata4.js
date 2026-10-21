@@ -329,17 +329,17 @@ async function main() {
     assert.ok(r.stdout.includes('usage.tokens_in must be a non-negative int'), r.stdout);
     assert.ok(!fs.existsSync(FJ), 'nessuna scrittura su usage invalido');
   });
-  ok('report-html: buildHtml include sezione «Costi & usage» con totali e per-agent', () => {
+  ok('report-html: buildHtml include la sezione «Cost & usage» con totali e per-agent', () => {
     const html = require(path.join(WS, 'tools', 'report-html'));
     const accounting = accLib.aggregateAll([
       { bin: 'nmap', agent: 'scout', usage: { tokens_in: 1000, tokens_out: 500, cost: 0.01 } },
     ]);
     const out = html.buildHtml({ findings: [], targets: [], chains: [], accounting, generatedAt: '2026-08-26T00:00:00Z' });
-    assert.ok(out.includes('Costi &amp; usage (F8)'));
-    assert.ok(out.includes('1500</strong> token'));
-    assert.ok(out.includes('Per agente'));
+    assert.ok(out.includes('Cost &amp; usage'));
+    assert.ok(out.includes('1500</strong> tokens'));
+    assert.ok(out.includes('By agent'));
     assert.ok(out.includes('nmap'));
-    assert.ok(html.accountingSection(null).includes('Nessun dato di usage'), 'senza dati: messaggio muted, non errore');
+    assert.ok(html.accountingSection(null).includes('No usage data recorded'), 'senza dati: messaggio muted, non errore');
   });
   ok('opstate accounting: read-only (zero scritture) con totali di sessione', () => {
     const auditFile = path.join(T, 'op-audit.jsonl');

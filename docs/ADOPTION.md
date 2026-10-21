@@ -22,6 +22,8 @@ one. The five questions a serious reviewer asks, and where each is answered:
 | Who is liable, and what covers us legally? | A signed RoE / authorization letter you adapt with counsel; a safe harbor that mirrors Kali/OWASP. | [`legal/RoE-template.md`](../legal/RoE-template.md), [`SECURITY.md`](../SECURITY.md#safe-harbor) |
 | Where does client data go? | Only to disk the operator controls, mode `0600`, never into git. | [`.gitignore`](../.gitignore), [`tools/privacy.js`](../tools/privacy.js), [`tools/doctor.js`](../tools/doctor.js) |
 | Can we reconstruct what happened? | Append-only, hash-chained, tamper-evident audit trail. | [`tools/audit-trail.js`](../tools/audit-trail.js), [`tools/record-finding.js`](../tools/record-finding.js) |
+| Who can act, and who approved it? | Three roles (viewer/operator/admin) enforced on reads and writes; every action audited with the signed-in identity. | [`tools/identity.js`](../tools/identity.js), [`docs/IDENTITY.md`](IDENTITY.md) |
+| How is it installed, configured and upgraded? | One validated config file plus env overrides (a bad file is one message and exit 2), a first-run command that writes only into the data directory, a code-only container image, and a documented upgrade path for identity and audit data. | [`tools/config.js`](../tools/config.js), [`docs/DEPLOY.md`](DEPLOY.md), [`docs/UPGRADING.md`](UPGRADING.md) |
 | What is the tool's own attack surface? | Zero runtime dependencies; a private disclosure channel; one honest caveat. | [`package.json`](../package.json), [`SECURITY.md`](../SECURITY.md) |
 
 The rest of this page expands each row.
@@ -46,6 +48,12 @@ that run below the model and fail closed.
   a destructive or high-impact action cannot start without an explicit operator
   grant ([`tools/request-approval.js`](../tools/request-approval.js),
   [`tools/cc-approvals.js`](../tools/cc-approvals.js)).
+- **Identity, not a shared secret.** The console authenticates every request
+  (session cookie from a scrypt-checked account, or the machine token at operator
+  level) and authorizes by role: a viewer cannot change scope, an operator cannot
+  create accounts, and account management needs an admin. The approver recorded
+  on a grant is the signed-in principal, and a body field claiming otherwise is
+  ignored ([`tools/identity.js`](../tools/identity.js), [`docs/IDENTITY.md`](IDENTITY.md)).
 
 ### The paperwork that must exist before anyone presses start
 
@@ -172,6 +180,11 @@ A reviewer can tick these against the repository directly:
 - [ ] Client data is git-ignored and `0600` at rest — [`.gitignore`](../.gitignore), [`tools/doctor.js`](../tools/doctor.js)
 - [ ] PII can be withheld from hosted models — [`tools/privacy.js`](../tools/privacy.js)
 - [ ] The audit trail is append-only and tamper-evident — [`tools/audit-trail.js`](../tools/audit-trail.js)
+- [ ] Configuration is one validated file and an invalid one refuses to start — [`tools/config.js`](../tools/config.js)
+- [ ] The image ships code only; engagements and config are mounted — [`Dockerfile`](../Dockerfile), [`docker-compose.yml`](../docker-compose.yml)
+- [ ] Upgrades and rollback are documented for identity and audit data — [`docs/UPGRADING.md`](UPGRADING.md)
+- [ ] Access is role-based and authenticated on reads and writes — [`tools/identity.js`](../tools/identity.js)
+- [ ] Who approved a destructive action is the signed-in identity — [`tools/cc-approvals.js`](../tools/cc-approvals.js)
 - [ ] Severity is capped by evidence — [`tools/record-finding.js`](../tools/record-finding.js)
 - [ ] Zero runtime dependencies — [`package.json`](../package.json)
 - [ ] A private vulnerability-disclosure channel exists — [`SECURITY.md`](../SECURITY.md)

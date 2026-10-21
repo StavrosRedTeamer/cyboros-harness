@@ -2,6 +2,16 @@
 auth.json
 c2.json
 scope.json
+# Account del Command Center (hash scrypt e ruoli): e' un segreto come scope.json.
+# Non c'e' un esempio versionato per scelta: il file nasce da tools/users.js add --generate.
+users.json
+users.json.bak*
+users.json.*.tmp
+# Configurazione di una installazione (percorsi, host, provider): nasce da
+# cyboros.config.example.json o da tools/init.js, e resta fuori dal repo.
+cyboros.config.json
+# Volume di deploy (config + dati montati): mai versionato.
+deploy/
 # Scope del benchmark (loopback-only, seed del bench): e' un'autorizzazione come scope.json,
 # anche se innocua. Nessun file di autorizzazione nel repo.
 scope.bench.json

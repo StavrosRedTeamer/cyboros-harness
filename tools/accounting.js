@@ -114,7 +114,7 @@ function aggregateAll(linesOrText) {
 // --- I/O helper (offline, env-overridable) ------------------------------------
 
 function loadAuditLines(file) {
-  const f = file || process.env.RUN_AUDIT_FILE || require('path').join(__dirname, '..', 'reports', 'tmp', 'run-audit.jsonl');
+  const f = file || process.env.RUN_AUDIT_FILE || require('path').join(require('./config').dataPaths().tmp, 'run-audit.jsonl');
   try {
     return fs.readFileSync(f, 'utf8').split(/\r?\n/).filter(Boolean)
       .map((l) => { try { return JSON.parse(l); } catch { return null; } }).filter(Boolean);

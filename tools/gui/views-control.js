@@ -316,7 +316,7 @@ function ccGraphPaint(pane, g) {
 
   if (!hosts.length) {
     pane.replaceChildren(el('div', { class: 'cc-grid' }, [tiles,
-      ccWide(ccPanel('Host exposure map', [el('div', { class: 'muted', style: { padding: '8px' } }, 'no target model yet — run recon/map to populate reports/state.db')],
+      ccWide(ccPanel('Host exposure map', [el('div', { class: 'muted', style: { padding: '8px' } }, 'no hosts mapped yet — run a recon or a map to populate the exposure view')],
         'un host per indirizzo · servizi, porte, endpoint e finding'))]));
     return;
   }
@@ -562,7 +562,7 @@ function renderArsenalTab() {
     const c = inv.counts || {};
     const inst = inv.install || {};
     const groups = inv.groups || {};
-    const readOnly = !CC_TOKEN;
+    const readOnly = !can('operator');
 
     const tiles = el('div', { class: 'cc-stats' }, [
       statTile({ label: 'registry', value: (c.registry_present != null ? c.registry_present + '/' + c.registry_total : '—'), tone: c.registry_missing ? 'med' : 'ok', hint: 'binari usati da run.js' }),

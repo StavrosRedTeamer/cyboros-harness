@@ -26,7 +26,7 @@ const fs = require('fs');
 const path = require('path');
 
 const REGISTRY_FILE = () => process.env.PROC_REGISTRY_FILE ||
-  path.join(__dirname, '..', 'reports', 'tmp', 'proc-registry.json');
+  path.join(require('./config').dataPaths().tmp, 'proc-registry.json');
 
 function load() {
   try { return JSON.parse(fs.readFileSync(REGISTRY_FILE(), 'utf8')); } catch { return { tasks: {} }; }

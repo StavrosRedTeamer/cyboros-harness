@@ -5,39 +5,39 @@ const $ = (s, r) => (r || document).querySelector(s);
 const $$ = (s, r) => Array.from((r || document).querySelectorAll(s));
 const byId = (id) => document.getElementById(id);
 
-// ── session token ───────────────────────────────────────────────────────────
-// Writes (POST/DELETE) and the interactive streams require it. It arrives once as
-// ?token=<hex> (printed by the server, injected by the desktop shell), is kept in
-// sessionStorage and stripped from the URL so it never lands in history/bookmarks.
-const CC_TOKEN = (() => {
-  try {
-    const u = new URL(location.href);
-    const t = u.searchParams.get('token');
-    if (t) {
-      sessionStorage.setItem('cc_token', t);
-      u.searchParams.delete('token');
-      const qs = u.searchParams.toString();
-      history.replaceState(null, '', u.pathname + (qs ? '?' + qs : '') + u.hash);
-      return t;
-    }
-    return sessionStorage.getItem('cc_token') || '';
-  } catch { return ''; }
-})();
-// append the token to a URL that cannot carry headers (EventSource: SSE)
-const withToken = (p) => (CC_TOKEN ? p + (p.indexOf('?') >= 0 ? '&' : '?') + 'token=' + encodeURIComponent(CC_TOKEN) : p);
+// ── identity ────────────────────────────────────────────────────────────────
+// The session is an HttpOnly cookie set by the server; the page never holds a
+// credential. `can()` only decides what to *render* — the API authorizes every
+// request independently, so hiding a button is convenience, not a control.
+const ROLE_RANK = { viewer: 1, operator: 2, admin: 3 };
+let CC_USER = null;
+const can = (need) => !!CC_USER && (ROLE_RANK[CC_USER.role] || 0) >= (ROLE_RANK[need] || 99);
+// Sessions travel in the cookie; EventSource sends it automatically. Kept as a
+// named function because the SSE call sites read better as withToken(url).
+const withToken = (p) => p;
 
-// Shown once if a write comes back 403 tokenRequired: the page was opened without
-// a token (e.g. a bare http://127.0.0.1:8787 bookmark), so it is read-only.
-function readOnlyBanner() {
+// A viewer sees the whole board and can change nothing: say so once, quietly,
+// instead of letting every control fail on click.
+function roleBanner(text) {
   if (byId('cc-readonly')) return;
   const bar = document.createElement('div');
   bar.id = 'cc-readonly';
   bar.className = 'readonly-banner';
   bar.setAttribute('role', 'status');
-  bar.textContent = 'READ-ONLY — this page has no session token: write actions (scope, pipeline, terminal) are disabled. Open the tokenized URL printed by the server, or relaunch with ./start-command-center.sh';
+  bar.textContent = text;
   const rail = byId('status-rail');
   if (rail && rail.parentNode) rail.parentNode.insertBefore(bar, rail.nextSibling);
   else document.body.insertBefore(bar, document.body.firstChild);
+}
+
+function renderUser() {
+  const chip = byId('cc-user');
+  if (!chip || !CC_USER) return;
+  chip.textContent = CC_USER.username + ' · ' + CC_USER.role;
+  chip.setAttribute('title', 'signed in as ' + CC_USER.username + ' (' + CC_USER.role + ')');
+  chip.dataset.role = CC_USER.role;
+  const out = byId('btn-logout');
+  if (out) out.disabled = false;
 }
 
 const esc = (v) => String(v == null ? '' : v)
@@ -83,15 +83,16 @@ const proofLevel = (s) => {
 const epBreak = (s) => esc(s).replace(/(\/|\?|=|&amp;|_|-)/g, '$1<wbr>');
 
 async function api(path, opts) {
-  const o = Object.assign({}, opts);
-  if (CC_TOKEN) o.headers = Object.assign({}, (opts && opts.headers) || {}, { 'X-Cyboros-Token': CC_TOKEN });
+  const o = Object.assign({ credentials: 'same-origin' }, opts);
   const res = await fetch(path, o);
   let body = null;
   try { body = await res.json(); } catch { /* empty */ }
-  if (!res.ok) {
-    if (res.status === 403 && body && body.tokenRequired) readOnlyBanner();
-    throw new Error((body && body.error) || ('HTTP ' + res.status));
+  if (res.status === 401) {
+    const next = encodeURIComponent(location.pathname + location.search);
+    location.replace('/login?next=' + next);
+    throw new Error('session expired — sign in again');
   }
+  if (!res.ok) throw new Error((body && body.error) || ('HTTP ' + res.status));
   return body;
 }
 
@@ -272,12 +273,14 @@ async function refreshBadges() {
     renderStatusRail(o);
     byId('server-sub').textContent = o.opstate
       ? o.opstate.mode + ' · updated ' + shortTs(o.opstate.updated_at)
-      : 'no operation-state.json';
+      : 'no operation started yet';
     if (activeTab === 'overview') renderOverview(o);
     return o;
   } catch (e) {
+    // The rail keeps what it last knew about the instance: which tree the tab is
+    // talking to does not change because one poll failed.
     renderStatusRail(null);
-    byId('server-sub').textContent = 'server unreachable — start: node tools/gui-server.js';
+    byId('server-sub').textContent = 'console not responding — retrying';
   }
 }
 
@@ -297,16 +300,55 @@ function railItem(o) {
   return node;
 }
 
+// ── served instance ─────────────────────────────────────────────────────────
+// Two consoles look identical while serving different data roots, so the rail says
+// which one answered. The last answer is kept: switching tabs (or one failed poll)
+// must not blank a line that has not changed.
+let LAST_INSTANCE = null;
+
+// Keep the segments that identify a root; the full path stays in the tooltip.
+function shortPath(p) {
+  const s = String(p || '');
+  const parts = s.split('/').filter(Boolean);
+  if (!parts.length) return '/';
+  if (parts.length <= 2) return s;
+  const tail = parts.slice(-2).join('/');
+  return parts[0] === '~' ? '~/' + tail : '…/' + tail;
+}
+
+function instanceItems(inst, offline) {
+  if (!inst) return [];
+  const where = inst.host + ':' + inst.port;
+  return [
+    railItem({
+      k: 'instance', v: where + (inst.packaged ? ' · packaged' : ' · checkout'),
+      tone: offline ? 'bad' : '',
+      title: 'serving http://' + where + '\nconfig: ' + (inst.configFile || 'built-in defaults'),
+    }),
+    railItem({
+      k: 'data', v: shortPath(inst.dataRoot),
+      tone: offline ? 'bad' : '',
+      title: 'data root: ' + inst.dataRoot + (inst.packaged
+        ? '\npackaged install — engagement data lives outside the code tree'
+        : '\ncheckout — code and engagement data share one tree'),
+    }),
+  ];
+}
+
 function renderStatusRail(o) {
   const rail = byId('status-rail');
   if (!rail) return;
-  if (!o) { rail.replaceChildren(railItem({ k: 'server', v: 'offline?', tone: 'bad' })); return; }
+  if (!o) {
+    rail.replaceChildren(...instanceItems(LAST_INSTANCE, true), railItem({ k: 'server', v: 'offline?', tone: 'bad' }));
+    return;
+  }
+  LAST_INSTANCE = o.instance || LAST_INSTANCE;
   const sc = o.scope, p = o.pipeline, bs = o.findings.bySeverity || {};
-  const items = [
-    railItem({ k: 'scope', tone: sc.failClosed ? 'bad' : 'ok', title: 'scope.json', tab: 'scope',
+  const items = instanceItems(LAST_INSTANCE, false);
+  items.push(
+    railItem({ k: 'scope', tone: sc.failClosed ? 'bad' : 'ok', title: 'authorized targets — empty blocks every target (fail-closed)', tab: 'scope',
       v: sc.failClosed ? 'FAIL-CLOSED' : sc.hosts + ' host · ' + sc.ips + ' ip' }),
-    railItem({ k: 'rps', v: String(sc.rps), title: 'max_requests_per_second', tab: 'scope' }),
-  ];
+    railItem({ k: 'rps', v: String(sc.rps), title: 'request rate cap per second', tab: 'scope' }));
   if (!p.db || !p.hasRun) items.push(railItem({ k: 'run', v: 'no run yet', tab: 'pipeline' }));
   else if (p.unclosed) items.push(railItem({ k: 'run', v: 'done (unclosed)', tone: 'warn', tab: 'pipeline',
     title: 'target: ' + (p.runTarget || '') + ' — phases finished, run never closed' }));
@@ -321,7 +363,8 @@ function renderStatusRail(o) {
     v: (o.findings.total || 0) + ' · ' + (bs.Critical || 0) + 'C ' + (bs.High || 0) + 'H',
     tone: (bs.Critical || 0) > 0 ? 'bad' : (bs.High || 0) > 0 ? 'warn' : 'ok' }));
   items.push(railItem({ k: 'loot', v: String(o.lootCount || 0), title: 'loot rows (contents never shown)' }));
-  items.push(el('div', { class: 'rail-spacer' }));
+  // Pinned right by an auto margin (not a spacer div): a spacer eats the free space
+  // before the hint gets a chance, so the hint wraps alone on a wide rail.
   items.push(el('div', { class: 'rail-item rail-hint', html: 'press <kbd>⌘K</kbd> for commands' }));
   rail.replaceChildren(...items);
 }
@@ -689,7 +732,7 @@ function renderPipeline(data) {
   if (!data.db) {
     pane.replaceChildren(el('div', { class: 'card' }, [
       el('h2', null, 'Pipeline'),
-      el('div', { class: 'muted', html: 'no <span class="mono">reports/state.db</span> yet — run <code>node tools/cyboros.js recon &lt;host&gt;</code> first.' }),
+      el('div', { class: 'muted' }, 'no run yet — start with a recon against an in-scope host.'),
     ]));
     return;
   }
@@ -895,7 +938,7 @@ function renderSessions(data) {
   ]);
 
   const tableCard = el('div', { class: 'card', style: { padding: '0', marginTop: '12px' } }, dataTable({
-    sticky: true, empty: 'no sessions in reports/sessions.json',
+    sticky: true, empty: 'no sessions yet — a session appears once you obtain access to a target',
     onRow: (s) => openSessionDrawer(s),
     rows: data.rows || [],
     columns: [
@@ -1102,6 +1145,7 @@ function renderTab(tab) {
   else if (tab === 'scope') { showSkeleton('scope'); api('/api/scope').then(renderScope).catch((e) => toast(String(e.message || e), 'err')); }
   else if (tab === 'arsenal') { showSkeleton('arsenal'); renderArsenalTab(); }
   else if (tab === 'control') { showSkeleton('control'); renderControlTab(); }
+  else if (tab === 'users') { showSkeleton('users'); renderUsers(); }
   else if (tab === 'reports') { showSkeleton('reports'); api('/api/reports').then(renderReports).catch((e) => toast(String(e.message || e), 'err')); }
   else if (tab === 'freebuff') renderFreebuffTab();
 }
@@ -1480,4 +1524,55 @@ setInterval(() => {
   }).catch(() => {});
 }, 5000);
 
-refreshBadges();
+// ── boot: identify, then render ───────────────────────────────────────────────
+// The shell is served unauthenticated (it is just markup), so the first data call
+// is what establishes the session — and a 401 sends the tab to /login.
+// Sticky chrome: the tab row wraps (17 tabs), so its height is not a constant.
+// Both sticky offsets come from these two custom properties.
+function measureChrome() {
+  const tb = byId('topbar');
+  const tabs = byId('tabs');
+  const rs = document.documentElement.style;
+  if (tb) rs.setProperty('--topbar-h', tb.offsetHeight + 'px');
+  if (tabs) rs.setProperty('--tabs-h', tabs.offsetHeight + 'px');
+}
+window.addEventListener('resize', measureChrome);
+if (typeof ResizeObserver === 'function') {
+  const ro = new ResizeObserver(measureChrome);
+  const tb = byId('topbar');
+  const tabs = byId('tabs');
+  if (tb) ro.observe(tb);
+  if (tabs) ro.observe(tabs);
+}
+
+async function boot() {
+  measureChrome();
+  try {
+    const res = await fetch('/api/auth/me', { credentials: 'same-origin' });
+    if (res.status === 401) {
+      const next = encodeURIComponent(location.pathname + location.search);
+      location.replace('/login?next=' + next);
+      return;
+    }
+    const me = await res.json();
+    CC_USER = me.user;
+    renderUser();
+    if (!can('operator')) {
+      roleBanner('VIEWER — read-only session: scope edits, pipeline runs, approvals and the terminal are disabled for this role.');
+    }
+  } catch (e) {
+    toast('Cannot reach the console backend: ' + (e && e.message ? e.message : 'network error'), 'err');
+    return;
+  }
+  refreshBadges();
+}
+
+const logoutBtn = byId('btn-logout');
+if (logoutBtn) {
+  logoutBtn.addEventListener('click', async () => {
+    try { await fetch('/api/auth/logout', { method: 'POST', credentials: 'same-origin' }); } catch { /* ignore */ }
+    location.replace('/login');
+  });
+}
+
+boot();

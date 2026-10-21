@@ -61,7 +61,7 @@ function scanAll(command) {
 
 function audit(entry) {
   try {
-    const dir = path.join(__dirname, '..', 'reports', 'tmp');
+    const dir = require('./config').dataPaths().tmp;
     fs.mkdirSync(dir, { recursive: true });
     fs.appendFileSync(path.join(dir, 'run-audit.jsonl'), JSON.stringify(entry) + '\n');
   } catch { /* audit best-effort */ }

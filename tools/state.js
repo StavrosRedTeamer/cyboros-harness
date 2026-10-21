@@ -7,7 +7,8 @@
 const fs = require('fs');
 const path = require('path');
 
-const DB_PATH = () => process.env.STATE_DB || path.join(__dirname, '..', 'reports', 'state.db');
+const { dataPaths } = require('./config');
+const DB_PATH = () => process.env.STATE_DB || dataPaths().stateDb;
 
 const SCHEMA = `
 CREATE TABLE IF NOT EXISTS runs (

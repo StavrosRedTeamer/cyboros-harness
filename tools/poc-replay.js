@@ -30,11 +30,12 @@ const path = require('path');
 const { spawnSync } = require('child_process');
 const { loadScope, inScope, cidrInScope } = require('./scope-guard');
 
-const WS_ROOT = path.join(__dirname, '..');
-const REPORTS = path.join(WS_ROOT, 'reports');
-const FINDINGS = process.env.FINDINGS_JSONL || path.join(REPORTS, 'findings.jsonl');
+const P = require('./config').dataPaths();
+const WS_ROOT = P.dataRoot;
+const REPORTS = P.reports;
+const FINDINGS = process.env.FINDINGS_JSONL || P.findings;
 const DEFAULT_EXP_DIR = process.env.EXP_DIR || path.join(REPORTS, 'exp');
-const DEFAULT_EI = process.env.EVIDENCE_INDEX_FILE || path.join(WS_ROOT, 'evidence-index.md');
+const DEFAULT_EI = process.env.EVIDENCE_INDEX_FILE || P.evidenceIndex;
 
 function loadFindings(file) {
   try {

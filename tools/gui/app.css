@@ -194,10 +194,15 @@ h1 { margin: 0; display: flex; align-items: center; gap: 11px; flex-wrap: wrap; 
 
 /* ── tabs ──────────────────────────────────────────────── */
 #tabs {
-  display: flex; gap: 2px; padding: 0 16px;
+  /* 17 tabs at 12px mono exceed a 1440px laptop: wrap so the last group (Users,
+     Reports, Freebuff) is never unreachable. The full nav rework stays its own
+     task; this keeps every tab visible until then. */
+  display: flex; flex-wrap: wrap; gap: 2px; padding: 0 16px;
   background: #070510;
   border-bottom: 1px solid var(--line-2);
-  position: sticky; top: 61px; z-index: 19;
+  /* sticky offsets are measured at runtime (app.js: measureChrome) because the
+     tab row wraps to two lines on a 1440px laptop and one line on a wide screen. */
+  position: sticky; top: var(--topbar-h, 61px); z-index: 19;
 }
 .tab {
   background: transparent; border: 0;
@@ -363,7 +368,7 @@ tr.sev-row.s-crit:hover td { background: rgba(255,43,94,.06); }
 
 /* ── forms ─────────────────────────────────────────────── */
 label { display: block; font: 600 10.5px var(--mono); text-transform: uppercase; letter-spacing: .8px; color: var(--muted); margin: 13px 0 5px; }
-input[type="text"], input[type="number"], input[type="search"], select, textarea {
+input[type="text"], input[type="number"], input[type="search"], input[type="password"], select, textarea {
   width: 100%; background: var(--bg2); color: var(--ink);
   border: 1px solid var(--line-2); border-radius: 0;
   padding: 7px 10px; font: 13px var(--mono);
@@ -540,8 +545,7 @@ body.term-resizing .term-grip { pointer-events: none; }
 
 @media (max-width: 760px) {
   #topbar { flex-direction: column; align-items: stretch; }
-  #tabs { top: 116px; overflow-x: auto; }
-  #status-rail { top: 156px; }
+  #tabs { overflow-x: auto; }
   .tabpane { padding: 14px; }
   .filters .f { flex: 1 1 100%; }
 }
@@ -556,7 +560,7 @@ body.term-resizing .term-grip { pointer-events: none; }
   padding: 0 16px; min-height: var(--rail-h);
   background: linear-gradient(180deg, #0a0715, #070510);
   border-bottom: 1px solid var(--line-2);
-  position: sticky; top: 100px; z-index: 18;
+  position: sticky; top: calc(var(--topbar-h, 61px) + var(--tabs-h, 45px)); z-index: 18;
   font: 11px var(--mono);
 }
 .rail-item {
@@ -581,8 +585,7 @@ body.term-resizing .term-grip { pointer-events: none; }
 .rail-item.st-warn .rail-v { color: #ffe98f; }
 .rail-item.st-bad  .rail-v { color: #ff9fb6; }
 .rail-item.st-live .rail-v { color: #a9ecff; }
-.rail-spacer { flex: 1 1 auto; border-right: 0; }
-.rail-item.rail-hint { color: var(--faint); font-size: 10px; border-right: 0; }
+.rail-item.rail-hint { margin-left: auto; color: var(--faint); font-size: 10px; border-right: 0; }
 .rail-item.rail-hint kbd { margin: 0 2px; }
 
 /* ══ command palette (⌘/Ctrl-K) — client-side navigator + quick actions ══════ */
@@ -888,4 +891,18 @@ body.tv .wr-feed { max-height: 58vh; }
 
 @media (prefers-reduced-motion: reduce) {
   .wr-flash, .wr-feed-row.wr-new, .wr-dot { animation: none !important; }
+}
+
+/* ══ users view (admin) ═════════════════════════════════════════════════════
+   Small, local layout for the account form; everything else reuses the table,
+   card and button primitives above. */
+@layer views {
+  .uform { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 10px; align-items: end; }
+  .ufield { display: grid; gap: 4px; font: 500 10px/1 var(--mono); letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
+  .ufield input, .ufield select { width: 100%; }
+  .uform-actions { grid-column: 1 / -1; display: flex; gap: 8px; align-items: center; }
+  .uform-actions .btn { flex: 1 1 auto; white-space: nowrap; }
+  #tab-users table td, #tab-users table th { vertical-align: middle; }
+  #tab-users input[type="password"] { min-width: 12em; }
+  .chip.ok { color: #9cf7c8; background: #061c12; border-color: var(--green); }
 }

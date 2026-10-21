@@ -326,7 +326,7 @@ function warSetFocus(host) {
 function warHostPanel(d) {
   const f = d.host_focus;
   const eng = d.engagement || {};
-  const readOnly = !CC_TOKEN;
+  const readOnly = !can('operator');
   if (f) {
     return ccPanel('Host focus', [
       el('div', { class: 'cc-row' }, [
@@ -414,7 +414,7 @@ function warHeader(d) {
     ccBadge('scope ' + (d.scope.fail_closed ? 'FAIL-CLOSED' : d.scope.hosts + 'h · ' + d.scope.ips + 'ip'), d.scope.fail_closed ? 'crit' : 'ok'),
     el('span', { class: 'wr-live', title: 'last tick ' + new Date().toLocaleTimeString() }, [el('span', { class: 'wr-dot' }), warTv ? 'TV · 2s' : 'live · 5s']),
     el('button', { class: 'btn btn-sm', onClick: warToggleTv }, warTv ? '⤢ exit TV' : '⛶ TV mode'),
-    el('button', { class: 'btn btn-sm', disabled: !(typeof CC_TOKEN !== 'undefined' && CC_TOKEN), title: 'stop harness-owned processes', onClick: warPanicDrawer }, '⏹ PANIC'),
+    el('button', { class: 'btn btn-sm', disabled: !can('operator'), title: 'stop harness-owned processes', onClick: warPanicDrawer }, '⏹ PANIC'),
   ]);
 }
 

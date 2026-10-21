@@ -35,7 +35,8 @@ const { loadScope, inScope, hostOf, cidrInScope } = require('./scope-guard');
 const { scanAll } = require('./enforce');
 const privacy = require('./privacy');
 const { hasBin } = require('./tool-plane');
-const EGRESS_STATE = process.env.EGRESS_STATE_FILE || path.join(__dirname, '..', 'reports', 'tmp', 'egress-proxy.json'); // vedi egress-proxy.js
+const { dataPaths } = require('./config');
+const EGRESS_STATE = process.env.EGRESS_STATE_FILE || path.join(dataPaths().tmp, 'egress-proxy.json'); // vedi egress-proxy.js
 
 // ─── Ondata 2 additions (D2/B8/E10 + budget hook) ─────────────────────────────
 // All additions are SUPERSET: original behavior, exit codes and audit fields are kept;
@@ -117,7 +118,7 @@ function taxonomyEntry(errorClass) {
 
 // E10: response cache — STRICTLY opt-in (--cache-ttl), ONLY for registry entries marked
 // read_only:true AND never for active scanners regardless of what the registry says.
-const CACHE_DIR = process.env.CACHE_DIR || path.join(__dirname, '..', 'reports', 'tmp', 'cache');
+const CACHE_DIR = process.env.CACHE_DIR || path.join(dataPaths().tmp, 'cache');
 const CACHE_TTL_DEFAULT = parseInt(process.env.CACHE_TTL_DEFAULT || '900', 10); // 15 min, per-engagement recon
 const CACHE_SCAN_NEVER = new Set(['nmap', 'masscan', 'nuclei', 'httpx', 'ffuf', 'gobuster', 'dirsearch', 'nikto', 'sqlmap', 'hydra', 'netexec']);
 function cacheEligible(bin, map) {
@@ -199,7 +200,7 @@ function budgetPrecheck() {
 // env AUDIT_DIR per i test). Un errore sul trail NON blocca mai il wrapper (additivo).
 function audit(entry) {
   try {
-    const file = process.env.RUN_AUDIT_FILE || path.join(__dirname, '..', 'reports', 'tmp', 'run-audit.jsonl');
+    const file = process.env.RUN_AUDIT_FILE || path.join(dataPaths().tmp, 'run-audit.jsonl');
     fs.mkdirSync(path.dirname(file), { recursive: true });
     fs.appendFileSync(file, JSON.stringify(entry) + '\n');
   } catch {}

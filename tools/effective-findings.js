@@ -25,7 +25,7 @@ const { validateQuote } = require('./evidence-quote');
 const vlog = require('./verification-log');
 const { key: findingKey } = require('./record-finding');
 
-const FINDINGS = () => process.env.FINDINGS_JSONL || path.join(__dirname, '..', 'reports', 'findings.jsonl');
+const FINDINGS = () => process.env.FINDINGS_JSONL || require('./config').dataPaths().findings;
 
 // Un record promuove solo se il disco, ora, regge: oracle rivalidato e quote verbatim.
 function promotable(rec) {

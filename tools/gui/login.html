@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sign in · Cyboros Command Center</title>
+<style>
+  /* Self-contained: the login page must render before any session exists, and it
+     borrows the console's palette rather than its 52 KB of app chrome. */
+  :root {
+    --bg: #08060d; --surface: #0f0b18; --line: #261a3d; --line-2: #3a2a5c;
+    --ink: #eae7f7; --muted: #9b90b8; --faint: #665b84;
+    --cyan: #24e3ff; --magenta: #ff2d95; --crit: #ff2b5e;
+    --mono: "JetBrains Mono", "Cascadia Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    --sans: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; min-height: 100vh; display: grid; place-items: center;
+    background:
+      radial-gradient(900px 500px at 50% -10%, rgba(36,227,255,.10), transparent 60%),
+      radial-gradient(700px 400px at 100% 110%, rgba(255,45,149,.08), transparent 60%),
+      var(--bg);
+    color: var(--ink); font-family: var(--sans);
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { width: min(420px, calc(100vw - 32px)); }
+  .brand { display: flex; align-items: baseline; gap: 10px; margin-bottom: 22px; }
+  .brand .glyph { color: var(--cyan); font-size: 22px; text-shadow: 0 0 12px rgba(36,227,255,.6); }
+  .brand h1 { font: 600 15px/1 var(--mono); letter-spacing: .18em; margin: 0; }
+  .brand span.tag { font: 500 10px/1 var(--mono); letter-spacing: .16em; color: var(--muted); border: 1px solid var(--line-2); padding: 4px 6px; }
+  form {
+    background: var(--surface); border: 1px solid var(--line);
+    padding: 26px 24px 20px; position: relative;
+    clip-path: polygon(0 0, calc(100% - 12px) 0, 100% 12px, 100% 100%, 12px 100%, 0 calc(100% - 12px));
+  }
+  form::before {
+    content: ""; position: absolute; inset: 0 auto auto 0; width: 60%; height: 2px;
+    background: linear-gradient(90deg, var(--cyan), transparent);
+  }
+  label { display: block; font: 500 10px/1 var(--mono); letter-spacing: .16em; color: var(--muted); margin: 0 0 6px; text-transform: uppercase; }
+  input {
+    width: 100%; padding: 11px 12px; margin-bottom: 16px;
+    background: #050409; color: var(--ink); border: 1px solid var(--line-2);
+    font: 400 14px/1.2 var(--mono); border-radius: 0; outline: none;
+  }
+  input:focus { border-color: var(--cyan); box-shadow: 0 0 0 1px rgba(36,227,255,.35), 0 0 14px rgba(36,227,255,.18); }
+  button {
+    width: 100%; padding: 12px; border: 1px solid var(--cyan); background: rgba(36,227,255,.10);
+    color: var(--ink); font: 600 12px/1 var(--mono); letter-spacing: .18em; text-transform: uppercase;
+    cursor: pointer;
+  }
+  button:hover:not(:disabled) { background: rgba(36,227,255,.18); }
+  button:disabled { opacity: .55; cursor: progress; }
+  .msg { min-height: 18px; margin: 14px 0 0; font: 400 12px/1.45 var(--mono); color: var(--crit); }
+  .msg:empty { display: none; }
+  .hint { margin-top: 16px; font: 400 11px/1.6 var(--mono); color: var(--faint); }
+  .hint code { color: var(--muted); }
+  :focus-visible { outline: 2px solid var(--cyan); outline-offset: 2px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="brand">
+    <span class="glyph" aria-hidden="true">◈</span>
+    <h1>CYBOROS HARNESS</h1>
+    <span class="tag">COMMAND CENTER</span>
+  </div>
+  <form id="login-form" novalidate>
+    <label for="username">Operator</label>
+    <input id="username" name="username" type="text" autocomplete="username" autocapitalize="none" spellcheck="false" required autofocus>
+    <label for="password">Password</label>
+    <input id="password" name="password" type="password" autocomplete="current-password" required>
+    <button id="submit" type="submit">Sign in</button>
+    <p class="msg" id="msg" role="alert" aria-live="assertive"></p>
+    <p class="hint">Accounts live in <code>users.json</code> on the console host. An admin creates them with
+      <code>node tools/users.js add &lt;name&gt; --role operator --generate</code>.</p>
+  </form>
+</div>
+<script src="login.js"></script>
+</body>
+</html>

@@ -29,9 +29,10 @@ const path = require('path');
 const crypto = require('crypto');
 const coverage = require('./coverage');
 
-const WS = path.join(__dirname, '..');
+const WS = path.join(__dirname, '..');   // the schema is code; the graph is engagement data
 const TAXONOMY_FILE = () => process.env.TAXONOMY_FILE || path.join(WS, 'docs', 'entity-taxonomy.yaml');
-const MEMORY_GRAPH_FILE = () => process.env.MEMORY_GRAPH_FILE || path.join(WS, 'lab-memory.json');
+const MEMORY_GRAPH_FILE = () => process.env.MEMORY_GRAPH_FILE
+  || path.join(require('./config').dataPaths().dataRoot, 'lab-memory.json');
 
 // I sei tipi della tassonomia (spec §3.1 F4). Nulla al di fuori è ammesso.
 const ENTITY_TYPES = ['Target', 'Port', 'Service', 'Vuln', 'Finding', 'Evidence'];

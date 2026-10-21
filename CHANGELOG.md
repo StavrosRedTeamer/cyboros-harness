@@ -8,6 +8,58 @@ changes). `v0.1.0` (2026-09-28) is the first tagged release; the latest is `v0.2
 
 ## [Unreleased]
 
+### Added
+
+- **Il Command Center ha un'identità: ruoli, account e audit dell'attore vero.** Prima
+  c'era un solo token condiviso: le scritture erano gated, ogni lettura era
+  loopback-trusted, e ogni azione era attribuita a una stringa scelta dal chiamante
+  (`actor: "mallory"` finiva nel log). Ora `tools/identity.js` autentica ogni richiesta
+  (cookie di sessione da account scrypt, oppure il token macchina come principal
+  `service`) e autorizza per ruolo — `viewer` legge, `operator` esegue, `admin` gestisce
+  gli account — su letture *e* scritture. Il terminale e lo stream dei job richiedono
+  `operator`: una shell non è una vista read-only. L'audit trail hash-chained registra
+  `auth.login`, `access.denied`, `console.write` e `user.*` con l'identità autenticata;
+  `cc-router` consuma `ctx.actor` e ignora `body.actor`, e la nota di modifica di
+  `scope.json` porta il nome di chi l'ha fatta.
+- **Account in un file validato (`users.json`, 0600) e una CLI per crearli.**
+  `node tools/users.js add <nome> --role admin --generate` è il primo passo (la password
+  non è mai un argomento: finirebbe in history e in `ps`); `passwd`, `role`, `disable`,
+  `remove`, `list` completano la gestione, e l'ultimo admin abilitato non può essere
+  rimosso, demoto o disabilitato. Un file corrotto fallisce chiuso: il server parte,
+  dichiara l'errore e rifiuta ogni login.
+- **Seam per un backend identità esterno.** `CYBOROS_AUTH_PROVIDER=<file.js>` carica un
+  provider `{ name, authenticate(req, ctx) -> principal|null }` consultato prima del
+  token macchina: un OIDC/SSO entra senza toccare un route handler. Un provider che
+  lancia, o che restituisce un ruolo sconosciuto, non autentica nessuno.
+- `docs/IDENTITY.md` (matrice dei ruoli, gestione account, sessione, audit, seam OIDC) e
+  la superficie di login del Command Center (`/login`, chip utente e sign-out).
+
+### Changed
+
+- **Le letture del Command Center non sono più anonime.** `GET /api/overview` senza
+  sessione risponde `401` (prima `200`), e un test che assumeva il contrario è stato
+  aggiornato: la superficie dati di un engagement non è pubblica nemmeno su loopback.
+- Il token di avvio resta per launcher e automazione, ma vale `operator` e non gestisce
+  account; aprire `/?token=…` lo scambia con un cookie di sessione e reindirizza, così
+  la credenziale non vive più nel JavaScript della pagina.
+
+- **Il Command Center dichiara l'istanza che sta servendo.** Due console con data root
+  diversi erano indistinguibili: la barra di stato non diceva né porta né albero. Ora
+  `/api/overview` porta `instance` (host, porta, data root, file di configurazione, e
+  `packaged` quando i dati vivono fuori dall'albero del codice) e la barra mostra
+  `instance 127.0.0.1:8787 · packaged` e `data <root>`, col path completo nel tooltip. La
+  riga resta anche quando un poll fallisce o si cambia tab.
+- **Il report HTML è in inglese, come il resto del prodotto.** Le sezioni copertura e
+  costi erano in italiano (`Copertura & accuratezza`, `Candidati`, `Per agente`) e il
+  documento consegnato al cliente citava file interni (`scope.json`, `state.db`,
+  `tools/report-html.js`). Ora ogni stringa è inglese e descrive l'esito, non il file —
+  `Coverage & accuracy`, `Cost & usage`, `Status legend` — e `test-report-html` rifiuta i
+  marcatori italiani.
+- **Le righe di stato parlano la lingua dell'operatore.** `no operation-state.json`,
+  `no sessions in reports/sessions.json`, `no reports/state.db` diventano «no operation
+  started yet», «no sessions yet», «no run yet»; il rail chiama lo scope «authorized
+  targets» invece del nome del file.
+
 ## [0.2.0] — 2026-10-20
 
 ### Fixed
