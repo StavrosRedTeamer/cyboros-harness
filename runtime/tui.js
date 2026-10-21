@@ -25,7 +25,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const readline = require('node:readline');
 const { loadScope, inScope } = require('../tools/scope-guard');
-const { renderMarkdown, createStream } = require('./render');
+const { renderMarkdown, createStream, thinkingLine, todoLines, THINKING_VERBS } = require('./render');
 const { createInput } = require('./inputline');
 
 const VERSION = '0.1.0-draft';
@@ -98,11 +98,11 @@ const GLYPHS = {
   '╭': '+', '╮': '+', '╰': '+', '╯': '+', '─': '-', '│': '|',
   '⏺': '*', '⎿': '|', '◆': '*', '◈': '@', '›': '>', '❯': '>', '⏵': '>',
   '✻': '*', '✢': '*', '✳': '*', '✶': '*', '✽': '*', '●': 'o', '▎': '|',
-  '→': '->', '←': '<-', '✔': 'OK', '✓': 'OK', '✖': 'X', '⚠': '!',
+  '→': '->', '←': '<-', '↑': '^', '↓': 'v', '✔': 'OK', '✓': 'OK', '✖': 'X', '⚠': '!',
   '■': '#', '█': '#', '░': '.', '…': '...', '·': '.', '—': '-', '–': '-',
-  '’': "'", '‘': "'",
+  '’': "'", '‘': "'", '☒': '[x]', '☐': '[ ]', '◐': '[~]',
 };
-const toAscii = (s) => String(s).replace(/[\u2500-\u259F\u25A0-\u25FF\u2700-\u27BF\u23B0-\u23FF\u276F\u2026\u2014\u2013\u2019\u2018\u00B7\u2192\u2190]/g, (c) => GLYPHS[c] || c);
+const toAscii = (s) => String(s).replace(/[\u2500-\u259F\u25A0-\u26FF\u2700-\u27BF\u23B0-\u23FF\u276F\u2026\u2014\u2013\u2019\u2018\u00B7\u2190-\u2193]/g, (c) => GLYPHS[c] || c);
 if (ASCII) {
   const write = process.stdout.write.bind(process.stdout);
   process.stdout.write = (chunk, enc, cb) => write(typeof chunk === 'string' ? toAscii(chunk) : chunk, enc, cb);
@@ -172,6 +172,7 @@ const state = {
   liveDeclined: false,   // asked once; /live still works
   liveUsage: { tokens_in: 0, tokens_out: 0, cost: 0 },
   thinking: true,
+  todos: [],
   events: [],
 };
 
@@ -336,17 +337,109 @@ function userBlock(text) {
   }
 }
 
+// ── interrupt: Esc (or ctrl+c) takes the turn back ──────────────────────────
+// The spinner advertises "esc to interrupt", so the key has to be real. Between
+// turns the input surface owns stdin; during a turn it is free, so this attaches
+// a transient raw-mode listener and tears it down when the turn ends. On a
+// non-TTY (the test harness, --script, a pipe) it is a strict no-op, so nothing
+// about the scripted output changes. It yields the keyboard back with pause()
+// whenever an approval prompt needs it, then resume()s.
+let ACTIVE_IRQ = null;
+const aborted = () => !!(ACTIVE_IRQ && ACTIVE_IRQ.aborted());
+
+function interruptScope() {
+  const stdin = process.stdin;
+  if (!stdin.isTTY || OPTS.fast || typeof stdin.setRawMode !== 'function') {
+    return { aborted: () => false, promise: new Promise(() => {}), stop() {}, pause() {}, resume() {} };
+  }
+  let isAborted = false;
+  let attached = false;
+  let stopped = false;
+  let resolveAbort = () => {};
+  const promise = new Promise((r) => { resolveAbort = r; });
+  const onData = (buf) => {
+    const s = buf.toString('utf8');
+    if (s === '\x1b' || s === '\x03') {            // bare Esc or ctrl+c
+      if (!isAborted) { isAborted = true; resolveAbort(); }
+    }
+  };
+  const detach = () => {
+    if (!attached) return;
+    stdin.removeListener('data', onData);
+    try { stdin.setRawMode(false); } catch { /* not a tty under us */ }
+    attached = false;
+  };
+  const attach = () => {
+    if (attached || stopped || isAborted) return;
+    try { stdin.setRawMode(true); } catch { /* not a tty under us */ }
+    stdin.resume();
+    stdin.on('data', onData);
+    attached = true;
+  };
+  attach();
+  return {
+    aborted: () => isAborted,
+    promise,
+    pause: detach,
+    resume: attach,
+    stop() {
+      if (stopped) return;
+      stopped = true;
+      detach();
+      stdin.pause();
+    },
+  };
+}
+
+// An interruptible pause: resolves after `ms`, or at once when the turn is
+// interrupted, so the scripted walkthrough stops the instant Esc is pressed.
+function pace(ms) {
+  if (OPTS.fast) return Promise.resolve();
+  if (!ACTIVE_IRQ || !ACTIVE_IRQ.promise) return sleep(ms);
+  return Promise.race([sleep(ms), ACTIVE_IRQ.promise]);
+}
+
+function printInterrupted() {
+  console.log(`    ${dim('⎿')}  ${red('Interrupted by user')}`);
+  console.log('');
+}
+
+// Runs one turn (scripted or live) with the interrupt watcher installed, and
+// prints the interrupted marker once if Esc was pressed.
+async function runTurn(fn) {
+  const irq = interruptScope();
+  ACTIVE_IRQ = irq;
+  try {
+    await fn(irq);
+  } finally {
+    irq.stop();
+    const was = irq.aborted();
+    ACTIVE_IRQ = null;
+    if (was) printInterrupted();
+  }
+}
+
 // The Claude Code spinner: one line, rewritten in place, only on a real terminal.
-function spinner(label) {
+// The verb rotates and the status carries the elapsed time, the live token count
+// and the interrupt hint, the way Claude Code's "✻ Simmering… (…)" does.
+function spinner(opts = {}) {
   if (!process.stdout.isTTY || OPTS.fast) return { stop() {} };
   const frames = ['·', '✢', '✳', '✶', '✻', '✽', '✻', '✶', '✳', '✢'];
+  const verbs = THINKING_VERBS;
   const t0 = Date.now();
+  const tokensOf = typeof opts.tokens === 'function' ? opts.tokens : () => 0;
+  const interruptible = opts.interruptible !== false;
+  let verb = verbs[Math.floor(Math.random() * verbs.length)];
+  let lastVerbAt = Date.now();
   let i = 0;
   let stopped = false;
   const tick = () => {
     if (stopped) return;
-    const secs = Math.round((Date.now() - t0) / 1000);
-    process.stdout.write(`\r\x1b[2K  ${mag(frames[i++ % frames.length])} ${dim(label)} ${dim(secs + 's')}`);
+    const now = Date.now();
+    if (now - lastVerbAt > 4000) { verb = verbs[Math.floor(Math.random() * verbs.length)]; lastVerbAt = now; }
+    const secs = Math.round((now - t0) / 1000);
+    const text = thinkingLine({ verb, secs, tokens: tokensOf(), interruptible });
+    process.stdout.write(`\r\x1b[2K  ${mag(frames[i++ % frames.length])} ${dim(text)}`);
   };
   const timer = setInterval(tick, 90);
   tick();
@@ -389,7 +482,9 @@ async function liveTurn(text) {
   let thinkingStarted = 0;
   let sawThinking = false;
   let feedAnswer = null;
-  let spin = spinner('Thinking…');
+  const irq = interruptScope();
+  ACTIVE_IRQ = irq;
+  let spin = spinner({ tokens: () => state.budget.tokens, interruptible: true });
 
   const stopSpin = () => { if (spin) { spin.stop(); spin = null; } };
   const closeBlocks = () => {
@@ -423,16 +518,19 @@ async function liveTurn(text) {
   };
 
   let res;
+  const INT = Symbol('interrupted');
+  let interrupted = false;
   try {
-    res = await state.live.run(text, {
+    const runP = state.live.run(text, {
       mode: state.mode,
       history: state.liveHistory,
       onThinkingDelta: (chunk) => {
-        if (!state.thinking) return;
+        if (aborted() || !state.thinking) return;
         stopSpin();
         startThinking().push(chunk);
       },
       onThinkingDone: (full) => {
+        if (aborted()) return;
         if (thinking) { thinking.end(); thinking = null; }
         // Provider senza delta (risposta JSON): mostra il blocco una volta, a fine giro.
         if (!sawThinking && state.thinking && full) {
@@ -449,6 +547,7 @@ async function liveTurn(text) {
         stopSpin();
       },
       onToken: (chunk) => {
+        if (aborted()) return;
         // Reasoning often has no newline until the end: close it before the answer so the
         // transcript keeps the true order (thinking first, then prose).
         stopSpin();
@@ -456,11 +555,13 @@ async function liveTurn(text) {
         startAnswer()(chunk);
       },
       onStep: (s) => {
+        if (aborted()) return;
         closeBlocks();
         console.log('');
         console.log(`  ${bold('⏺')} ${bold(s.tool)}${s.args && Object.keys(s.args).length ? dim('(' + clipJson(s.args) + ')') : ''}${s.viaText ? dim(' (text protocol)') : ''}`);
       },
       onToolResult: (r) => {
+        if (aborted()) return;
         const lines = String(r.out == null ? '' : r.out).replace(/\r/g, '').split('\n').filter((l) => l.trim());
         const tone = r.blocked ? ylw : (s) => s;
         console.log(`    ${dim('⎿')}  ${tone((lines[0] || '(empty)').slice(0, 300))}`);
@@ -479,8 +580,16 @@ async function liveTurn(text) {
         state.budget.req += 1;
       },
     });
+    // The agent loop has no abort hook, so Esc cannot cancel the in-flight
+    // provider request; it stops the rendering and hands the prompt back the way
+    // Claude Code does. The late result is swallowed so it cannot crash the REPL.
+    runP.catch(() => {});
+    res = await Promise.race([runP, irq.promise.then(() => INT)]);
+    if (res === INT) interrupted = true;
   } catch (e) {
     closeBlocks();
+    irq.stop();
+    ACTIVE_IRQ = null;
     console.log('');
     console.log(`  ${red('✖')} ${e.message}`);
     console.log(dim('  session and events are on disk; fix the provider/config and retry'));
@@ -489,7 +598,17 @@ async function liveTurn(text) {
     return;
   }
 
+  if (interrupted) {
+    closeBlocks();
+    irq.stop();
+    ACTIVE_IRQ = null;
+    printInterrupted();
+    return;
+  }
+
   closeBlocks();
+  irq.stop();
+  ACTIVE_IRQ = null;
   state.liveHistory = res.messages;
   if (!answerPrinted) {
     const md = renderMarkdown(res.text || '(empty)', { width: ANSWER_W(), color: COLOR });
@@ -596,6 +715,7 @@ function printHelp() {
     ['tab', 'complete the highlighted command'],
     ['shift+tab', 'cycle mode (ask → plan → auto)'],
     ['\\ + enter', 'newline in the prompt'],
+    ['esc', 'interrupt the running turn'],
     ['?', 'shortcuts, when the input is empty'],
   ]) {
     console.log('  ' + cyan(pad(key, 30)) + dim(desc));
@@ -653,18 +773,20 @@ function sayUser(text) {
 }
 
 async function assistant(text) {
+  if (aborted()) return;
   const lines = renderMarkdown(text, { width: ANSWER_W(), color: COLOR });
   console.log('');
   lines.forEach((line, i) => {
     console.log(i === 0 ? `  ${bold('⏺')} ${line}` : `    ${line}`);
   });
   console.log('');
-  if (!OPTS.fast) await sleep(35);
+  await pace(35);
 }
 
 // Claude Code's tool row: the call on the bullet, every result line hanging off a
 // single ⎿, and the long tail collapsed into a count instead of flooding the log.
 async function tool(name, args, result, ms, opts = {}) {
+  if (aborted()) return;
   console.log(`  ${bold('⏺')} ${bold(name)}${args ? dim('(' + args + ')') : ''}`);
   const tone = opts.tone === 'ok' ? grn : opts.tone === 'warn' ? ylw : opts.tone === 'bad' ? red : (s) => s;
   console.log(`    ${dim('⎿')}  ${tone(result)}${ms ? dim('  ' + ms) : ''}`);
@@ -672,10 +794,11 @@ async function tool(name, args, result, ms, opts = {}) {
   const shown = state.details ? details.slice(0, 8) : details.slice(0, 2);
   for (const d of shown) console.log(`       ${dim(d)}`);
   if (details.length > shown.length) console.log(`       ${dim(`… +${details.length - shown.length} lines (/details to expand)`)}`);
-  if (!OPTS.fast) await sleep(130);
+  await pace(130);
 }
 
 async function finding(f) {
+  if (aborted()) return;
   console.log('');
   const sev = f.sev === 'CRITICAL' ? red : f.sev === 'HIGH' ? mag : f.sev === 'MEDIUM' ? ylw : cyan;
   console.log(`  ${mag('◆')} ${bold('finding')} ${dim('·')} ${sev(f.sev)} ${dim('·')} ${bold(f.title)} ${dim(f.endpoint)}`);
@@ -683,7 +806,22 @@ async function finding(f) {
   if (f.note) {
     for (const line of wrap(f.note, W() - 9)) console.log(`       ${dim(line)}`);
   }
-  if (!OPTS.fast) await sleep(160);
+  await pace(160);
+}
+
+// Claude Code's TodoWrite block: the plan as a checklist, done/active/pending.
+// Here the plan is the engagement's own coverage, so the operator reads it the
+// way they read the model's task list. `state.todos` is the source of truth.
+async function updateTodos(items, opts = {}) {
+  if (aborted()) return;
+  if (items) state.todos = items;
+  const list = state.todos || [];
+  if (!list.length) return;
+  console.log('');
+  console.log(`  ${bold('⏺')} ${bold(opts.title || 'Update Todos')}`);
+  const rows = todoLines(list, { color: COLOR });
+  rows.forEach((row, i) => console.log(i === 0 ? `    ${dim('⎿')}  ${row}` : `       ${row}`));
+  await pace(120);
 }
 
 function printApprovalDetails(spec) {
@@ -699,23 +837,31 @@ async function approval(spec) {
   // Arrow-key selection, the way Claude Code asks: one frame, four options,
   // numbers still work and Esc takes the safe exit.
   if (INPUT) {
+    // The approval owns the keyboard: yield the turn's interrupt watcher so the two
+    // raw-mode readers do not fight over stdin, then take it back afterwards.
+    const irq = ACTIVE_IRQ;
+    if (irq && irq.pause) irq.pause();
     console.log('');
-    for (;;) {
-      const choice = await INPUT.select({
-        title: `Permission required ${dim('· confirm-tier')}`,
-        heading: spec.title,
-        command: spec.command,
-        lines: [
-          `scope ${grn('IN SCOPE')} ${dim('· single-use · host-bound · ' + (demoScope ? 'demo allowlist' : 'scope.json'))}`,
-          dim(spec.reason || ''),
-        ],
-        question: 'Do you want to proceed?',
-        options: ['Yes', 'No, skip this step', 'Show details', 'No, stop the run'],
-      });
-      if (choice === 0) return 'approve';
-      if (choice === 1) return 'skip';
-      if (choice === 2) { printApprovalDetails(spec); continue; }
-      return 'stop';
+    try {
+      for (;;) {
+        const choice = await INPUT.select({
+          title: `Permission required ${dim('· confirm-tier')}`,
+          heading: spec.title,
+          command: spec.command,
+          lines: [
+            `scope ${grn('IN SCOPE')} ${dim('· single-use · host-bound · ' + (demoScope ? 'demo allowlist' : 'scope.json'))}`,
+            dim(spec.reason || ''),
+          ],
+          question: 'Do you want to proceed?',
+          options: ['Yes', 'No, skip this step', 'Show details', 'No, stop the run'],
+        });
+        if (choice === 0) return 'approve';
+        if (choice === 1) return 'skip';
+        if (choice === 2) { printApprovalDetails(spec); continue; }
+        return 'stop';
+      }
+    } finally {
+      if (irq && irq.resume) irq.resume();
     }
   }
 
@@ -753,6 +899,14 @@ async function runSqlDemo() {
   ev('run_start', `${state.target} · ${state.phase}/${state.klass}`);
   await sayUser('Test SQL injection on /api/orders. Benign marker first.');
   await assistant('Map is ready: 18 endpoints, 4 with parameters. I will check scope, recall the technique, then probe `id` with a benign quote before anything intrusive.');
+
+  await updateTodos([
+    { text: 'Map the target surface', status: 'done' },
+    { text: 'Probe /api/orders?id for SQL injection', status: 'active' },
+    { text: 'Prove the hypothesis with a timing oracle', status: 'pending' },
+    { text: 'Cover authz (IDOR) on the same object', status: 'pending' },
+    { text: 'Close the report gate', status: 'pending' },
+  ]);
 
   await tool('scope_check', state.target, 'IN SCOPE', '41 ms', { tone: 'ok' });
   ev('tool', 'scope_check · allow');
@@ -815,6 +969,14 @@ async function runSqlDemo() {
     ev('finding', 'triggered · SQL injection time-based · /api/orders');
     state.contextPct = 18;
 
+    await updateTodos([
+      { text: 'Map the target surface', status: 'done' },
+      { text: 'Probe /api/orders?id for SQL injection', status: 'done' },
+      { text: 'Prove the hypothesis with a timing oracle', status: 'done' },
+      { text: 'Cover authz (IDOR) on the same object', status: 'active' },
+      { text: 'Close the report gate', status: 'pending' },
+    ]);
+
     await assistant('Confirmed at `triggered`. Next class is authz. The report gate stays locked until coverage is complete and no finding is pending.');
   } else if (choice === 'notty') {
     ev('approval', 'refused · stdin is not a TTY');
@@ -862,8 +1024,7 @@ async function runIdorDemo() {
 
 async function runDemo(kind) {
   enterDemo();
-  if (kind === 'idor') return runIdorDemo();
-  return runSqlDemo();
+  return runTurn(() => (kind === 'idor' ? runIdorDemo() : runSqlDemo()));
 }
 
 // ── commands ───────────────────────────────────────────────────────────────
@@ -881,6 +1042,7 @@ const CMDS = [
   ['/findings', 'current findings and proof levels'],
   ['/gate', 'coverage and report gate'],
   ['/trace', 'last events'],
+  ['/todos', 'coverage plan as a checklist'],
   ['/status', 'session card'],
   ['/permissions', 'approval policy'],
   ['/details [on|off]', 'tool call details'],
@@ -1278,6 +1440,27 @@ function cmdTrace() {
   console.log('');
 }
 
+// The engagement plan as Claude Code's todo checklist. A run keeps its own list
+// (the demo seeds one); otherwise the plan is the phase ladder, with the current
+// phase in progress and the ones before it done.
+function cmdTodos() {
+  console.log('');
+  let list = state.todos || [];
+  if (!list.length) {
+    const here = Math.max(0, PHASES.indexOf(state.phase));
+    list = PHASES.map((p, i) => ({
+      text: p,
+      status: i < here ? 'done' : i === here ? 'active' : 'pending',
+    }));
+  }
+  console.log(`  ${bold('⏺')} ${bold('Todos')} ${dim('· ' + phaseTag())}`);
+  const rows = todoLines(list, { color: COLOR });
+  rows.forEach((row, i) => console.log(i === 0 ? `    ${dim('⎿')}  ${row}` : `       ${row}`));
+  console.log('');
+  console.log(dim('  the plan the run is working; a scripted or live turn updates it'));
+  console.log('');
+}
+
 function cmdCompact() {
   console.log('');
   if (!demoScope && !state.contextPct) {
@@ -1399,6 +1582,7 @@ async function handleCommand(line) {
     case '/cost': cmdCost(); return;
     case '/status': cmdStatus(); return;
     case '/trace': cmdTrace(); return;
+    case '/todos': cmdTodos(); return;
     case '/compact': cmdCompact(); return;
     case '/clear': cmdClear(); return;
     case '/permissions': cmdPermissions(); return;
@@ -1540,7 +1724,7 @@ function printShortcuts() {
     ['tab', 'complete · next command'],
     ['shift+tab', 'cycle mode (ask → plan → auto)'],
     ['\\ + enter', 'newline in the prompt'],
-    ['esc', 'dismiss the command menu'],
+    ['esc', 'interrupt a turn · dismiss the menu'],
     ['/', 'command menu · ? this panel'],
   ]) {
     console.log('  ' + cyan(pad(key, 12)) + dim(desc));

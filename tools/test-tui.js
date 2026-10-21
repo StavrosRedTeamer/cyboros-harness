@@ -256,4 +256,28 @@ ok('the transcript never prints a key-shaped secret', () => {
   assert.ok(!/api[_-]?key\s*[:=]\s*\S+/i.test(r.out), 'no api_key assignment');
 });
 
+ok('the demo renders the coverage plan as a todo checklist and updates it', () => {
+  const r = run(['--demo', '--fast', '--demo-approve'], { input: '' });
+  assert.strictEqual(r.status, 0);
+  const updates = (r.out.match(/Update Todos/g) || []).length;
+  assert.ok(updates >= 2, 'the plan is shown and then updated as the run progresses');
+  assert.ok(r.out.includes('[x] Map the target surface'), 'a done item is a filled box in ascii');
+  assert.ok(r.out.includes('[~] Probe /api/orders'), 'the active item is marked');
+  assert.ok(r.out.includes('[ ] Close the report gate'), 'a pending item is an empty box');
+});
+
+ok('/todos shows the phase ladder when no run has seeded a plan', () => {
+  const r = run(['--script'], { input: '/todos\n/quit\n' });
+  assert.strictEqual(r.status, 0);
+  assert.ok(r.out.includes('Todos'), 'the panel is titled');
+  assert.ok(r.out.includes('[~] recon-map'), 'the current phase is in progress');
+  assert.ok(r.out.includes('[ ] report'), 'later phases are pending');
+});
+
+ok('/help lists the /todos command', () => {
+  const r = run(['--script'], { input: '/help\n/quit\n' });
+  assert.strictEqual(r.status, 0);
+  assert.ok(r.out.includes('/todos'), 'the command is discoverable');
+});
+
 summary('test-tui');
