@@ -1,3 +1,25 @@
+                        Cyboros Harness License
+            Apache License 2.0, with an Organizational Use Restriction
+
+   Additional Use Restriction (this paragraph is not part of the Apache License 2.0
+   below, and takes precedence over it where the two conflict):
+
+   Use of the Software by, on behalf of, or for the direct operational benefit of a
+   company, organization, or other legal entity — including deploying it as that
+   entity's own infrastructure, tooling, or product/service offering — requires a
+   separate written license from the Licensor. This restriction does NOT apply to:
+   an individual using the Software in a personal capacity, including a freelance or
+   independent professional conducting an authorized security engagement for a
+   client (the client's authorization of the engagement is not, by itself, use "by"
+   that client); personal, educational, or academic use; or use for security
+   research. To request an organizational license, contact the Licensor via the
+   contact method listed in this repository's SECURITY.md or CODE_OF_CONDUCT.md.
+
+   Subject to that restriction, the Software is licensed under the Apache License,
+   Version 2.0, reproduced in full below, unmodified.
+
+   ---
+
                                  Apache License
                            Version 2.0, January 2004
                         http://www.apache.org/licenses/
