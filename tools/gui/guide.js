@@ -219,7 +219,7 @@
   }
 
   function renderViews() {
-    return '<p>Diciassette viste, raggruppate come nella barra. Clicca una tab per aprirla; qui trovi cosa mostra e a cosa serve.</p>' +
+    return '<p>Diciotto viste, raggruppate come nella barra. Clicca una tab per aprirla; qui trovi cosa mostra e a cosa serve.</p>' +
       '<div class="guide-grid">' + VIEWS.map(function (grp) {
         return '<div class="guide-group-h">' + grp[0] + '</div>' + grp[1].map(function (v) {
           return '<div class="guide-card" data-tab="' + v[0] + '"><h4>' + v[1] + '</h4><p>' + v[2] + '</p></div>';
