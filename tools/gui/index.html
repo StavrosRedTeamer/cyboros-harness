@@ -6,6 +6,17 @@
 <title>Cyboros Redteamer · Command Center</title>
 <link rel="stylesheet" href="vendor/xterm.css">
 <link rel="stylesheet" href="app.css">
+<link id="theme-pro-css" rel="stylesheet" href="app.pro.css">
+<script>
+(function () {
+  try {
+    var t = localStorage.getItem('cyboros-theme') || 'pro';
+    var l = document.getElementById('theme-pro-css');
+    if (l) l.disabled = (t !== 'pro');
+    document.documentElement.setAttribute('data-theme', t);
+  } catch (e) {}
+})();
+</script>
 </head>
 <body>
 <header id="topbar">
@@ -17,6 +28,7 @@
     </div>
   </div>
   <div class="badges">
+    <button id="btn-theme" class="btn btn-ghost" title="Switch theme (professional ⇄ cyberdeck)" aria-label="Switch theme"><span id="theme-glyph">◐</span> <span id="theme-label">pro</span></button>
     <span id="cc-user" class="chip" aria-live="polite" title="signed-in operator">…</span>
     <button id="btn-cmdk" class="btn btn-ghost" title="Command palette (Ctrl/⌘-K)" aria-haspopup="dialog"><kbd>⌘K</kbd> commands</button>
     <button id="btn-refresh" class="btn" title="refresh all">⟳ refresh</button>
@@ -104,5 +116,31 @@
 <script src="views-admin.js"></script>
 <script src="views-chat.js"></script>
 <script src="app.js"></script>
+<script>
+/* Theme switch — flips the professional overlay stylesheet and remembers it.
+   Kept separate from app.js: it only touches its own button + the overlay link. */
+(function () {
+  var link  = document.getElementById('theme-pro-css');
+  var btn   = document.getElementById('btn-theme');
+  var label = document.getElementById('theme-label');
+  var glyph = document.getElementById('theme-glyph');
+  if (!link || !btn) return;
+  function read() { try { return localStorage.getItem('cyboros-theme') || 'pro'; } catch (e) { return 'pro'; } }
+  function apply(theme) {
+    var pro = (theme === 'pro');
+    link.disabled = !pro;
+    document.documentElement.setAttribute('data-theme', theme);
+    if (label) label.textContent = pro ? 'pro' : 'cyberdeck';
+    if (glyph) glyph.textContent = pro ? '◐' : '◈';
+    btn.setAttribute('aria-pressed', String(pro));
+  }
+  apply(read());
+  btn.addEventListener('click', function () {
+    var next = read() === 'pro' ? 'cyberdeck' : 'pro';
+    try { localStorage.setItem('cyboros-theme', next); } catch (e) {}
+    apply(next);
+  });
+})();
+</script>
 </body>
 </html>
