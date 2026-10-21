@@ -48,6 +48,13 @@ const env = Object.assign({}, process.env, {
   CC_APPROVALS_FILE: APPROVALS,
   GUI_PORT: '0',
   SCC_TOKEN: SERVICE_TOKEN,
+  // The chat role-gate assertion below expects /api/chat to fail PAST auth (500, missing
+  // provider config), not AT auth. runtime/live.js's provider config is repo-global, not
+  // CC_ROOT-scoped (deliberately — one LLM setup serves every engagement), so without this
+  // override the test picks up whatever real runtime/providers.json happens to exist on the
+  // machine running the suite and the assertion becomes environment-dependent. Point it at a
+  // path that is guaranteed not to exist, inside the test's own throwaway tree.
+  CYBOROS_PROVIDERS: path.join(T, 'no-providers.json'),
 });
 const child = spawn(process.execPath, [path.join(WS, 'tools', 'gui-server.js'), '--print-port', '--instance'], { cwd: WS, env });
 let out = '';
