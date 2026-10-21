@@ -10,6 +10,7 @@
 const state = require('./state');
 const families = [
   require('./accounts'),
+  require('./chat'),
   state,
   require('./streams'),
 ];

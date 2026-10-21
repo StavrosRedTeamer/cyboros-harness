@@ -44,6 +44,7 @@ const { createPipeline } = require('./console/pipeline');
 const { createEngagement } = require('./console/engagement');
 const { createJobs } = require('./console/jobs');
 const { createTerminals } = require('./console/terminals');
+const { createChat } = require('./console/chat');
 const routes = require('./console/routes/index');
 const publicRoutes = require('./console/routes/public');
 const { createApp } = require('./console/app');
@@ -153,6 +154,7 @@ const engagement = createEngagement({
 });
 const jobs = createJobs({ root: ROOT });
 const terminals = createTerminals({ root: ROOT, toolsDir: TOOLS_DIR });
+const chat = createChat();
 
 // The seam every module is wired through: routes read only from this context, so a
 // different identity or job backend is a different constructor call here.
@@ -163,7 +165,7 @@ const ctx = {
   sendJson, sendText, bodyJson,
   guardOk: hostGuard.guardOk,
   static: statics, gate, identity,
-  scope, findings, pipeline, engagement, jobs, terminals,
+  scope, findings, pipeline, engagement, jobs, terminals, chat,
   routes, publicRoutes, ccRouter,
   instance: { host: HOST, port: () => boundPort, startedAt: STARTED_AT, tokenRequired: !!TOKEN },
 };

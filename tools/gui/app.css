@@ -906,3 +906,53 @@ body.tv .wr-feed { max-height: 58vh; }
   #tab-users input[type="password"] { min-width: 12em; }
   .chip.ok { color: #9cf7c8; background: #061c12; border-color: var(--green); }
 }
+
+/* ── Chat view (talk to the model) — token-driven, works in both themes ─────── */
+@layer views {
+  .chat-root { display: flex; flex-direction: column; gap: 12px; height: calc(100vh - 230px); min-height: 440px; }
+
+  .chat-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+  .chat-tb-left, .chat-tb-right { display: flex; align-items: center; gap: 10px; }
+  .chat-tb-label { font: 600 11px var(--mono); text-transform: uppercase; letter-spacing: 1px; color: var(--faint); }
+  .chat-select { background: var(--surface-2); color: var(--ink); border: 1px solid var(--line-2); border-radius: 6px; padding: 5px 10px; font: 12px var(--mono); max-width: 440px; }
+  .chat-egress { font: 600 10px var(--mono); text-transform: uppercase; letter-spacing: 1px; padding: 3px 9px; border-radius: 999px; border: 1px solid var(--line-2); color: var(--muted); }
+  .chat-egress.local { color: var(--green); border-color: var(--green); }
+  .chat-egress.cloud { color: var(--high); border-color: var(--high); }
+  .chat-meta { font: 11px var(--mono); color: var(--faint); }
+
+  .chat-list { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 16px; padding: 8px 4px 8px 2px; }
+  .chat-msg { display: flex; gap: 12px; align-items: flex-start; }
+  .chat-msg.user { flex-direction: row-reverse; }
+  .chat-avatar { flex: 0 0 auto; width: 30px; height: 30px; border-radius: 8px; display: grid; place-items: center; font: 600 11px var(--mono); border: 1px solid var(--line-2); background: var(--surface-2); color: var(--muted); }
+  .chat-msg.assistant .chat-avatar { color: var(--accent); border-color: var(--accent-dim); }
+  .chat-col { display: flex; flex-direction: column; gap: 8px; max-width: min(760px, 82%); min-width: 0; }
+  .chat-msg.user .chat-col { align-items: flex-end; }
+
+  .chat-bubble { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 10px 14px; font: 14px/1.6 var(--sans); color: var(--ink); word-break: break-word; overflow-wrap: anywhere; }
+  .chat-msg.user .chat-bubble { background: var(--accent-dim); border-color: transparent; color: var(--ink); }
+  .chat-cursor { color: var(--accent); font-weight: 700; animation: chat-blink 1s steps(2, jump-none) infinite; }
+  @keyframes chat-blink { 50% { opacity: 0; } }
+  .chat-code { background: var(--bg2); border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; overflow-x: auto; font: 12.5px/1.5 var(--mono); margin: 8px 0; white-space: pre; }
+  .chat-bubble code { background: var(--bg2); border: 1px solid var(--line); border-radius: 4px; padding: 1px 5px; font: 12.5px var(--mono); }
+  .chat-bubble a { color: var(--accent); }
+
+  .chat-think { border: 1px dashed var(--line-2); border-radius: 8px; padding: 2px 10px 4px; margin-bottom: 2px; }
+  .chat-think-sum { cursor: pointer; color: var(--muted); font: 600 11px var(--mono); text-transform: uppercase; letter-spacing: 1px; padding: 5px 0; list-style: none; }
+  .chat-think-sum::-webkit-details-marker { display: none; }
+  .chat-think-sum::before { content: '▸ '; color: var(--faint); }
+  .chat-think[open] .chat-think-sum::before { content: '▾ '; }
+  .chat-think-body { color: var(--muted); font: 12.5px/1.55 var(--mono); padding: 4px 0 8px; word-break: break-word; }
+
+  .chat-empty { margin: auto; text-align: center; color: var(--muted); display: flex; flex-direction: column; gap: 8px; align-items: center; padding: 40px 20px; }
+  .chat-empty-glyph { font-size: 34px; color: var(--accent); opacity: .6; }
+  .chat-empty-title { font: 600 16px var(--sans); color: var(--ink); }
+  .chat-empty-sub { font-size: 13px; max-width: 440px; line-height: 1.5; }
+
+  .chat-composer { display: flex; flex-direction: column; gap: 8px; border: 1px solid var(--line-2); border-radius: 12px; background: var(--surface); padding: 10px 12px; }
+  .chat-composer:focus-within { border-color: var(--accent); }
+  .chat-input { width: 100%; resize: none; background: transparent; border: 0; outline: none; color: var(--ink); font: 14px/1.5 var(--sans); max-height: 220px; overflow-y: auto; }
+  .chat-input::placeholder { color: var(--faint); }
+  .chat-composer-actions { display: flex; align-items: center; justify-content: flex-end; gap: 10px; }
+  .btn.hidden { display: none; }   /* beat .btn's own display so Send/Stop toggle cleanly */
+  .chat-foot { margin-right: auto; font: 11px var(--mono); color: var(--faint); }
+}

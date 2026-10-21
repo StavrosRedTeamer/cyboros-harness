@@ -1148,6 +1148,7 @@ function renderTab(tab) {
   else if (tab === 'users') { showSkeleton('users'); renderUsers(); }
   else if (tab === 'reports') { showSkeleton('reports'); api('/api/reports').then(renderReports).catch((e) => toast(String(e.message || e), 'err')); }
   else if (tab === 'freebuff') renderFreebuffTab();
+  else if (tab === 'chat') renderChat();
 }
 
 

@@ -6,6 +6,17 @@
 <title>Cyboros Redteamer · Command Center</title>
 <link rel="stylesheet" href="vendor/xterm.css">
 <link rel="stylesheet" href="app.css">
+<link id="theme-pro-css" rel="stylesheet" href="app.pro.css">
+<script>
+(function () {
+  try {
+    var t = localStorage.getItem('cyboros-theme') || 'pro';
+    var l = document.getElementById('theme-pro-css');
+    if (l) l.disabled = (t !== 'pro');
+    document.documentElement.setAttribute('data-theme', t);
+  } catch (e) {}
+})();
+</script>
 </head>
 <body>
 <header id="topbar">
@@ -17,6 +28,8 @@
     </div>
   </div>
   <div class="badges">
+    <button id="btn-theme" class="btn btn-ghost" title="Switch theme (professional ⇄ cyberdeck)" aria-label="Switch theme"><span id="theme-glyph">◐</span> <span id="theme-label">pro</span></button>
+    <button id="btn-guide" class="btn btn-ghost" title="Guida interattiva (premi ? o F1)" aria-haspopup="dialog"><span aria-hidden="true">?</span> Guida</button>
     <span id="cc-user" class="chip" aria-live="polite" title="signed-in operator">…</span>
     <button id="btn-cmdk" class="btn btn-ghost" title="Command palette (Ctrl/⌘-K)" aria-haspopup="dialog"><kbd>⌘K</kbd> commands</button>
     <button id="btn-refresh" class="btn" title="refresh all">⟳ refresh</button>
@@ -44,6 +57,7 @@
   <button class="tab" data-tab="control" role="tab" id="tabbtn-control" aria-controls="tab-control" aria-selected="false" tabindex="-1">Control</button>
   <button class="tab" data-tab="users" role="tab" id="tabbtn-users" aria-controls="tab-users" aria-selected="false" tabindex="-1">Users</button>
   <span class="navgroup" aria-hidden="true">Console</span>
+  <button class="tab" data-tab="chat" role="tab" id="tabbtn-chat" aria-controls="tab-chat" aria-selected="false" tabindex="-1">Chat</button>
   <button class="tab" data-tab="reports" role="tab" id="tabbtn-reports" aria-controls="tab-reports" aria-selected="false" tabindex="-1">Reports</button>
   <button class="tab" data-tab="freebuff" role="tab" id="tabbtn-freebuff" aria-controls="tab-freebuff" aria-selected="false" tabindex="-1">Freebuff</button>
 </nav>
@@ -65,6 +79,7 @@
   <section id="tab-scope" class="tabpane" role="tabpanel" aria-labelledby="tabbtn-scope"></section>
   <section id="tab-arsenal" class="tabpane" role="tabpanel" aria-labelledby="tabbtn-arsenal"></section>
   <section id="tab-control" class="tabpane" role="tabpanel" aria-labelledby="tabbtn-control"></section>
+  <section id="tab-chat" class="tabpane" role="tabpanel" aria-labelledby="tabbtn-chat"></section>
   <section id="tab-users" class="tabpane" role="tabpanel" aria-labelledby="tabbtn-users"></section>
   <section id="tab-reports" class="tabpane" role="tabpanel" aria-labelledby="tabbtn-reports"></section>
   <section id="tab-freebuff" class="tabpane" role="tabpanel" aria-labelledby="tabbtn-freebuff"></section>
@@ -100,6 +115,34 @@
 <script src="views-control.js"></script>
 <script src="views-warroom.js"></script>
 <script src="views-admin.js"></script>
+<script src="views-chat.js"></script>
 <script src="app.js"></script>
+<script src="guide.js"></script>
+<script>
+/* Theme switch — flips the professional overlay stylesheet and remembers it.
+   Kept separate from app.js: it only touches its own button + the overlay link. */
+(function () {
+  var link  = document.getElementById('theme-pro-css');
+  var btn   = document.getElementById('btn-theme');
+  var label = document.getElementById('theme-label');
+  var glyph = document.getElementById('theme-glyph');
+  if (!link || !btn) return;
+  function read() { try { return localStorage.getItem('cyboros-theme') || 'pro'; } catch (e) { return 'pro'; } }
+  function apply(theme) {
+    var pro = (theme === 'pro');
+    link.disabled = !pro;
+    document.documentElement.setAttribute('data-theme', theme);
+    if (label) label.textContent = pro ? 'pro' : 'cyberdeck';
+    if (glyph) glyph.textContent = pro ? '◐' : '◈';
+    btn.setAttribute('aria-pressed', String(pro));
+  }
+  apply(read());
+  btn.addEventListener('click', function () {
+    var next = read() === 'pro' ? 'cyberdeck' : 'pro';
+    try { localStorage.setItem('cyboros-theme', next); } catch (e) {}
+    apply(next);
+  });
+})();
+</script>
 </body>
 </html>
