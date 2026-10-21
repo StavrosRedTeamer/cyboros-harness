@@ -58,6 +58,11 @@ o.txt
 
 # Tool vendored (binari grandi, obscura/frida) e mirror: mai nel repo
 vendor/
+# Eccezione: le librerie UMD del terminale embedded (xterm.js, MIT, ~490 KB) — zero-dipendenze
+# per design (vedi tools/gui/vendor/README.md), non un mirror di tool offensivi. Senza questa
+# eccezione la tab Freebuff del Command Center è rotta su un clone pulito.
+!tools/gui/vendor/
+!tools/gui/vendor/**
 
 # Runtime
 # Self-referential symlink accidentalmente creato dentro il progetto (recursione scan)

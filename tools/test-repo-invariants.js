@@ -74,16 +74,17 @@ function walk(dir, acc) {
 // fixture (payloads/examples/app).
 function toolsModules() {
   const skip = /[\\/](payloads|examples|app)[\\/]/;
-  // Conta i file TRACCIATI, non quelli presenti su disco: `tools/gui/vendor/*.js` sono copie di
-  // terze parti, gitignored, che esistono solo nelle copie-cartella. Contando il working tree il
-  // README dichiarava un numero che un clone pulito non poteva verificare (141 invece di 139) —
+  // Conta i file TRACCIATI, non quelli presenti su disco: un file presente solo sul tuo working
+  // tree farebbe dichiarare al README un numero che un clone pulito non può verificare —
   // esattamente il drift che questo test esiste per impedire.
   const ls = spawnSync('git', ['ls-files', 'tools/'], { cwd: WS, encoding: 'utf8' });
   const files = ls.status === 0
     ? String(ls.stdout).split('\n').filter(Boolean).map((rel) => path.join(WS, rel))
     : walk(path.join(WS, 'tools'), []);
   return files
-    .filter((p) => p.endsWith('.js') && !skip.test(p))
+    // tools/gui/vendor/*.js (xterm.js, addon-fit.js) sono librerie di terze parti vendorizzate
+    // (UMD, MIT), non moduli dell'harness: stessa esclusione di project-map.js's toolsModules().
+    .filter((p) => p.endsWith('.js') && !skip.test(p) && !/[\\/]gui[\\/]vendor[\\/]/.test(p))
     .filter((p) => !path.basename(p).startsWith('test-') && path.basename(p) !== 'testkit.js')
     .map((p) => path.relative(WS, p).split(path.sep).join('/'));
 }
