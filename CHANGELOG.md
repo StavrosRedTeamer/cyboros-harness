@@ -4,9 +4,20 @@ All notable changes to this project are documented here. Dates are commit dates.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project
 uses [Semantic Versioning](https://semver.org/) (pre-1.0: a minor bump may carry breaking
-changes). `v0.1.0` (2026-09-28) is the first tagged release; the latest is `v0.3.0` (2026-10-21).
+changes). `v0.1.0` (2026-09-28) is the first tagged release; the latest is `v0.3.1` (2026-10-21).
 
 ## [Unreleased]
+
+## [0.3.1] — 2026-10-21
+
+### Changed
+- **La restrizione di licenza è commerciale, non organizzativa.** Le aziende possono usare
+  l'harness gratuitamente finché non ne ricavano ricavi: serve una licenza commerciale per
+  servizi pagati a terzi (assessment, consulenza, managed service), per un prodotto o servizio
+  a pagamento, o per qualunque uso inteso a generare ricavi. Gli individui restano liberi,
+  compresi freelance e consulenti in ingaggi pagati; l'uso interno senza ricavi, quello
+  personale, didattico e di ricerca restano liberi. Aggiornati `LICENSE`, README, badge e la
+  landing, che dichiarava ancora solo `Apache-2.0` (e i conteggi vecchi: 161 moduli, 114 test).
 
 ## [0.3.0] — 2026-10-21
 

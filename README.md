@@ -6,9 +6,9 @@
 and where the lesson of one engagement changes the next.**
 
 [![CI](https://github.com/stavrosredteamer/cyboros-harness/actions/workflows/ci.yml/badge.svg?branch=master)](https://github.com/stavrosredteamer/cyboros-harness/actions/workflows/ci.yml)
-[![License: Apache-2.0 + organizational-use restriction](docs/assets/license-apache-2.0.svg)](LICENSE)
+[![License: Apache-2.0 + commercial-use restriction](docs/assets/license-apache-2.0.svg)](LICENSE)
 
-[Apache-2.0, with an organizational-use restriction](LICENSE) · zero dependencies · offline-capable · 123 tests, hermetic and parallel
+[Apache-2.0, with a commercial-use restriction](LICENSE) · zero dependencies · offline-capable · 123 tests, hermetic and parallel
 
 [Cyboros](docs/OUROBOROS.md): cyber + ouroboros. The loop is not marketing — every claim on
 that page names the file that proves it. The agent still cannot violate scope, because the
@@ -374,12 +374,14 @@ same gate CI uses.
 
 ## License
 
-Apache License 2.0, with one addition: use by, on behalf of, or for the direct
-operational benefit of a company or organization requires a separate written
-license from the Licensor. An individual — including a freelance or independent
-professional on an authorized engagement — is not affected. Personal, educational,
-research and security-testing use is not affected either. See [LICENSE](LICENSE)
-for the exact terms.
+Apache License 2.0, with one addition: an individual may use it freely — including a
+freelance or independent professional on an authorized engagement, paid or not. A company
+or organization needs a separate written commercial license when it uses the harness to
+generate revenue: paid client work, a product or service offered for a fee, or any use
+intended to produce revenue — work delivered through a company, including your own, is
+organizational use. Internal use that generates no revenue, plus personal,
+educational, academic and research use, is not affected. See [LICENSE](LICENSE) for the
+exact terms.
 
 ## Citing this project
 

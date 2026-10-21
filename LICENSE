@@ -1,19 +1,31 @@
                         Cyboros Harness License
-            Apache License 2.0, with an Organizational Use Restriction
+          Apache License 2.0, with a Commercial-Use Restriction
 
    Additional Use Restriction (this paragraph is not part of the Apache License 2.0
    below, and takes precedence over it where the two conflict):
 
    Use of the Software by, on behalf of, or for the direct operational benefit of a
-   company, organization, or other legal entity — including deploying it as that
-   entity's own infrastructure, tooling, or product/service offering — requires a
-   separate written license from the Licensor. This restriction does NOT apply to:
-   an individual using the Software in a personal capacity, including a freelance or
-   independent professional conducting an authorized security engagement for a
-   client (the client's authorization of the engagement is not, by itself, use "by"
-   that client); personal, educational, or academic use; or use for security
-   research. To request an organizational license, contact the Licensor via the
-   contact method listed in this repository's SECURITY.md or CODE_OF_CONDUCT.md.
+   company, organization, or other legal entity is permitted free of charge only for
+   purposes that do not generate revenue for that entity. A separate written
+   commercial license from the Licensor is required when such an entity uses the
+   Software:
+
+     (a) to deliver paid services to third parties, including paid security
+         assessments, consulting, or managed services;
+     (b) as part of, or in support of, a product or service offered for a fee; or
+     (c) in any other way intended to generate revenue for that entity,
+
+   whether by the entity itself or by persons acting on its behalf.
+
+   This restriction does NOT apply to: an individual acting in a personal capacity,
+   including a freelance or independent professional conducting an authorized
+   security engagement for a client, whether or not that engagement is paid (the
+   client's authorization of the engagement is not, by itself, use "by" that client);
+   personal, educational, or academic use; or security research that is not offered as
+   a paid service.
+
+   To request a commercial license, contact the Licensor via the contact method listed
+   in this repository's SECURITY.md or CODE_OF_CONDUCT.md.
 
    Subject to that restriction, the Software is licensed under the Apache License,
    Version 2.0, reproduced in full below, unmodified.
