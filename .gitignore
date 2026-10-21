@@ -88,6 +88,11 @@ npm-debug.log*
 __pycache__/
 *.pyc
 
+# Command Center — stato del data root quando coincide col checkout: conversazioni della
+# chat e impostazioni dell'operatore finiscono in app/chat/. Dati, non sorgente: un clone
+# pulito non deve né portarseli dietro né vederli come untracked.
+/app/
+
 # Command Center — engagement data (client names, RoE contacts, approvals).
 # These are local engagement state: never commit them.
 campaign.json

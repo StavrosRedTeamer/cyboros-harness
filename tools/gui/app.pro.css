@@ -244,10 +244,16 @@
   #term-stage-freebuff, #term-stage-opencode { border-color: var(--line-2); box-shadow: none; }
   #term-stage-freebuff.max, #term-stage-opencode.max { box-shadow: 0 24px 70px rgba(0,0,0,.55); }
 
-  /* ── Chat — align the toolbar eyebrow with the rest of the sans chrome ──── */
-  .chat-tb-label { font-family: var(--sans); letter-spacing: .1em; }
-  .chat-egress   { font-family: var(--sans); }
-  .chat-meta, .chat-foot { font-family: var(--sans); }
+  /* ── Chat — neutral rail, ember kept for the loop mark and approvals ────── */
+  .chat-root { --chat-ember-line: rgba(255, 122, 47, .45); }
+  .chat-side { background: var(--surface); }
+  .chat-brand-text b { letter-spacing: .12em; }
+  .chat-hero-title { letter-spacing: -.015em; }
+  .chat-tool, .chat-approval, .chat-think, .chat-composer { box-shadow: none; }
+  .chat-code, .chat-tool-out, .chat-approval-cmd { font-size: 12px; }
+  .chat-pop, .chat-set-panel, .chat-settings { box-shadow: 0 24px 70px rgba(0, 0, 0, .55); }
+  .chat-egress, .chat-meta, .chat-foot, .chat-hint { font-family: var(--sans); }
+  .chat-set-head h2 { font-family: var(--sans); letter-spacing: 0; }
 
   /* ── desktop optimisation (this console is desktop-only) ────────────────────
      Wider content cap for large monitors, tighter vertical rhythm to lift more

@@ -189,9 +189,13 @@ const AREAS = [
       'console/routes/index', 'console/routes/public', 'console/routes/accounts',
       'console/routes/state', 'console/routes/streams', 'console/routes/chat',
       'console/jobs', 'console/terminals', 'console/chat',
+      // Chat as one responsibility per file: transport and tool dispatch on the server,
+      // transcript rendering and transport in the client.
+      'console/chat-presets', 'console/chat-sessions', 'console/chat-settings', 'console/chat-tools',
       'console/scope', 'console/findings', 'console/pipeline', 'console/engagement',
       'gui/app', 'gui/views-control', 'gui/views-engagement', 'gui/views-warroom',
       'gui/login', 'gui/views-admin', 'gui/views-chat', 'gui/guide',
+      'gui/chat-api', 'gui/chat-render', 'gui/chat-settings',
       'identity', 'users', 'config', 'init',
       'portal', 'backfill-findings-tab',
     ],

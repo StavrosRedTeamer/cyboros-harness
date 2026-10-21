@@ -247,27 +247,46 @@ function sessionRead(args = {}) {
 }
 
 // ---- dispatch ---------------------------------------------------------------------
-function safeReportPath(p) {
+// Report directories a write is confined to. The CLI default is `<repo>/reports`; a
+// console whose data root lives elsewhere passes its own configured reports dir, so
+// evidence lands where the operator will look for it instead of in the checkout.
+function safeReportPath(p, roots) {
   const abs = path.resolve(WS, p);
-  if (!abs.startsWith(path.resolve(WS, 'reports') + path.sep)) throw new Error('consentito solo sotto reports/');
+  const allowed = [path.resolve(WS, 'reports')].concat((roots || []).map((r) => path.resolve(r)));
+  if (!allowed.some((root) => abs === root || abs.startsWith(root + path.sep))) {
+    throw new Error('consentito solo sotto reports/');
+  }
   return abs;
 }
 
-function makeDispatch({ allowRunTool = true, noCache = false } = {}) {
+// `runner(cmd, args, opts) -> Promise<{code, out}>` is the execution seam: absent, this
+// module keeps its historical spawnSync behaviour (deterministic, fine for a one-turn CLI).
+// The console passes an async spawn so a tool with a 30-minute budget cannot block the
+// HTTP event loop. The switch below is the SAME table either way — that is the point.
+// `readRoots` / `reportRoots` exist for the same reason as `runner`: the console can be
+// installed with its engagement data outside the code tree. Absent, nothing changes.
+function makeDispatch({ allowRunTool = true, noCache = false, runner = null, readRoots = [], reportRoots = [] } = {}) {
+  const readAllowed = [path.resolve(WS)].concat((readRoots || []).map((r) => path.resolve(r)));
+  const exec = runner
+    ? (cmd, args, opts) => runner(cmd, args, opts)
+    : (cmd, args, opts) => Promise.resolve(sh(cmd, args, opts));
+  const runNode = (rel, args, opts) => exec(process.execPath, [path.join(WS, 'tools', rel), ...args], opts);
   return async function dispatch(name, args = {}) {
     switch (name) {
       case 'scope_check': {
-        const r = nodeTool('scope-guard.js', ['check', String(args.target || '')]);
+        const r = await runNode('scope-guard.js', ['check', String(args.target || '')]);
         return r.code === 0 ? `IN SCOPE: ${args.target}` : `OUT OF SCOPE / BLOCCATO: ${args.target}\n${r.out}`;
       }
       case 'read_file': {
         const abs = path.resolve(WS, String(args.path || ''));
-        if (!abs.startsWith(path.resolve(WS) + path.sep)) return 'ERRORE: percorso fuori dal workspace';
+        if (!readAllowed.some((root) => abs === root || abs.startsWith(root + path.sep))) {
+          return 'ERRORE: percorso fuori dal workspace';
+        }
         if (!fs.existsSync(abs)) return `ERRORE: file non trovato: ${args.path}`;
         return fs.readFileSync(abs, 'utf8');
       }
       case 'write_file': {
-        const abs = safeReportPath(String(args.path || ''));
+        const abs = safeReportPath(String(args.path || ''), reportRoots);
         fs.mkdirSync(path.dirname(abs), { recursive: true });
         fs.writeFileSync(abs, String(args.content ?? ''));
         return `scritto: ${args.path} (${String(args.content ?? '').length} char)`;
@@ -275,7 +294,7 @@ function makeDispatch({ allowRunTool = true, noCache = false } = {}) {
       case 'pipeline': {
         const phase = String(args.phase || '');
         if (!['recon', 'scan', 'enumerate'].includes(phase)) return 'ERRORE: phase deve essere recon|scan|enumerate';
-        const r = nodeTool('cyboros.js', [phase, String(args.host || '')], { timeout: 1800000 });
+        const r = await runNode('cyboros.js', [phase, String(args.host || '')], { timeout: 1800000 });
         return `[pipeline ${phase} exit ${r.code}]\n${r.out}`;
       }
       case 'run_tool': {
@@ -295,19 +314,19 @@ function makeDispatch({ allowRunTool = true, noCache = false } = {}) {
           }
           return 'ERRORE: bin mancante. Forma attesa: {"bin":"<tool>","args":["<arg1>","<arg2>"]}.';
         }
-        const r = nodeTool('run.js', [...(noCache ? ['--no-cache'] : []), bin, ...a], { timeout: 1800000 });
+        const r = await runNode('run.js', [...(noCache ? ['--no-cache'] : []), bin, ...a], { timeout: 1800000 });
         return `[run ${bin} exit ${r.code}]\n${r.out}`;
       }
       case 'record_finding': {
-        const r = nodeTool('record-finding.js', [JSON.stringify(args)]);
+        const r = await runNode('record-finding.js', [JSON.stringify(args)]);
         return `[record-finding exit ${r.code}]\n${r.out}`;
       }
       case 'kb_search': {
-        const r = nodeTool('kb-search.js', [String(args.query || '')]);
+        const r = await runNode('kb-search.js', [String(args.query || '')]);
         return r.out || '(nessun risultato)';
       }
       case 'memory_recall': {
-        const r = nodeTool('memory-recall.js', [String(args.query || '')]);
+        const r = await runNode('memory-recall.js', [String(args.query || '')]);
         return r.out || '(memoria vuota)';
       }
       case 'findings_query': return findingsQuery(args);

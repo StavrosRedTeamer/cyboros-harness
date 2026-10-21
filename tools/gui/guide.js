@@ -38,7 +38,7 @@
       ['users', 'Users', 'Account e ruoli (viewer · operator · admin): chi può leggere, agire o gestire gli account. Visibile solo con ruolo admin.'],
     ]],
     ['Console', [
-      ['chat', 'Chat', 'Conversazione con il modello locale: solo chat, nessun tool e nessuna azione di scope. Un badge indica se l’endpoint è locale o cloud.'],
+      ['chat', 'Chat', 'Il turno agente dal browser: il modello risponde e usa i tool guardati secondo il preset scelto. <b>pentest</b> agisce sul target (i tool intrusivi chiedono approvazione), <b>analysis</b> legge report, finding e sessioni senza poter agire, <b>conversation</b> non ha tool. Un badge indica se l’endpoint è locale o cloud.'],
       ['reports', 'Reports', 'Genera il report HTML standalone (findings + state.db + attack chains) e lo visualizza. È il deliverable che riceve il cliente.'],
       ['freebuff', 'Freebuff', 'Un terminale interattivo live (pseudo-terminale) verso lo strumento Freebuff: la sessione vive lato server e sopravvive ai reload del browser.'],
     ]],

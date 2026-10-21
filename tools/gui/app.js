@@ -357,8 +357,10 @@ function renderStatusRail(o) {
     items.push(railItem({ k: 'run', v: s, tab: 'pipeline', title: 'target: ' + (p.runTarget || ''),
       tone: s === 'running' ? 'live' : s === 'done' ? 'ok' : 'bad' }));
   }
-  items.push(railItem({ k: 'sessions', v: String(o.sessions.active), tone: o.sessions.active > 0 ? 'live' : '',
-    title: 'active C2 sessions', tab: 'sessions' }));
+  // Not 'sessions': the chat rail lists conversations, this counts implants. The label says
+  // which, so a reading of 0 next to five conversations no longer contradicts anything.
+  items.push(railItem({ k: 'c2 sessions', v: String(o.sessions.active), tone: o.sessions.active > 0 ? 'live' : '',
+    title: 'active C2 (implant) sessions — the chat rail counts conversations', tab: 'sessions' }));
   items.push(railItem({ k: 'findings', tab: 'findings', title: 'total · critical · high',
     v: (o.findings.total || 0) + ' · ' + (bs.Critical || 0) + 'C ' + (bs.High || 0) + 'H',
     tone: (bs.Critical || 0) > 0 ? 'bad' : (bs.High || 0) > 0 ? 'warn' : 'ok' }));

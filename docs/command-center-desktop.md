@@ -389,13 +389,18 @@ tre viste che vivevano solo sul branch sperimentale `feat/gui-pro-theme-guide` (
 - **Guida interattiva**: pulsante `#btn-guide` (o tasto **`?`**/**F1**), `tools/gui/guide.js` —
   zero-dipendenze, overlay con indice ricercabile e tour spotlight sul chrome reale; non parla
   mai col backend (nessuna egress nuova).
-- **Chat**: vista `tools/gui/views-chat.js` sopra `/api/chat` e `/api/chat/profiles`
-  (`tools/console/chat.js` + `tools/console/routes/chat.js`), superficie conversazionale stile
-  OpenAI sugli stessi provider dell'agente (`runtime/providers.json`): nessun tool, nessun
-  guard, solo conversazione. Profili locali (llama su loopback) di default; i profili cloud
-  compaiono solo se `allow_cloud` è attivo in config e la chiave è presente. **Role-gated**:
-  lettura profili aperta a `viewer`+, l'avvio conversazione (`POST /api/chat`) richiede
-  `operator`+, lo stesso cancello di scrittura delle altre route.
+- **Chat**: quattro file client, un solo proprietario per ciascun compito —
+  `tools/gui/views-chat.js` (stato della conversazione + reducer dei frame SSE),
+  `chat-render.js` (transcript → DOM: markdown, turni, card tool/approval, riga azioni),
+  `chat-api.js` (rotte e pump SSE) e `chat-settings.js` (il dialogo impostazioni). Sopra
+  `/api/chat` — `tools/console/chat.js` più `chat-presets.js` (allowlist dei tool),
+  `chat-tools.js` (dispatch guardato), `chat-sessions.js` (store) e `chat-settings.js`
+  (default del turno) — un turno esegue lo stesso loop del CLI, con i guard in codice e
+  l'approvazione dell'operatore sui tool intrusivi. Profili locali (llama su loopback) di
+  default; i profili cloud compaiono solo se `allow_cloud` è attivo in config e la chiave è
+  presente. **Role-gated**: lettura di modelli/preset aperta a `viewer`+, l'avvio di un turno
+  (`POST /api/chat`) e la risposta a un'approvazione richiedono `operator`+, lo stesso
+  cancello di scrittura delle altre route.
 
 La vista **Users/admin** (ruoli, account, audit) non nasce da questo piano: è il lavoro identity
 già atterrato in `tools/gui/views-admin.js`, documentato in `docs/IDENTITY.md` — non duplicato qui.

@@ -177,7 +177,8 @@ class LocalLLM {
   }
 
   // Un giro agente completo: system+instructions+task, tool-loop finche' il modello
-  // chiude con testo (o max_tool_iters). `dispatch(name, args)` ritorna una stringa.
+  // chiude con testo (o budget dei tool / max_tool_iters: a quel punto la richiesta di
+  // chiusura senza schema tool lo costringe a rispondere).
   // `toolSchema` = array OpenAI tools; `toolNames` = nomi ammessi (per il fallback testuale).
   // `history` (opzionale): messaggi di una conversazione precedente da continuare (REPL).
   // Se assente, comportamento identico a prima (single-shot). Il system non viene duplicato
@@ -254,14 +255,44 @@ class LocalLLM {
     let grammarActive = !!(grammar && this.rt.use_grammar);
     let reasoningAll = ''; // reasoning del modello, accumulato per il caller (mai rimandato al modello)
 
-    for (let iter = 0; iter < maxIters; iter++) {
+    // --- TOOL BUDGET: un limite che FORZA la conclusione. La loop-guard qui sopra vede le
+    // ripetizioni che sa riconoscere; `exempt_tools: ['run_tool']` esenta le chiamate da
+    // riga di comando proprio perché due probe con URL diversi sono evidenza nuova. Con un
+    // modello reale questo basta a consumare l'intero turno in esplorazione: dieci curl
+    // "diversi" non fanno scattare nulla, e il turno finiva solo perché l'operatore
+    // premeva Stop. Quindi il turno ha anche un budget di CHIAMATE — l'esenzione dal
+    // controllo delle varianti non è esenzione dal budget — e quando finisce (o si
+    // raggiunge il tetto di iterazioni) la richiesta successiva parte SENZA schema dei
+    // tool e con una direttiva esplicita a rispondere con ciò che ha già.
+    const maxCalls = Math.max(1, Number(this.rt.max_tool_calls) || Math.max(4, Math.min(12, maxIters)));
+    const closingNote = (n) => `TOOL BUDGET EXHAUSTED (${n}/${maxCalls} tool calls in this turn). `
+      + 'Tools are no longer available. Answer now, in the operator\'s language, using the results already in this conversation. '
+      + 'If the evidence is incomplete, say in one sentence what is missing.';
+    let callsMade = 0;
+    let closingIdx = -1;   // where the directive sits, so it never enters the stored history
+    // Il messaggio di chiusura serve al contesto di QUESTA richiesta, non alla
+    // conversazione: se restasse in `messages` verrebbe salvato e ripresentato come se
+    // l'operatore l'avesse scritto nel turno successivo.
+    const finish = (finalText) => {
+      if (closingIdx >= 0) messages.splice(closingIdx, 1);
+      return { text: finalText, messages, reasoning: reasoningAll };
+    };
+
+    for (let iter = 0; iter <= maxIters; iter++) {
+      // L'ultima iterazione (e ogni iterazione a budget speso) è la richiesta di chiusura.
+      const mustConclude = iter === maxIters || callsMade >= maxCalls;
+      if (mustConclude && closingIdx < 0) {
+        closingIdx = messages.length;
+        messages.push({ role: 'user', content: closingNote(callsMade) });
+      }
+      const offeredTools = mustConclude ? null : tools;
       // Lo streaming è possibile solo senza grammatica: la GBNF gira sul path testuale
       // non-stream (e in chat non viene mai passata). Ricadiamo comunque su non-stream
       // se lo stream fallisce prima di produrre token.
       const useStream = !!stream && !grammarActive;
       let msg;
       if (useStream) {
-        const body = this._completionBody(messages, tools, null);
+        const body = this._completionBody(messages, offeredTools, null);
         body.stream = true;
         // llama.cpp-specific: many OpenAI-compatible gateways reject it with HTTP 400 and the
         // run would silently fall back to non-stream. Opt-in, never sent by default.
@@ -273,7 +304,7 @@ class LocalLLM {
           sres = await this._postStream(body, { onToken, onTimings, onFirstToken, onThinkingDelta, onThinkingDone });
         } catch (e) {
           // fallback: una singola chiamata non-stream (nessun token era ancora uscito).
-          const resp = await this._post(this._completionBody(messages, tools, null));
+          const resp = await this._post(this._completionBody(messages, offeredTools, null));
           msg = resp && resp.choices && resp.choices[0] && resp.choices[0].message;
           if (resp && resp.timings && onTimings) onTimings(normTimings(resp.timings));
           if (resp && resp.usage && onUsage) onUsage(resp.usage);
@@ -285,7 +316,9 @@ class LocalLLM {
       } else {
         let resp;
         try {
-          resp = await this._post(this._completionBody(messages, tools, grammarActive ? grammar : null));
+          // La grammatica impone il protocollo ACTION/FINAL: incompatibile con la richiesta
+          // di chiusura, dove il modello deve solo scrivere la risposta.
+          resp = await this._post(this._completionBody(messages, offeredTools, !mustConclude && grammarActive ? grammar : null));
         } catch (e) {
           if (grammarActive && looksLikeGrammarError(e)) {
             if (onStep) onStep({ tool: '(grammar disattivata: il server l\'ha rifiutata)', args: {} });
@@ -316,7 +349,20 @@ class LocalLLM {
 
       // 1) tool_calls nativi
       if (msg.tool_calls && msg.tool_calls.length) {
+        if (mustConclude) {
+          // Nessuno schema è stato offerto: una chiamata qui è il modello che ignora la
+          // direttiva. NON si esegue (il budget è un limite, non un suggerimento) e la
+          // correzione torna nel contesto; se anche l'ultimo giro non produce testo, il
+          // turno finisce dicendolo invece di far finta di aver risposto.
+          messages.push({ role: 'assistant', content: msg.content || '', tool_calls: msg.tool_calls });
+          for (const tc of msg.tool_calls) {
+            messages.push({ role: 'tool', tool_call_id: tc.id, content: 'NOT EXECUTED: the tool budget is exhausted for this turn. Answer with text only.' });
+          }
+          if (iter === maxIters) break;
+          continue;
+        }
         messages.push({ role: 'assistant', content: msg.content || '', tool_calls: msg.tool_calls });
+        callsMade += msg.tool_calls.length;   // ogni chiamata conta, anche se poi viene bloccata
         for (const tc of msg.tool_calls) {
           let args = {};
           try { args = JSON.parse(tc.function.arguments || '{}'); } catch { args = { _raw: tc.function.arguments }; }
@@ -345,10 +391,12 @@ class LocalLLM {
       }
 
       // 2) fallback a protocollo testuale: il modello emette una riga ACTION: {json}
+      // Nella richiesta di chiusura un ACTION non viene eseguito: il testo è la risposta.
       const text = msg.content || '';
-      const act = this.rt.text_protocol_fallback ? parseTextAction(text) : null;
+      const act = (!mustConclude && this.rt.text_protocol_fallback) ? parseTextAction(text) : null;
       if (act) {
         messages.push({ role: 'assistant', content: text });
+        callsMade += 1;
         if (onStep) onStep({ tool: act.tool, args: act.args, viaText: true });
         const rep = isRepeat(act.tool, act.args);
         let out;
@@ -369,11 +417,17 @@ class LocalLLM {
         continue;
       }
 
-      // 3) nessun tool: e' la risposta finale
-      if (onTrace) onTrace({ type: 'final', iter, text: stripFinal(text) });
-      return { text: stripFinal(text), messages, reasoning: reasoningAll };
+      // 3) nessun tool: e' la risposta finale. Va anche in `messages`: chi riusa
+      // l'array come history (REPL, chat della console) altrimenti riparte senza
+      // l'ultima risposta del modello — la conversazione sembra sospesa a meta'.
+      const finalText = stripFinal(text);
+      if (onTrace) onTrace({ type: 'final', iter, text: finalText });
+      if (finalText) messages.push({ role: 'assistant', content: finalText });
+      return finish(finalText);
     }
-    return { text: '[max iterazioni tool raggiunte]', messages, reasoning: reasoningAll };
+    return finish(callsMade
+      ? `[budget esaurito dopo ${callsMade} tool: il modello non ha prodotto una risposta]`
+      : '[il modello non ha prodotto una risposta]');
   }
 }
 

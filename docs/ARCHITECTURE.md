@@ -172,6 +172,11 @@ under `tools/console/`:
 | `tools/console/routes/public.js` · `accounts.js` · `state.js` · `streams.js` | one route family each: handshake and sign-in, accounts, engagement state, streaming and terminals | transport, auth internals |
 | `tools/console/jobs.js` | background jobs, their buffers and SSE viewers | which job to start |
 | `tools/console/terminals.js` | PTY sessions, replay, viewer fan-out, auto-restart | HTTP routing |
+| `tools/console/chat.js` | one conversational turn: model and preset resolution, SSE frames, session save | deciding what a tool may touch |
+| `tools/console/chat-presets.js` | the allowlist each preset grants (pentest, analysis, conversation) | executing anything |
+| `tools/console/chat-tools.js` | async spawn, preset refusal, operator approval, call/result frames | transport, prompts |
+| `tools/console/chat-sessions.js` | one JSON document per conversation, atomic write, resume | the audit trail (that stays in `reports/agent/sessions`) |
+| `tools/console/chat-settings.js` | the turn knobs the settings menu owns (model, preset, temperature, max tokens, streaming, approval policy), validated and written under the data root | anything that authorizes a target or a tool tier |
 | `tools/console/scope.js` | the authorization file: validate, back up, write, check | routing |
 | `tools/console/findings.js` · `pipeline.js` · `engagement.js` | read models over engine output | writes outside their own file |
 | `tools/console/files.js` | tolerant JSON/JSONL reads, the 0600 atomic write | policy decisions |
@@ -188,6 +193,79 @@ a different constructor call in the composition root; adding an endpoint touches
 family file plus its read model; and the terminal/streaming side cannot reach into the
 data routes. Behaviour is unchanged by the split — the RBAC matrix, the cc-route suite and
 the config/startup checks all run against the same HTTP surface as before.
+
+## The chat is a turn, not a script
+
+The console chat is the same loop as the CLI, driven from a browser: a turn calls
+`local/llm.js#runAgent` with the guarded switch in `local/tools-bridge.js#makeDispatch`
+and the engagement prompt in `runtime/live.js#systemFor`. `tools/console/chat.js` adds
+transport only — SSE, model/preset discovery, a resumable conversation, and an approval
+channel a browser can answer. There is deliberately no second agent engine to drift.
+
+Two things a client may rely on:
+
+- **A refusal is a frame, not prose.** `tool_result {blocked:true, reason}` is emitted for
+  every refused call — `reason: preset` when the preset does not grant the tool,
+  `reason: approval` when the operator denied it, `reason: invalid-args` when the call
+  was malformed. The model's own words are never the evidence that something ran.
+- **The allowlist is data, in two layers.** `chat-presets.js` filters the schema offered to
+  the model, and `chat-tools.js` refuses the same call if it arrives anyway (stale tab, a
+  `ACTION:` line from the text fallback, a model inventing tools). Analysis mode is
+  read-only by construction: `run_tool`, `pipeline`, `write_file` and `record_finding` are
+  absent from its list, so no prompt can talk its way into them.
+
+Frame contract (one JSON object per `data:` line, blank line between frames, additive
+only — a client must ignore a `type` it does not know):
+
+| Frame | Payload |
+|---|---|
+| `meta` | `session, model, modelId, profile, egress, preset, readonly, tools[]` |
+| `session` | `id, title` |
+| `start` · `thinking` · `token` | `{}` · `{t}` · `{t}` |
+| `tool_call` | `id, tool, args` |
+| `tool_result` | `id, tool, ok, exit, durationMs, output, blocked?, reason?` |
+| `approval` | `id, tool, args, command, tier, reason, expiresAt` |
+| `approval_result` | `id, decision` (`approve` · `deny` · `stop` · `timeout`) |
+| `usage` · `timings` · `error` | `{tokensIn, tokensOut, cost}` · `{timings}` · `{message}` |
+| `done` | `session, text, stopped, error?, usage` |
+
+An intrusive tool (its `risk_tier` in `tools/tool-registry.json`, the same table `run.js`
+consults) parks the turn on `POST /api/chat/approval`. Unanswered is denied: a closed tab
+times out to `deny`, never to a grant.
+
+Settings are server-owned (`app/chat/settings.json` under the data root) because each one
+changes what the model receives or what a tool is allowed to do: a stale tab or a second
+operator must not silently change an answer. The menu writes them, every turn reads them,
+and `GET /api/chat/settings` also returns the read-only `context` (data root, session
+store, settings file) that the dialog displays without pretending to edit it. Scope stays
+in `scope.json` and tool tiers in `tools/tool-registry.json`; there is deliberately no
+setting that widens either.
+
+Conversations live under the data root (`app/chat/<id>.json`) while tool processes run
+against the checkout. When the two differ, the chat hands the guarded switch the
+configured reports directory for reads and evidence writes (`readRoots`/`reportRoots`)
+and passes `FINDINGS_JSONL` / `CYBOROS_AGENT_DIR` to child tools, so analysis mode reads
+the engagement the dashboard is showing rather than a stale checkout's `reports/`.
+
+### Client shape (`tools/gui`)
+
+The chat is four zero-build files over one state object, and the split is the frame
+contract continued into the browser: each file receives data and returns DOM, and none of
+them re-decides what the server already decided.
+
+| File | Owns | Does not own |
+|---|---|---|
+| `views-chat.js` | the transcript model (`S`), the frame → state reducer, edit/regenerate, composer wiring | how a tool card is drawn, how a frame is parsed, the settings form |
+| `chat-render.js` | transcript → DOM: markdown, user/assistant turns, tool and approval cards, the action row, the in-place painters | state, transport, scroll position |
+| `chat-api.js` | every route the chat speaks, and the SSE pump (`ChatApi.stream(body, {signal, onFrame})`) | what to do with a frame |
+| `chat-settings.js` | the settings surface (seven sections, one save path) | where settings come from, what saving means for the current conversation |
+
+`views-chat.js` is the only place that mutates state, so a stream handler and a redraw
+cannot disagree. Rendering asks for the three behaviours it cannot own — `onEdit`,
+`onRegenerate`, `onDecide` — instead of reaching into the view, and `ChatSettings` takes
+`{getState, onSaved}` rather than importing the view's globals. A refused request keeps
+its `.notAccepted` flag through `chat-api.js`: that flag is what tells the view to reload
+the stored transcript instead of showing a rewrite the server never applied.
 
 ## Deliberate non-goals
 

@@ -23,7 +23,7 @@
 ## `docs/` — riferimento
 
 - [**Adopting Cyboros in an organization**](ADOPTION.md) — A due-diligence page for the security lead, the legal reviewer and the procurement · 12,0 KB
-- [**Architecture**](ARCHITECTURE.md) — The whole design follows from one decision: the model decides what to try; the · 13,8 KB
+- [**Architecture**](ARCHITECTURE.md) — The whole design follows from one decision: the model decides what to try; the · 19,2 KB
 - [**Deploying the console**](DEPLOY.md) — A deployment is two things: code (this repository, or the container image) and a · 6,5 KB
 - [**Glossary**](GLOSSARY.md) — The harness uses a small set of terms with exact meanings. They are load-bearing: · 3,3 KB
 - [**Identity and access control**](IDENTITY.md) — The Command Center has accounts. Every `/api` request — read or write — is · 7,0 KB
@@ -36,7 +36,7 @@
 - [**Alternative-tools audit — what the harness should adopt, borrow, or leave alone**](TOOL-ALTERNATIVES-AUDIT.md) — Three concrete gaps, in priority order: · 26,1 KB
 - [**What the published benchmarks measure, and what they leave out**](TOOL-LANDSCAPE.md) — As of mid-2026 there is real, serious work here, and none of it is · 6,3 KB
 - [**Upgrading an installation**](UPGRADING.md) — Two things move independently: the code (checkout or image) and the data · 4,3 KB
-- [**Cyboros Command Center — Desktop Edition (piano e work package)**](command-center-desktop.md) — Obiettivo. Portare il Command Center da dashboard web a programma desktop (`cyboros-cc`) · 27,2 KB
+- [**Cyboros Command Center — Desktop Edition (piano e work package)**](command-center-desktop.md) — Obiettivo. Portare il Command Center da dashboard web a programma desktop (`cyboros-cc`) · 27,6 KB
 - [**Community scout #2 — web, HN e community, 2026-10-04 → 2026-10-09**](community-scout-2026-10-09.md) — OpenAPI/GraphQL SDL/WSDL/.proto. Pipeline a due stadi — cattura una volta, genera (anche · 30,1 KB
 - [**Community scout — Reddit pentest/redteam, ottobre 2026**](community-scout-2026-10.md) — *supervised*, guardia obbligatoria al confine di esecuzione, finding legati a ricevute · 23,1 KB
 - [**Egress gateway & anonymized egress (red-team OPSEC)**](egress-opsec.md) — To force third-party HTTP(S) binaries through the scope allowlist, start the proxy first: · 2,4 KB

@@ -16,6 +16,8 @@ const CT = {
   '.js': 'text/javascript; charset=utf-8',
   '.json': 'application/json; charset=utf-8',
   '.svg': 'image/svg+xml',
+  '.webp': 'image/webp',
+  '.png': 'image/png',
 };
 
 function sendJson(res, code, obj) {
@@ -134,6 +136,21 @@ function createStatic(opts) {
       res.end(fs.readFileSync(p));
       return true;
     }
+    // Brand art under /img/ — a DELIBERATE widening of the static surface, not a
+    // general one: image extensions only, basenames only, inside tools/gui/img/. The
+    // chat's ouroboros is the real asset from the marketing site (webp), so a route is
+    // the honest option; turning the whole allowlist into "any static file" is not.
+    const imgMatch = url.match(/^\/img\/([\w.-]+)$/);
+    if (imgMatch && /\.(webp|svg|png)$/.test(imgMatch[1])) {
+      if (!guardOk(req)) { sendText(res, 403, 'forbidden'); return true; }
+      const name = imgMatch[1];
+      const p = path.join(guiDir, 'img', name);
+      if (name.includes('..') || !fs.existsSync(p)) { sendText(res, 404, 'not found'); return true; }
+      res.writeHead(200, { 'Content-Type': CT[path.extname(p)] || 'application/octet-stream', 'Cache-Control': 'no-store' });
+      res.end(fs.readFileSync(p));
+      return true;
+    }
+
     // vendored static assets (xterm.js terminal): /vendor/<file>.{js,css}
     const vendMatch = url.match(/^\/vendor\/([\w.-]+)$/);
     if (vendMatch) {

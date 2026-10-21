@@ -154,7 +154,9 @@ const engagement = createEngagement({
 });
 const jobs = createJobs({ root: ROOT });
 const terminals = createTerminals({ root: ROOT, toolsDir: TOOLS_DIR });
-const chat = createChat();
+// Chat talks to a provider through the same agent loop as the CLI; conversations live
+// under the data root, while tool processes run against the repository.
+const chat = createChat({ root: ROOT, reportsDir: REPORTS });
 
 // The seam every module is wired through: routes read only from this context, so a
 // different identity or job backend is a different constructor call here.
