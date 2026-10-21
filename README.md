@@ -122,7 +122,17 @@ clean scan.
 
 ## Quick start
 
-Requires **Node ≥ 22** (the Command Center backend uses `node:sqlite`).
+### Prerequisites
+
+- **Node ≥ 22** — `.nvmrc` pins the major, and `package.json` declares it in `engines`; the
+  Command Center backend uses `node:sqlite`, which is why the floor is that high. Nothing
+  else: zero dependencies means no lockfile, no `node_modules`, no registry hit.
+- **git**, to clone.
+- Linux and macOS run the harness natively. On Windows the core harness is plain Node, so it
+  runs there too; the extended offensive arsenal (step 5 below) installs via
+  `install-tools.ps1` instead of `install-tools.sh`.
+
+### 1. Clone and run the test suite
 
 ```bash
 git clone https://github.com/stavrosredteamer/cyboros-harness.git
@@ -130,8 +140,22 @@ cd cyboros-harness
 npm test                 # 123 tests, no install, no network, 2 workers (--jobs 1 to serialize)
 ```
 
-Then write your authorization. `scope.json` **is** the written authorization, and the
-harness is fail-closed until you fill it in:
+This is also how you verify the clone: a green suite means the guards, the oracle discipline
+and the reporting pipeline all behave as documented on your machine, before you point
+anything at a real target. A `pretest` hook (`tools/ensure-test-scope.js`) writes a
+loopback-only `scope.json` the first time, purely so the fail-closed guard below has
+something to authorize for the offline/loopback tests — it only ever creates that file, never
+touches one you already wrote.
+
+If the run fails before a single test starts, check `node --version` against the
+Prerequisites above. If it fails partway through, `node tools/doctor.js` says exactly what's
+missing (see Troubleshooting).
+
+### 2. Write your authorization
+
+`scope.json` **is** the written authorization, and the harness is fail-closed until you fill
+it in — empty or absent, every target is blocked, with no flag to override it. Replace the
+loopback-only file step 1 created with your real scope:
 
 ```json
 {
@@ -141,6 +165,8 @@ harness is fail-closed until you fill it in:
 }
 ```
 
+### 3. Run it against something in scope
+
 ```bash
 node tools/scope-guard.js check https://target.example   # exit 0 = authorized
 node tools/cyboros.js recon target.example
@@ -149,14 +175,41 @@ node tools/cyboros.js status
 npm run tui              # terminal surface: scope.json is real, no model call until --live
 ```
 
-To get `cyboros` as a command — bare `cyboros` opens the TUI, the subcommands keep the
-pipeline — run the launcher once and forget the path:
+### 4. Get `cyboros` as a command (optional)
+
+Bare `cyboros` opens the TUI, the subcommands keep the pipeline — run the launcher once and
+forget the path:
 
 ```bash
 ./scripts/install-cyboros-launcher.sh   # symlink into ~/.local/bin (idempotent, --uninstall to remove)
 cyboros                         # TUI
 cyboros scan target.example     # same pipeline as node tools/cyboros.js
 ```
+
+### 5. Install the extended tool arsenal (optional)
+
+The core harness — guards, pipeline, reporting, TUI — needs nothing beyond Node. Offensive
+binaries (nmap, sqlmap, the recon/wireless/mobile tool-plane) are a separate, optional layer:
+
+```bash
+./install-tools.sh       # Parrot/Debian
+# or
+install-tools.ps1        # Windows
+node tools/doctor.js     # confirms what landed, and what's still missing
+```
+
+A workstation without the extended arsenal still runs the core harness in full; `doctor.js`
+just reports the gap instead of hiding it.
+
+### Troubleshooting
+
+- **`scope-guard.js check` exits non-zero** for a host you just added — this is correct until
+  the JSON in `scope.json` parses and the host/IP matches exactly (`allowed_hosts` wants bare
+  hostnames, `allowed_ips` wants CIDR). An empty or missing file blocks everything by design.
+- **`doctor.js` lists binaries as `MISS`** under the tool-plane sections — expected on a bare
+  clone before step 5; none of them are required for `npm test`, the scope guard, or the TUI.
+- **`node:sqlite` errors** from the Command Center backend mean Node is older than 22 — see
+  Prerequisites.
 
 ### Live agent with your own provider
 
@@ -279,6 +332,9 @@ yourself; going through the proxy is the supported path.
 
 ## Documentation
 
+- [`docs/INDEX.md`](docs/INDEX.md) — every document in the repo, generated from the files
+  themselves (title, first paragraph, size), so it cannot drift from what's actually here. Start
+  there to browse everything; the list below is the hand-picked subset worth reading first.
 - [`docs/ADOPTION.md`](docs/ADOPTION.md) — **for security teams and organizations**: a due-diligence page on authorization, client-data governance, auditability and the tool's own security posture — every answer naming the file that proves it
 - [`docs/IDENTITY.md`](docs/IDENTITY.md) — roles, accounts, sessions, the audit actor, and how to plug an OIDC/SSO backend in
 - [`docs/DEPLOY.md`](docs/DEPLOY.md) — config surface and precedence, first run, container, reverse proxy, honest limits

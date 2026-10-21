@@ -157,9 +157,9 @@ The project states its own boundaries so you do not discover them in production
 ## Deploying for a team
 
 1. **Prerequisite:** Node ≥22. No other runtime install for the core harness.
-2. **Per operator:** clone, `npm install` (dev/test tooling only), `npm test` to
-   confirm the guardrails pass on their machine, then `npm run doctor` for a health
-   and secret-exposure check.
+2. **Per operator:** clone, `npm test` to confirm the guardrails pass on their machine
+   (zero dependencies — there is nothing to `npm install`), then `npm run doctor` for a
+   health and secret-exposure check.
 3. **Per engagement:** fill `scope.json` from [`scope.example.json`](../scope.example.json)
    and have the client sign the RoE *before* any active step. An empty or absent
    `scope.json` is fail-closed — the safe default.

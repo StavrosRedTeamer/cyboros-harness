@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # demo.sh — three refusals, and a green suite. Meant to be recorded, not read.
 #
-#   ./tools/demo.sh              # full run, ~40s: the whole 115-test gate
+#   ./tools/demo.sh              # full run, ~40s: the whole 123-test gate
 #   DEMO_FAST=1 ./tools/demo.sh  # the guard tests only, for a README GIF
 #   DEMO_PACE=3 DEMO_FAST=1 ./tools/demo.sh   # ...with 3s of hold per step
 #
