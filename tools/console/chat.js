@@ -77,7 +77,7 @@ function createChat() {
       return sendJson(res, 403, { error: `profile "${profile}" uses cloud egress but allow_cloud=false` });
     }
     let key = '';
-    try { key = m.live.resolveKey(profile, p.api_key_env) || ''; } catch { key = ''; }
+    try { key = (m.live.resolveKey(profile, p.api_key_env) || {}).key || ''; } catch { key = ''; }
     if (!key) key = egress === 'local' ? 'sk-local' : '';
     if (egress === 'cloud' && !key) {
       return sendJson(res, 400, { error: `no API key for cloud profile "${profile}"${p.api_key_env ? ' — set $' + p.api_key_env : ''}` });
