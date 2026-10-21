@@ -73,6 +73,9 @@ scope.json.bak-*
 tools/.pace.json
 tools/.test-routes.txt
 node_modules/
+# Scratch degli agenti Claude Code: worktree isolati per i piani di lavoro (EnterWorktree),
+# mai sorgente del progetto. Senza questa riga un `git add -A` distratto li raccoglie.
+.claude/
 # `wrangler dev` (usato solo in sites/, e mai come dipendenza: gira via npx) scrive qui bundle
 # e cache. Stato di build generato, non sorgente.
 .wrangler/
