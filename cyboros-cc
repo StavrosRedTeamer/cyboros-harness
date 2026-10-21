@@ -7,6 +7,15 @@ set -euo pipefail
 WS="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$WS"
 
+# Machine-local secrets for cloud chat/agent profiles (the api_key_env values named in
+# runtime/providers.json) live outside the repo, same convention as ~/.config/manicode used
+# elsewhere in this tree. A no-op on a fresh clone/machine with nothing there yet.
+if [ -d "$HOME/.config/cyboros" ]; then
+  shopt -s nullglob
+  for f in "$HOME/.config/cyboros"/*.env; do source "$f"; done
+  shopt -u nullglob
+fi
+
 if ! command -v node >/dev/null 2>&1; then
   echo "cyboros-cc: node >= 22 is required" >&2
   exit 1
