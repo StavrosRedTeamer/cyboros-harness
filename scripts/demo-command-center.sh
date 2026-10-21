@@ -19,6 +19,33 @@ export CC_APPROVALS_FILE="$DEMO_ROOT/reports/approvals.jsonl"
 export CC_OPSTATE_FILE="$DEMO_ROOT/operation-state.json"
 export CC_TEMPLATES_DIR="$WS/templates/campaign"
 
+# Full isolation. CC_ROOT alone is NOT enough: several data modules read their OWN
+# env knob (default = the repo), not CC_ROOT, so the Command Center's Graph, Ledger
+# and Coverage panels would read the operator's REAL state.db / artifact-ledger /
+# findings and render real client hosts. Redirect every knob into the throwaway root;
+# a wrong shape just yields an empty panel (fails closed), never real data.
+export STATE_DB="$DEMO_ROOT/reports/state.db"
+export FINDINGS_JSONL="$DEMO_ROOT/reports/findings.jsonl"
+export ARTIFACT_LEDGER_FILE="$DEMO_ROOT/reports/tmp/artifact-ledger.jsonl"
+export AUDIT_DIR="$DEMO_ROOT/artifacts/audit"
+export GATE_LOG_FILE="$DEMO_ROOT/reports/gate-log.md"
+export COVERAGE_REPORTS_DIR="$DEMO_ROOT/reports/coverage"
+export COVERAGE_WORKFLOW_FILE="$DEMO_ROOT/reports/coverage-workflow.json"
+export SESSIONS_JSON="$DEMO_ROOT/reports/sessions.json"
+export LOOT_JSONL="$DEMO_ROOT/reports/loot.jsonl"
+export VERIFICATIONS_JSONL="$DEMO_ROOT/reports/verifications.jsonl"
+export RUN_AUDIT_FILE="$DEMO_ROOT/reports/run-audit.jsonl"
+mkdir -p "$DEMO_ROOT/reports/tmp" "$DEMO_ROOT/artifacts/audit"
+
+# Fail-closed guard: refuse to run if any data knob still points outside the throwaway
+# root (an earlier version of this script leaked real hosts into Graph/Ledger).
+for v in CC_ROOT SCOPE_JSON STATE_DB FINDINGS_JSONL ARTIFACT_LEDGER_FILE AUDIT_DIR; do
+  case "${!v}" in
+    "$DEMO_ROOT"|"$DEMO_ROOT"/*) ;;
+    *) echo "demo-cc: $v is not isolated (got '${!v}') — refusing to run" >&2; exit 2 ;;
+  esac
+done
+
 step() { printf '\n\033[1;36m▶ %s\033[0m\n' "$1"; }
 
 # 1) scope (this is an authorization file: the demo uses a lab host only)
