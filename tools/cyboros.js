@@ -616,17 +616,26 @@ function report(db, opts) {
 
 // ---- CLI ----
 
-function usage() {
-  console.error(
+function usage(code = 2) {
+  // --help is a success, a bad invocation is not: stdout/0 vs stderr/2.
+  const out = code === 0 ? console.log : console.error;
+  out(
     'usage: cyboros [--live|--demo|--task <text>]            open the TUI (on a terminal)\n' +
     '       cyboros recon <host> [--takeover] | scan <host|cidr> | enumerate <host> |\n' +
     '               fuzz <host> [--ports N,N] | status [<host>] | resume | report'
   );
-  process.exit(2);
+  process.exit(code);
 }
 
 async function main() {
   const [cmd, ...rest] = process.argv.slice(2);
+  // The version comes from package.json — the same file a release tag is cut from — and
+  // works without a TTY, so a script can read it.
+  if (cmd === '--version' || cmd === '-v') {
+    console.log(require('../package.json').version);
+    return;
+  }
+  if (cmd === '--help' || cmd === '-h') usage(0);
   // No subcommand (or a TUI flag) on a terminal opens the interactive surface:
   // `cyboros` is the product, `cyboros scan host` is the mechanical pipeline. Without a
   // TTY the usage still wins, so pipes and tests keep their exit code 2.

@@ -9,7 +9,7 @@
 // The point is not the bugs; it is watching the agent find them through the guarded
 // tools and record a finding that quotes the exact request/response.
 //
-//   node demo/target.js            # http://127.0.0.1:8787
+//   node demo/target.js            # http://127.0.0.1:8788
 //   PORT=9000 node demo/target.js
 //
 // Test-only export: createServer() lets the suite bind an ephemeral port.
@@ -133,8 +133,10 @@ function createServer() {
 }
 
 if (require.main === module) {
-  // Explicit argv wins over PORT so `node demo/target.js 8787` is unambiguous.
-  const port = Number(process.argv[2] || process.env.PORT || 8787);
+  // 8788, not 8787: the Command Center's default port is 8787, and the demo used to
+  // fail to bind whenever the console was open on the same machine.
+  // Explicit argv wins over PORT so `node demo/target.js 8788` is unambiguous.
+  const port = Number(process.argv[2] || process.env.PORT || 8788);
   const server = createServer();
   server.listen(port, '127.0.0.1', () => {
     const actual = server.address().port;

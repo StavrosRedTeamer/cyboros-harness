@@ -28,7 +28,9 @@ const { loadScope, inScope } = require('../tools/scope-guard');
 const { renderMarkdown, createStream, thinkingLine, todoLines, THINKING_VERBS } = require('./render');
 const { createInput } = require('./inputline');
 
-const VERSION = '0.1.0-draft';
+// Single source of truth: the banner, `/version` and `--version` must agree with the
+// release, and package.json is what a tag is cut from.
+const VERSION = require('../package.json').version;
 const argv = process.argv.slice(2);
 
 function argValue(flag) {

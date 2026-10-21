@@ -15,7 +15,7 @@ The data is invented (`demo.example` emails, fake card endings). The server bind
 ## 1. Start the target
 
 ```bash
-node demo/target.js                 # http://127.0.0.1:8787
+node demo/target.js                 # http://127.0.0.1:8788
 # or: PORT=9000 node demo/target.js
 ```
 
@@ -37,7 +37,7 @@ Second terminal, from the repository root:
 
 ```bash
 export SCOPE_JSON="$PWD/demo/scope.demo.json"
-npm run tui -- --live --allow-cloud 127.0.0.1:8787
+npm run tui -- --live --allow-cloud 127.0.0.1:8788
 ```
 
 Then ask, for example:
@@ -55,7 +55,7 @@ Or run one turn without the interactive prompt:
 
 ```bash
 export SCOPE_JSON="$PWD/demo/scope.demo.json"
-npm run tui -- --live --allow-cloud 127.0.0.1:8787 \
+npm run tui -- --live --allow-cloud 127.0.0.1:8788 \
   --task "Map the demo shop and prove an access-control issue between alice and bob."
 ```
 

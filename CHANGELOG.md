@@ -4,9 +4,11 @@ All notable changes to this project are documented here. Dates are commit dates.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project
 uses [Semantic Versioning](https://semver.org/) (pre-1.0: a minor bump may carry breaking
-changes). `v0.1.0` (2026-09-28) is the first tagged release; the latest is `v0.2.0` (2026-10-20).
+changes). `v0.1.0` (2026-09-28) is the first tagged release; the latest is `v0.3.0` (2026-10-21).
 
 ## [Unreleased]
+
+## [0.3.0] — 2026-10-21
 
 ### Added
 
@@ -46,6 +48,10 @@ changes). `v0.1.0` (2026-09-28) is the first tagged release; the latest is `v0.2
   restituisce subito il prompt (la richiesta in volo non è annullabile — l'agent loop non ha un
   hook di abort — ma il rendering si ferma). L'approval cede e riprende la tastiera così i due
   lettori di stdin non si contendono il terminale.
+- **`cyboros --version` e `--help` rispondono anche senza TTY.** Prima `--version` in una pipe
+  stampava l'usage con exit 2 e la versione esisteva solo dentro la TUI; ora la stampa
+  `package.json` — la stessa da cui si taglia una release — ed esce 0, `--help` è un successo,
+  e un'invocazione sbagliata resta exit 2.
 
 ### Changed
 
@@ -78,6 +84,12 @@ changes). `v0.1.0` (2026-09-28) is the first tagged release; the latest is `v0.2
   Triangulating…), secondi trascorsi, conteggio token live e il suggerimento di interruzione. Il
   conteggio a zero sparisce invece di mostrarsi `0`. Formattazione pura in `runtime/render.js`
   (`thinkingLine`, `formatTokens`).
+- **La versione mostrata è quella del pacchetto.** Il banner della TUI diceva `0.1.0-draft`
+  mentre `package.json` era 0.2.0: ora banner, `/version` e `--version` leggono `package.json`,
+  così la prima schermata e il tag non possono divergere.
+- **La demo ascolta su 8788.** `demo/target.js` usava 8787, la porta di default del Command
+  Center: con la console aperta la demo non riusciva a bindare. Il default è ora 8788 (`PORT=`
+  e l'argomento restano per cambiarla) e `demo/README.md` segue.
 
 ### Fixed
 
@@ -87,6 +99,12 @@ changes). `v0.1.0` (2026-09-28) is the first tagged release; the latest is `v0.2
   al repo — così i pannelli mostravano host di clienti reali. Ora `scripts/demo-command-center.sh`
   redirige ogni variabile nella root usa-e-getta e si rifiuta di partire se una è rimasta fuori
   (fail closed).
+- **Il README non documenta più un comando che non esiste.** `cyboros target.example` usciva 2
+  con l'usage, perché senza un flag iniziale il primo token è un sottocomando: l'esempio live
+  ora è `cyboros --live target.example`.
+- **Il badge di licenza dice cosa dice il file.** Il badge recitava solo `Apache-2.0` puntando a
+  un `LICENSE` che porta anche la restrizione organizzativa; ora badge, alt e `title` lo
+  dichiarano.
 
 ## [0.2.0] — 2026-10-20
 

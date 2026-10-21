@@ -6,7 +6,7 @@
 and where the lesson of one engagement changes the next.**
 
 [![CI](https://github.com/stavrosredteamer/cyboros-harness/actions/workflows/ci.yml/badge.svg?branch=master)](https://github.com/stavrosredteamer/cyboros-harness/actions/workflows/ci.yml)
-[![License: Apache-2.0](docs/assets/license-apache-2.0.svg)](LICENSE)
+[![License: Apache-2.0 + organizational-use restriction](docs/assets/license-apache-2.0.svg)](LICENSE)
 
 [Apache-2.0, with an organizational-use restriction](LICENSE) · zero dependencies · offline-capable · 123 tests, hermetic and parallel
 
@@ -209,7 +209,9 @@ just reports the gap instead of hiding it.
 - **`doctor.js` lists binaries as `MISS`** under the tool-plane sections — expected on a bare
   clone before step 5; none of them are required for `npm test`, the scope guard, or the TUI.
 - **`node:sqlite` errors** from the Command Center backend mean Node is older than 22 — see
-  Prerequisites.
+  Prerequisites. On Node 22/23 a harmless `ExperimentalWarning: SQLite is an experimental
+  feature` appears the first time a command opens the state database; it disappears once the
+  module graduates and needs no action.
 
 ### Live agent with your own provider
 
@@ -220,7 +222,7 @@ in the environment, never in the file, and an inline `api_key` is refused:
 cp runtime/providers.example.json runtime/providers.json   # gitignored
 export OPENROUTER_API_KEY=...                              # or any OpenAI-compatible key
 # or, instead of exporting, keep it in ~/.config/cyboros/openrouter.env (chmod 600)
-cyboros target.example        # asks once, at the first message, before any egress
+cyboros --live target.example          # asks once, at the first message, before any egress
 cyboros --allow-cloud target.example   # the flag also connects at launch
 ```
 

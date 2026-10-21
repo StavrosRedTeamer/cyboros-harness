@@ -113,11 +113,11 @@ if [ "$DEMO_FAST" = "1" ]; then
   step "4. The guards, under test, offline"
   cmd "npm test -- --only guard 2>&1 | tail -3  # 4 tests, offline"
   echo
-  echo "The full gate is 115 tests, under a minute. Zero dependencies either way:"
+  echo "The full gate is 123 tests, a couple of minutes. Zero dependencies either way:"
   echo "nothing to audit but the repository."
 else
-  step "4. 115 tests, no install, no network"
-  cmd "npm test 2>&1 | tail -3  # ~45s"
+  step "4. 123 tests, no install, no network"
+  cmd "npm test 2>&1 | tail -3  # ~2 min"
   echo
   echo "Zero dependencies. Nothing to audit but the repository."
 fi
