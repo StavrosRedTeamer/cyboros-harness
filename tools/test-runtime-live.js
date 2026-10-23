@@ -100,6 +100,41 @@ function close(server) {
   return new Promise((resolve) => server.close(resolve));
 }
 
+// A provider that answers with a status the test chooses, and remembers every request:
+// what a failure COSTS is part of the contract (a 4xx retried twice is two extra
+// requests and two extra seconds before the same rejection).
+function startStatusProvider(script) {
+  return new Promise((resolve) => {
+    let n = 0;
+    const requests = [];
+    const server = http.createServer((req, res) => {
+      let body = '';
+      req.on('data', (d) => { body += d; });
+      req.on('end', () => {
+        let parsed = {};
+        try { parsed = JSON.parse(body || '{}'); } catch { /* the count is what matters */ }
+        requests.push(parsed);
+        const move = script(n++, parsed) || {};
+        res.writeHead(move.status || 200, { 'content-type': 'application/json' });
+        res.end(typeof move.body === 'string' ? move.body : JSON.stringify(move.body || {}));
+      });
+    });
+    server.listen(0, '127.0.0.1', () => resolve({ server, port: server.address().port, requests }));
+  });
+}
+
+// The loop without live.js: recovery is a property of local/llm.js, and a test that went
+// through the TUI would be measuring the surface instead.
+function loopFor(port, runtime = {}, capabilities) {
+  const { LocalLLM } = require('../local/llm');
+  return new LocalLLM({
+    endpoint: { base_url: `http://127.0.0.1:${port}/v1`, api_key: 'x', model: 'mock' },
+    sampling: { temperature: 0, top_p: 1, max_tokens: 64 },
+    capabilities,
+    runtime: { max_tool_iters: 4, use_grammar: false, retries: 2, retry_backoff_ms: 1, ...runtime },
+  });
+}
+
 // ── config gate ────────────────────────────────────────────────────────────
 async function main() {
   ok('loadConfig refuses a missing file with the copy hint', () => {
@@ -477,6 +512,104 @@ async function main() {
       if (prevKey == null) delete process.env.EXPERIENTIAL_API_KEY;
       else process.env.EXPERIENTIAL_API_KEY = prevKey;
     }
+  });
+
+  // ── provider failures: retry what a retry can fix, never disguise the rest ────
+  await okAsync('a 4xx is the provider\'s answer: one request, no retries', async () => {
+    const { server, port, requests } = await startStatusProvider(() => ({ status: 401, body: { error: { message: 'bad key' } } }));
+    try {
+      const llm = loopFor(port);
+      await assert.rejects(
+        () => llm.runAgent({ task: 'x', dispatch: async () => 'never' }),
+        (e) => e.status === 401 && /HTTP 401/.test(e.message),
+        'the rejection surfaces as the provider sent it',
+      );
+      assert.strictEqual(requests.length, 1, 'a rejected request is not sent again');
+    } finally { await close(server); }
+  });
+
+  await okAsync('a 5xx is retried, and the retry is the one that answers', async () => {
+    const { server, port, requests } = await startStatusProvider((n) => (
+      n === 0 ? { status: 503, body: 'busy' } : { body: chat({ role: 'assistant', content: 'FINAL: recovered' }) }
+    ));
+    try {
+      const llm = loopFor(port);
+      const res = await llm.runAgent({ task: 'x', dispatch: async () => 'never' });
+      assert.strictEqual(requests.length, 2, 'one retry');
+      assert.strictEqual(res.text, 'recovered');
+    } finally { await close(server); }
+  });
+
+  await okAsync('a generic 400 does not silently disable the grammar', async () => {
+    const { server, port, requests } = await startStatusProvider(() => (
+      { status: 400, body: { error: { message: 'unsupported parameter: top_k' } } }
+    ));
+    try {
+      const llm = loopFor(port, { use_grammar: true }, { grammar: true });
+      await assert.rejects(
+        () => llm.runAgent({ task: 'x', grammar: 'root ::= "x"', dispatch: async () => 'never' }),
+        /HTTP 400/,
+      );
+      assert.strictEqual(requests.length, 1, 'no retry and no second, grammar-less request');
+      assert.ok(JSON.stringify(requests[0]).includes('grammar'), 'the request did carry the grammar');
+    } finally { await close(server); }
+  });
+
+  await okAsync('a 400 that names the grammar still falls back to native tools', async () => {
+    const { server, port, requests } = await startStatusProvider((n) => (
+      n === 0 ? { status: 400, body: { error: { message: 'this server does not support grammar' } } }
+        : { body: chat({ role: 'assistant', content: 'FINAL: no grammar' }) }
+    ));
+    try {
+      const llm = loopFor(port, { use_grammar: true }, { grammar: true });
+      const res = await llm.runAgent({ task: 'x', grammar: 'root ::= "x"', dispatch: async () => 'never' });
+      assert.strictEqual(requests.length, 2, 'the fallback is one extra request');
+      assert.ok(!('grammar' in requests[1]), 'the retry does not carry the grammar');
+      assert.strictEqual(res.text, 'no grammar');
+    } finally { await close(server); }
+  });
+
+  await okAsync('truncated tool arguments are repaired, not guessed', async () => {
+    const cut = '{"bin":"curl","args":["-s","http://127.0.0.1/very/long/path';
+    const { server, port } = await startStatusProvider((n) => (
+      n === 0
+        ? { body: chat({ role: 'assistant', content: '', tool_calls: [{ id: 'call_cut', type: 'function', function: { name: 'run_tool', arguments: cut } }] }) }
+        : { body: chat({ role: 'assistant', content: 'FINAL: done' }) }
+    ));
+    const seen = [];
+    try {
+      const llm = loopFor(port);
+      await llm.runAgent({ task: 'x', dispatch: async (name, args) => { seen.push({ name, args }); return 'ok'; } });
+      assert.strictEqual(seen.length, 1, 'the repaired call ran once');
+      assert.strictEqual(seen[0].args.bin, 'curl');
+      assert.strictEqual(seen[0].args.args[1], 'http://127.0.0.1/very/long/path', 'the cut string is closed, not truncated');
+    } finally { await close(server); }
+  });
+
+  await okAsync('unrepairable arguments are refused and fed back, never dispatched', async () => {
+    const { server, port } = await startStatusProvider((n) => (
+      n === 0
+        ? { body: chat({ role: 'assistant', content: '', tool_calls: [{ id: 'call_bad', type: 'function', function: { name: 'run_tool', arguments: 'curl -s http://127.0.0.1/' } }] }) }
+        : { body: chat({ role: 'assistant', content: 'FINAL: re-emitted' }) }
+    ));
+    const seen = [];
+    try {
+      const llm = loopFor(port);
+      const res = await llm.runAgent({ task: 'x', dispatch: async (name, args) => { seen.push({ name, args }); return 'SHOULD NOT RUN'; } });
+      assert.strictEqual(seen.length, 0, 'nothing was dispatched from unparsable arguments');
+      assert.ok(res.messages.some((m) => m.role === 'tool' && /ARGOMENTI NON VALIDI/.test(String(m.content))), 'the refusal is an observation');
+      assert.strictEqual(res.text, 're-emitted');
+    } finally { await close(server); }
+  });
+
+  ok('repairToolArguments: fences, trailing commas and truncation, but never a guess', () => {
+    const { repairToolArguments, readToolArguments } = require('../local/llm');
+    assert.deepStrictEqual(repairToolArguments('```json\n{"a":1}\n```').value, { a: 1 }, 'fenced JSON');
+    assert.deepStrictEqual(repairToolArguments('{"a":[1,2,],}').value, { a: [1, 2] }, 'trailing commas');
+    assert.deepStrictEqual(repairToolArguments('{"a":{"b":"x').value, { a: { b: 'x' } }, 'unterminated string and object');
+    assert.strictEqual(repairToolArguments('curl -s http://x').ok, false, 'prose is not an object');
+    assert.strictEqual(readToolArguments('[]').ok, false, 'an array is not a tool-argument object');
+    assert.deepStrictEqual(readToolArguments('').value, {}, 'empty is an empty object, not a failure');
   });
 
   summary('test-runtime-live');

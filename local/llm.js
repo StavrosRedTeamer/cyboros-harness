@@ -19,6 +19,11 @@ function clip(s, n) {
   return s.length <= n ? s : s.slice(0, n) + `\n…[troncato, ${s.length - n} char in piu']`;
 }
 
+// HTTP statuses a second identical request can plausibly fix. Everything else in the
+// 4xx range is the provider's verdict on THIS request (bad key, bad model, bad message
+// shape) and retrying it only triples the latency before the same error surfaces.
+const RETRYABLE_STATUS = new Set([408, 409, 425, 429, 500, 502, 503, 504]);
+
 class LocalLLM {
   constructor(cfg) {
     this.cfg = cfg;
@@ -62,9 +67,21 @@ class LocalLLM {
           signal: ctrl.signal,
         });
         clearTimeout(to);
-        if (!r.ok) { lastErr = new Error(`HTTP ${r.status}: ${clip(await r.text(), 300)}`); }
-        else return await r.json();
-      } catch (e) { clearTimeout(to); lastErr = e; }
+        if (!r.ok) {
+          const text = await r.text();
+          const err = new Error(`HTTP ${r.status}: ${clip(text, 300)}`);
+          err.status = r.status;
+          err.body = text;
+          // A 4xx is the provider's answer, not a transport hiccup: retrying it spends
+          // the same rejection again and hides the real cause behind the last attempt.
+          if (!RETRYABLE_STATUS.has(Number(r.status))) throw err;
+          lastErr = err;
+        } else return await r.json();
+      } catch (e) {
+        clearTimeout(to);
+        if (e && e.status != null && !RETRYABLE_STATUS.has(Number(e.status))) throw e;
+        lastErr = e;
+      }
       if (attempt < (rt.retries ?? 2)) await new Promise((res) => setTimeout(res, rt.retry_backoff_ms ?? 3000));
     }
     throw new Error(`llama.cpp non raggiungibile (${this.base}): ${lastErr && lastErr.message}. Avvia llama-server o correggi local/config.local.json.`);
@@ -394,8 +411,21 @@ class LocalLLM {
         messages.push(this.adapter.echoReasoning({ role: 'assistant', content: msg.content || '', tool_calls: msg.tool_calls }, rsn));
         callsMade += msg.tool_calls.length;   // ogni chiamata conta, anche se poi viene bloccata
         for (const tc of msg.tool_calls) {
-          let args = {};
-          try { args = JSON.parse(tc.function.arguments || '{}'); } catch { args = { _raw: tc.function.arguments }; }
+          // A truncated argument blob is a model error we can often recover from, and it is
+          // never a reason to dispatch a guess. `readToolArguments` closes what truncation
+          // left open; if the result is still not an object, the call is refused with an
+          // observation the model can answer — instead of a `{_raw: …}` dispatch that made
+          // the dispatcher report “bin mancante” and spent the turn on a non-call.
+          const read = readToolArguments(tc.function.arguments);
+          if (!read.ok) {
+            const note = `ARGOMENTI NON VALIDI (${read.error}). La chiamata ${tc.function.name || '(senza nome)'} NON è stata eseguita: `
+              + 'gli argomenti devono essere un oggetto JSON completo. Re-emetti la stessa chiamata con JSON valido.';
+            if (onStep) onStep({ tool: tc.function.name, args: {}, invalid: true });
+            messages.push({ role: 'tool', tool_call_id: tc.id, content: note });
+            if (onTrace) onTrace({ type: 'tool', iter, tool: tc.function.name, args: {}, out: note, invalid: true });
+            continue;
+          }
+          const args = read.value;
           if (onStep) onStep({ tool: tc.function.name, args });
           const rep = isRepeat(tc.function.name, args);
           let out;
@@ -476,6 +506,79 @@ class LocalLLM {
   }
 }
 
+// ── tool arguments: parse, or repair what truncation left behind ─────────────
+// The model's bytes are evidence. A cut-off JSON object usually still says what the call
+// was; closing an unterminated string and the open braces recovers it. Guessing is the
+// thing we never do: a value that still does not parse is refused, and the refusal is fed
+// back so the model can re-emit the call.
+const MAX_REPAIR_CHARS = 1_000_000;
+
+function readToolArguments(raw) {
+  const text = raw == null ? '' : String(raw);
+  if (!text.trim()) return { ok: true, value: {} };
+  try {
+    const parsed = JSON.parse(text);
+    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) return { ok: true, value: parsed };
+    return { ok: false, error: 'gli argomenti devono essere un oggetto JSON' };
+  } catch { /* fall through to the bounded repair */ }
+  const fixed = repairToolArguments(text);
+  if (fixed.ok && fixed.value && typeof fixed.value === 'object' && !Array.isArray(fixed.value)) {
+    return { ok: true, value: fixed.value, repaired: true };
+  }
+  return { ok: false, error: fixed.error || 'gli argomenti non sono JSON valido' };
+}
+
+function repairToolArguments(raw) {
+  const original = raw == null ? '' : String(raw);
+  if (!original.trim()) return { ok: false, error: 'argomenti vuoti' };
+  if (original.length > MAX_REPAIR_CHARS) return { ok: false, error: 'argomenti troppo grandi per il repair' };
+
+  const start = original.search(/[{[]/);
+  if (start < 0) return { ok: false, error: 'nessun oggetto JSON negli argomenti' };
+  const body = original.slice(start);
+  const lastClose = Math.max(body.lastIndexOf('}'), body.lastIndexOf(']'));
+  const candidates = [body];
+  if (lastClose >= 0) candidates.push(body.slice(0, lastClose + 1));
+  for (const base of candidates.slice()) {
+    const closed = closeJson(base);
+    candidates.push(closed, closed.replace(/,\s*([}\]])/g, '$1'));
+  }
+  for (const candidate of candidates) {
+    try {
+      const value = JSON.parse(candidate);
+      if (value && typeof value === 'object' && !Array.isArray(value)) {
+        return { ok: true, value, repaired: candidate !== original };
+      }
+    } catch { /* next candidate */ }
+  }
+  return { ok: false, error: 'gli argomenti non sono JSON valido' };
+}
+
+// Close what truncation left open. Strings are tracked so a brace inside one does not
+// change the nesting; a dangling backslash cannot end a JSON string, so it is dropped.
+function closeJson(text) {
+  const s = String(text);
+  const stack = [];
+  let inString = false;
+  let esc = false;
+  for (const ch of s) {
+    if (inString) {
+      if (esc) esc = false;
+      else if (ch === '\\') esc = true;
+      else if (ch === '"') inString = false;
+      continue;
+    }
+    if (ch === '"') inString = true;
+    else if (ch === '{') stack.push('}');
+    else if (ch === '[') stack.push(']');
+    else if (ch === '}' || ch === ']') stack.pop();
+  }
+  let out = s;
+  if (esc) out = out.slice(0, -1);
+  if (inString) out += '"';
+  return out + stack.reverse().join('');
+}
+
 // Protocollo testuale di ripiego: cerca una riga  ACTION: {"tool":"...","args":{...}}
 function parseTextAction(text) {
   const m = text.match(/ACTION:\s*(\{[\s\S]*\})\s*$/m) || text.match(/ACTION:\s*(\{[\s\S]*?\})/m);
@@ -521,9 +624,17 @@ function accToolDeltas(acc, deltas) {
 
 // Un errore del server dovuto alla grammatica (parse GBNF, campo non supportato…): spegni
 // la grammatica e continua coi tool nativi invece di far cadere l'intera run.
+//
+// The message has to NAME the grammar. A bare `HTTP 400` used to qualify, so a provider
+// rejecting the request for any other reason (an unsupported parameter, a malformed
+// message list, a model that does not exist) silently disabled GBNF and the run went on
+// in a configuration nobody had chosen. The fallback is still available for the case it
+// exists for: the server saying, in words, that it does not accept `grammar`.
 function looksLikeGrammarError(e) {
   const m = (e && e.message ? e.message : '').toLowerCase();
-  return m.includes('grammar') || m.includes('gbnf') || m.includes('http 400') || m.includes('http 500');
+  return m.includes('grammar') || m.includes('gbnf');
 }
 
-module.exports = { LocalLLM, clip, trimContext };
+module.exports = {
+  LocalLLM, clip, trimContext, RETRYABLE_STATUS, readToolArguments, repairToolArguments, closeJson,
+};
