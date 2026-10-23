@@ -179,7 +179,30 @@ function checkProject() {
   const reg = spawnSync(process.execPath, [path.join(ROOT, 'tools', 'run.js'), '--registry-check'],
     { cwd: ROOT, encoding: 'utf8', timeout: 60000 });
   rows.push({ file: 'tools/run.js --registry-check (schema)', ok: reg.status === 0, note: reg.status === 0 ? null : dimS((reg.stdout || reg.stderr || '').trim().split('\n').slice(0, 2).join(' | ')) });
+  rows.push(providerRow());
   return rows;
+}
+
+// Il profilo del modello è dichiarato; la sonda (`tools/provider-probe.js`) lo rende
+// misurato. Qui si dice solo QUALE dei due stati vale per l'endpoint configurato — letture
+// locali, zero richieste: doctor resta un tool che non parla con nessun target.
+function providerRow() {
+  try {
+    const live = require('../runtime/live');
+    const { cfg } = live.loadConfig();
+    const { profile, p } = live.resolveProfile(cfg, null);
+    const m = live.measurementsFor(profile, p);
+    if (m) {
+      const when = String(m.measured_at || '').slice(0, 10);
+      return { file: `provider "${profile}" (misurato)`, ok: true, optional: true,
+        note: `misure del ${when}: finestra ${m.usable_window_tokens ?? 'n/d'} token · ${m.requests_made} richieste` };
+    }
+    return { file: `provider "${profile}" (solo dichiarato)`, ok: true, optional: true,
+      note: 'nessuna misura per questo endpoint · node tools/provider-probe.js plan' };
+  } catch (e) {
+    const why = e && e.code === 'config_missing' ? 'runtime/providers.json assente' : (e && e.message ? String(e.message).split('\n')[0] : String(e));
+    return { file: 'provider (non configurato)', ok: true, optional: true, note: dimS(why) };
+  }
 }
 
 // ---- 3. registry (i 35 bin via run.js) -----------------------------------------------

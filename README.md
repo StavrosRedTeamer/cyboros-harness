@@ -8,7 +8,7 @@ and where the lesson of one engagement changes the next.**
 [![CI](https://github.com/stavrosredteamer/cyboros-harness/actions/workflows/ci.yml/badge.svg?branch=master)](https://github.com/stavrosredteamer/cyboros-harness/actions/workflows/ci.yml)
 [![License: Apache-2.0 + commercial-use restriction](docs/assets/license-apache-2.0.svg)](LICENSE)
 
-[Apache-2.0, with a commercial-use restriction](LICENSE) · zero dependencies · offline-capable · 124 tests, hermetic and parallel
+[Apache-2.0, with a commercial-use restriction](LICENSE) · zero dependencies · offline-capable · 129 tests, hermetic and parallel
 
 [Cyboros](docs/OUROBOROS.md): cyber + ouroboros. The loop is not marketing — every claim on
 that page names the file that proves it. The agent still cannot violate scope, because the
@@ -109,7 +109,7 @@ clean scan.
   On a client network, `npm install` does nothing.
 - **Runs air-gapped.** `local/` drives the same deterministic engine against a local
   model. No API key, no data leaving the engagement laptop.
-- **124 tests, hermetic and parallel by default, no network.** Offline and loopback tests,
+- **129 tests, hermetic and parallel by default, no network.** Offline and loopback tests,
   classified by the runner; `npm test` is the gate, `npm run test:all` includes the live e2e
   set. Tests keep the engine's shared state — the global rate limiter, the run audit, the
   findings head-anchor, the egress-proxy state — in a fixture (`hermetic()` in
@@ -137,7 +137,7 @@ clean scan.
 ```bash
 git clone https://github.com/stavrosredteamer/cyboros-harness.git
 cd cyboros-harness
-npm test                 # 124 tests, no install, no network, 2 workers (--jobs 1 to serialize)
+npm test                 # 129 tests, no install, no network, 2 workers (--jobs 1 to serialize)
 ```
 
 This is also how you verify the clone: a green suite means the guards, the oracle discipline
@@ -229,6 +229,87 @@ cyboros --allow-cloud target.example   # the flag also connects at launch
 The key is read from the environment, or from `~/.config/cyboros/<profile>.env` when it is
 mode 600; an inline `api_key` in `providers.json` is still refused.
 
+#### What a profile declares
+
+A provider is not "OpenAI-compatible" and a pile of exceptions: it is a `type` plus a
+`capabilities` block, and the request builder (`local/adapters.js`) sends **only** what that
+block declares. An unknown key is refused when the file is loaded — a typo that silently
+does nothing is the bug this replaces.
+
+| Capability | Controls | Undeclared |
+|---|---|---|
+| `tool_calls` | `native` (send `tools`) or `text` (parse `ACTION:` only) | `native` |
+| `tool_choice` | whether `tool_choice: "auto"` is sent | not sent |
+| `parallel_tool_calls` | `true`/`false` field, or `null` to leave it out | not sent |
+| `reasoning: {param, on, off}` | the **shape** of the thinking switch: `chat_template_kwargs` (llama.cpp), `thinking` (DeepSeek), `reasoning_effort`, or `none` | no thinking field is ever sent |
+| `reasoning_field` | where streamed/returned reasoning lives: `reasoning_content`, `reasoning`, or `null` | reads either name; writes nothing |
+| `reasoning_echo_with_tools` | send prior reasoning back so a tool turn can continue | not echoed |
+| `strict_unknown_fields` | the body is asserted against the declared capabilities before it leaves | no assertion |
+| `grammar` | accepts llama.cpp's GBNF `grammar`; it also withholds the tool schema, since the grammar *is* the contract | not sent — and asking for one anyway is an error, not a silent downgrade |
+| `timings` · `stream_options` · `sampling_extras` | `timings_per_token`, `stream_options.include_usage`, `top_k`/`*_penalty` | not sent (except `stream_options`, which `openai-compatible` declares: it is the standard usage chunk) |
+| `context_window_tokens` · `reserved_output_tokens` · `context_safety_tokens` | the context budget: window − output − safety | falls back to the legacy `context_char_budget`, and the TUI says so |
+| `max_output_tokens` | ceiling applied to `max_tokens` | the profile's `max_tokens` |
+| `pricing {input_per_1m, output_per_1m, cached_input_per_1m}` | cost when the provider does not report one | cost shown as unknown, never invented |
+
+Three types ship, and each default matches what its name claims: `openai-compatible` is the
+bare chat-completions shape (the standard `stream_options` usage chunk, every vendor
+extension off unless declared), `llama-cpp` adds the llama.cpp extensions this project uses
+(`grammar`, `timings`, `sampling_extras`), and `deepseek` assumes a strict cloud endpoint
+with its thinking shape and reasoning echo. `runtime/providers.example.json` contains a worked example of each —
+every number in it is an overridable default, not a claim: change the key and the next
+request follows.
+
+The adapter also arbitrates what a caller cannot: a GBNF grammar and a native tool schema
+are mutually exclusive, so a declared grammar withholds the schema, and a grammar requested
+on a profile that never declared one **fails the request** instead of quietly sending
+neither. There is no path where a run loses tool-calling without an error.
+
+#### From declared to measured
+
+A declaration is a default until something asks the endpoint. `tools/provider-probe.js`
+does, with a bounded number of requests and no guessing:
+
+```bash
+node tools/provider-probe.js plan                       # zero requests: count, tokens, cost
+node tools/provider-probe.js run --max-requests 24 --yes
+```
+
+It measures what a run can trip over — whether fields it does not know are refused, whether
+`tool_choice` and a GBNF `grammar` are accepted, which field carries the reasoning and
+whether it must be echoed back when tools are present, whether a streamed request reports
+usage, and the usable context window found by probing rather than read out of the profile.
+Each result is `measured` with the evidence that produced it, or `unknown` with the reason;
+an unreachable endpoint or a missing key produces an `unmeasured` record holding **no
+numbers**, so a default can never come back dressed as a measurement. `run` refuses without
+`--yes`, without an explicit cap, and when the plan needs more requests than the cap allows;
+the client is the one a turn uses, so the cloud-egress and key gates apply unchanged.
+Results land in `reports/provider-measurements.json`, keyed by profile and by a hash of
+`base_url|model`: `local/adapters.js` applies them only where the endpoint still matches,
+and only in the safe direction — it will stop sending a field the endpoint refuses, but
+never enlarge what is sent because an unknown field happened to be accepted once.
+`node tools/doctor.js --check` reports which of the two states a profile is in.
+
+#### Continuing a session
+
+A turn is persisted as it completes, not when the process exits. `state.json` next to
+`events.jsonl` holds the history the next turn would send, the facts extracted from it
+(targets, artifacts, findings, actions — from the compactor's own extractor) and the run's
+identity. A kill, a crash or a closed terminal no longer means rediscovering the host:
+
+```bash
+node runtime/tui.js --resume 20261022T091500-a1b2c3
+# or, inside the REPL: /resume <id> — the next /live turn continues it
+```
+
+Resume validates before it trusts. The payload is hashed on write and re-hashed on read, so
+a truncated or hand-edited file is refused with the reason; a history that fails the send
+boundary is repaired and the repair is named; one that cannot be made valid is refused
+rather than half-sent; a session older than seven days needs `--allow-stale`, because
+resuming a week-old engagement unnoticed is how a stale map gets treated as current.
+`/resume` reports what actually came back — messages, targets, findings, artifacts,
+actions — and what was trimmed or repaired. `/sessions` marks which sessions have state and
+which cannot be continued.
+
 It is one assistant, not two: the same session runs the engagement and answers questions
 about it. Ask `what did we find on this host?` and it reads `findings_query`,
 `sessions_list` or `session_read` instead of scanning; ask it to verify an object and it
@@ -241,7 +322,10 @@ grey band, `⏺` for the assistant and each tool, one `⎿` with the result tail
 reasoning — in a neutral grey/white palette with one warm accent, not neon. Answers
 are rendered Markdown — bold, inline code, lists, tables whose cells wrap instead of
 overflowing — while they stream. `/thinking off` hides the reasoning, and every turn ends
-with duration, tokens and the cost the provider reports.
+with duration, tokens and the engagement's running cost, labelled with where the price came
+from (`provider-reported`, `declared prices`) — or `cost unknown` when no price exists, rather
+than a zero that looks measured. `/cost` breaks the same rollup down per source, calls and
+tokens, and it continues across `--resume` instead of restarting the bill.
 
 Every tool call goes through the guarded surface (`scope_check`, `tools/run.js`,
 `record-finding.js`), and an intrusive binary stops for an in-session approval. Without
@@ -303,7 +387,7 @@ only the processes the harness owns.
 
 | | |
 |---|---|
-| `tools/` | the engine: 194 modules, scope guards, repeater, oracle, pipeline, C2, wifi, GUI, tests |
+| `tools/` | the engine: 195 modules, scope guards, repeater, oracle, pipeline, C2, wifi, GUI, tests |
 | `local/fleet/` | 28 agent definitions (orchestrator + specialists) |
 | `local/` | standalone runner against a local model — no cloud, no Freebuff |
 | `workflows/` | 20 reusable `enum-*` / `attack-*` pipelines |
@@ -349,7 +433,7 @@ yourself; going through the proxy is the supported path.
 - [`docs/THREAT-MODEL.md`](docs/THREAT-MODEL.md) — our own attack surface, written down before someone else finds it
 - [`docs/GLOSSARY.md`](docs/GLOSSARY.md) — canonical terminology for levels, status and guards
 - [`knowledge.md`](knowledge.md) — engagement rules and toolbox (the contract)
-- [`docs/project-map.html`](docs/project-map.html) — where everything lives: the 194 modules
+- [`docs/project-map.html`](docs/project-map.html) — where everything lives: the 195 modules
   grouped into the 16 areas the harness is thought in (guard, recon, web, host, wireless, mobile,
   opsec, proof, memory, console), the guard chain, the suite gates. Generated by
   `node tools/project-map.js`, so it cannot drift; it also answers the question a flat `tools/`

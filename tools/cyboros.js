@@ -9,7 +9,7 @@
 //   node tools/cyboros.js fuzz <host>        OPTIONAL post-scan service fuzzing via APT++ (tcp/udp/http), operator-installed
 //   node tools/cyboros.js status [<host>]    summary of state.db
 //   node tools/cyboros.js resume             re-drive the last incomplete run, skipping done phases
-//   node tools/cyboros.js report             consolidate state.db + findings.jsonl (and close the run)
+//   node tools/cyboros.js report             read-only: consolidate state.db + findings.jsonl
 //
 // Principles (see the plan): "i tool eseguono, la pipeline orchestra, gli agenti decidono".
 // - Every third-party binary runs through runBin (default = scope-check + audit + streaming
@@ -22,6 +22,7 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const state = require('./state');
+const { readFindings } = require('../runtime/findings');
 const { loadScope, inScope, cidrInScope } = require('./scope-guard');
 const { collectHosts, isCidr, runBinary } = require('./run');
 const pace = require('./pace');
@@ -522,13 +523,19 @@ function fuzzOutRoot(target) {
 
 // ---- status / resume / report ----
 
+// One projection of a run, shared by the read views so they cannot disagree about what
+// the row says (report used to print 'done' while status printed the truth).
+function runView(db, run) {
+  return run && { id: run.id, status: run.status, command: run.command, target: run.target, phases: state.listPhases(db, run.id) };
+}
+
 function status(db, host) {
   const targets = host
     ? (() => { const t = state.getTarget(db, normalizeHost(host)); return t ? [t] : []; })()
     : state.listTargets(db);
   const run = state.lastRun(db);
   return {
-    run: run && { id: run.id, status: run.status, command: run.command, target: run.target, phases: state.listPhases(db, run.id) },
+    run: runView(db, run),
     targets: targets.map((t) => {
       const hosts = state.listHosts(db, t.id);
       const portCount = hosts.reduce((n, h) => n + state.listPorts(db, h.id).length, 0);
@@ -589,8 +596,9 @@ async function resume(db, opts) {
 
 function report(db, opts) {
   opts = opts || {};
+  // Read-only: generating a report reads evidence, and evidence must not change by being
+  // read. A run's status moves only through resume or the phase that owns it.
   const run = state.lastRun(db);
-  if (run && run.status === 'running') state.finishRun(db, run.id, 'done');
   const targets = state.listTargets(db).map((t) => ({
     target: t.host,
     hosts: state.listHosts(db, t.id).map((h) => ({
@@ -600,16 +608,19 @@ function report(db, opts) {
     endpoints: state.listEndpoints(db, t.id),
   }));
   const findingsFile = opts.findingsFile || process.env.FINDINGS_JSONL || require('./config').dataPaths().findings;
-  let findings = [];
-  try {
-    findings = fs.readFileSync(findingsFile, 'utf8').split(/\r?\n/).filter(Boolean).map((l) => {
-      try { return JSON.parse(l); } catch { return null; }
-    }).filter(Boolean);
-  } catch {}
+  // The terminal's reader, not a second one: the readable rows are returned even from a
+  // corrupt file, but the verdict and the error travel with them, so a partial read cannot
+  // look like a clean count. An absent ledger is genuinely zero; unreadable and corrupt are not.
+  const ledger = readFindings(findingsFile);
+  const findings = ledger.rows;
   return {
-    run: run && { id: run.id, status: 'done', command: run.command, target: run.target, phases: state.listPhases(db, run.id) },
+    run: runView(db, run),
     targets,
     findings_count: findings.length,
+    findings_status: ledger.kind,
+    findings_error: ledger.kind === 'corrupt'
+      ? `line ${ledger.line} ${ledger.detail}`
+      : (ledger.kind === 'unreadable' ? ledger.error : null),
     findings,
   };
 }
@@ -644,6 +655,11 @@ async function main() {
       require('../runtime/tui');
       return;
     }
+    // A pipe is not a usage mistake: the TUI owns stdin/stdout and cannot draw its box
+    // without a terminal. Say that before the usage summary, which would read as if the
+    // command were malformed.
+    console.error('cyboros: the interactive TUI needs a terminal (stdin and stdout must be TTYs).');
+    console.error('         in a pipe, use a pipeline subcommand such as: cyboros scan <host>');
     usage();
   }
   const db = state.open();

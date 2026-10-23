@@ -13,7 +13,7 @@
 - [**Changelog**](../CHANGELOG.md) — All notable changes to this project are documented here. Dates are commit dates. · 69,8 KB
 - [**Contributor Covenant Code of Conduct**](../CODE_OF_CONDUCT.md) — We as members, contributors, and leaders pledge to make participation in our community a · 5,8 KB
 - [**Contributing**](../CONTRIBUTING.md) — This repository is a penetration-testing harness built around one claim: a finding is only a · 5,8 KB
-- [**Cyboros Harness**](../README.md) — A penetration-testing harness where a finding is only a finding if code can prove it — · 21,3 KB
+- [**Cyboros Harness**](../README.md) — A penetration-testing harness where a finding is only a finding if code can prove it — · 27,2 KB
 - [**Security Policy**](../SECURITY.md) — Cyboros Harness is offensive-security tooling. It executes reconnaissance and · 4,5 KB
 - [**Prompt di sessione — benchmark gen-bench**](../bench-session-prompt.md) — Sei Cyboros. Questa sessione è una run di benchmark, non un engagement. · 5,1 KB
 - [**Cyboros — Web Red Team Methodology & Rules of Engagement**](../knowledge.md) — Shared brain for every Cyboros agent — read before acting. Detail lives in docs/ (map at bottom); · 16,2 KB
@@ -23,7 +23,7 @@
 ## `docs/` — riferimento
 
 - [**Adopting Cyboros in an organization**](ADOPTION.md) — A due-diligence page for the security lead, the legal reviewer and the procurement · 12,0 KB
-- [**Architecture**](ARCHITECTURE.md) — The whole design follows from one decision: the model decides what to try; the · 19,2 KB
+- [**Architecture**](ARCHITECTURE.md) — The whole design follows from one decision: the model decides what to try; the · 27,4 KB
 - [**Deploying the console**](DEPLOY.md) — A deployment is two things: code (this repository, or the container image) and a · 6,5 KB
 - [**Glossary**](GLOSSARY.md) — The harness uses a small set of terms with exact meanings. They are load-bearing: · 3,3 KB
 - [**Identity and access control**](IDENTITY.md) — The Command Center has accounts. Every `/api` request — read or write — is · 7,0 KB
@@ -44,7 +44,7 @@
 - [**docs/f3-rom-alioth.md — Poco F3 (alioth): ROM dedicata per il client harness**](f3-rom-alioth.md) — (`docs/egress-opsec.md`). Le uniche app extra: Termux (F-Droid) e nulla altro. · 7,6 KB
 - [**Forum — il lato admin: ruolo, homepage, sanzioni**](forum-admin.md) — Il forum firmato (`tools/forum-server.js` + `tools/forum.js`) ha un ruolo admin lato server: lo · 7,4 KB
 - [**Host exploitation (post-web: C2 / post-ex / lateral) + threat intel**](host-exploitation.md) — Confirm-tier is refused unless `--confirm "<reason>"` is passed, which needs your explicit in-session · 9,1 KB
-- [**Testing by class — dettaglio metodologico**](methodology-classes.md) — Class names for `record-finding.js` are the canonical keys of `tools/test-registry.json` — · 6,9 KB
+- [**Testing by class — dettaglio metodologico**](methodology-classes.md) — Class names for `record-finding.js` are the canonical keys of `tools/test-registry.json` — · 13,5 KB
 - [**Mobile (Android) — methodology & tool detail**](mobile.md) — (`127.0.0.1`, `localhost`) o un serial USB esplicitamente in allowlist (device fisico autorizzato). · 4,9 KB
 - [**System Prompt Dump — StavrosRedTeamer**](system-prompt-dump.md) — Nessun dato di target, credenziale o output di engagement lascia la macchina. Vedi `docs/egress-opsec.md`. · 6,7 KB
 - [**Toolbox — dettaglio per-tool (knowledge.md tiene la tabella compatta)**](toolbox.md) — (it refuses out-of-scope hosts; supports `-l -`/`--stdin` AND a piped stdin for target lists; every · 30,6 KB

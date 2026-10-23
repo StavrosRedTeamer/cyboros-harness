@@ -27,10 +27,25 @@
 //                     answer with POST /api/chat/approval {id, decision}; failure to
 //                     answer before expiresAt is a deny ("timeout"), never a grant
 //   approval_result {id, decision}                       decision: approve|deny|stop|timeout
-//   usage           {tokensIn, tokensOut, cost}
+//   usage           {tokensIn, tokensOut, totalTokensIn, totalTokensOut, cost, source,
+//                    costLabel, costText, costKnown, costPartial}
+//                     `tokensIn`/`tokensOut`/`cost`/`source` are THIS call (cost null when
+//                     neither the provider nor the profile had a price); `totalTokens*` and
+//                     `costLabel`/`costText` are the CONVERSATION's, rendered by
+//                     runtime/usage.js. A footer can therefore pair tokens with the cost
+//                     label and both are the same quantity.
 //   timings         {timings}                            provider timings, when reported
 //   error           {message}                            turn failed; followed by done
 //   done            {session, text, stopped, error?, usage}
+//                     usage: {tokensIn, tokensOut, cost, costLabel, costText, costKnown,
+//                             costPartial, requests, totalTokensIn, totalTokensOut}
+//                     tokensIn/Out are THIS turn; cost and the cost* fields are the
+//                     conversation's rollup (the same one the CLI calls `/cost`)
+//
+// Cost is not formatted here and not in the browser: `runtime/usage.js` owns the
+// ledger, the unknown/floor rules and the label, exactly as it does for the CLI. The
+// console's conversation store keeps its usage in the same shape, so a bill shown in a
+// browser is the bill the terminal would report for that usage.
 //
 // Role: POST stays operator-only (tools/identity.js), viewer keeps the read endpoints.
 // Egress: a cloud profile is used only when the config sets allow_cloud AND the key is
@@ -44,6 +59,11 @@ const presets = require('./chat-presets');
 const { createChatSessions } = require('./chat-sessions');
 const { createChatSettings } = require('./chat-settings');
 const { createAsyncRunner, createApprovalBroker, createChatDispatch } = require('./chat-tools');
+// The one ledger and the one formatter (runtime/usage.js): a conversation's cost is
+// accumulated by the same owner as a session's, so the two surfaces cannot disagree. The
+// continuity module is deliberately NOT required here — this surface keeps its own store
+// and has no business loading a resumable session file to format money.
+const usage = require('../../runtime/usage');
 
 const WORKSPACE = path.join(__dirname, '..', '..');
 const MAX_INPUT_CHARS = 24000;
@@ -455,10 +475,44 @@ function createChat(opts = {}) {
     });
     emit({ type: 'session', id: doc.id, title: doc.title });
 
-    const usage = { tokens_in: 0, tokens_out: 0, cost: 0 };
+    // What this conversation has spent so far, restored from its own store: a turn adds to
+    // the bill instead of reporting only its own calls. `stored.usage` written before the
+    // rollup existed is a flat number, which normalizeUsage keeps as `unattributed` —
+    // preserved, not attributed to a source it never had.
+    let rollup = usage.normalizeUsage(stored && stored.usage);
+    // The per-message badge counts this turn; the rollup counts the conversation. Two
+    // numbers, one accumulator each, and neither is derived from the other.
+    let turnIn = 0;
+    let turnOut = 0;
+    const costFrame = () => {
+      const v = usage.costView(rollup);
+      return {
+        costLabel: usage.costBadge(v),
+        costText: usage.costText(v),
+        costKnown: v.known,
+        costPartial: v.partial,
+      };
+    };
+    const usageFrame = () => {
+      const v = usage.costView(rollup);
+      return Object.assign({
+        tokensIn: turnIn,
+        tokensOut: turnOut,
+        totalTokensIn: rollup.tokens_in,
+        totalTokensOut: rollup.tokens_out,
+        requests: rollup.requests,
+        // `cost` is the amount when one exists (a floor, if partial — the flags say
+        // which); null when nothing was priced, never 0 as a stand-in for unknown.
+        cost: v.known ? v.amount : null,
+      }, costFrame());
+    };
     const turnStarted = Date.now();
     let text = '';
     const llm = new LocalLLM({
+      // The profile's declared type and capabilities travel with the model choice: the
+      // request builder sends only what this endpoint declares it accepts.
+      type: prof.p.type || 'openai-compatible',
+      capabilities: prof.p.capabilities,
       endpoint: { base_url: prof.p.base_url, model: chosen.model, api_key: key },
       sampling: {
         temperature: current.temperature,
@@ -468,10 +522,16 @@ function createChat(opts = {}) {
       runtime: {
         max_tool_iters: preset.max_iters ?? prof.p.max_tool_iters ?? 12,
         max_tool_calls: prof.p.max_tool_calls,
-        native_tools: true,
+        // No `native_tools` here: the tool-calling style is the profile's declaration,
+        // not a per-surface assumption. A text-only profile still gets the ACTION: parser.
         text_protocol_fallback: true,
         use_grammar: false,
         context_char_budget: prof.p.context_char_budget ?? 40000,
+        // Same budget resolution as the CLI loop: the model window wins over the legacy
+        // char field, so a turn is not sized off a 15k-token assumption.
+        context_window_tokens: prof.p.context_window_tokens,
+        reserved_output_tokens: prof.p.reserved_output_tokens,
+        context_safety_tokens: prof.p.context_safety_tokens,
         tool_output_clip_chars: prof.p.tool_output_clip_chars ?? 4000,
         request_timeout_ms: prof.p.request_timeout_ms ?? 180000,
         retries: prof.p.retries ?? 1,
@@ -509,11 +569,25 @@ function createChat(opts = {}) {
         onUsage: (u) => {
           const tin = Number(u.prompt_tokens ?? u.tokens_in ?? 0) || 0;
           const tout = Number(u.completion_tokens ?? u.tokens_out ?? 0) || 0;
-          const cost = Number(u.cost);
-          usage.tokens_in += tin;
-          usage.tokens_out += tout;
-          if (Number.isFinite(cost)) usage.cost += cost;
-          emit({ type: 'usage', tokensIn: tin, tokensOut: tout, cost: Number.isFinite(cost) ? cost : null });
+          // A number the provider did not report and the profile did not price is not a
+          // cost of 0: it is an unpriced call, and the rollup counts it as one.
+          const hasCost = u.cost != null && Number.isFinite(Number(u.cost));
+          const cost = hasCost ? Number(u.cost) : null;
+          const source = hasCost ? (u.cost_source || null) : null;
+          turnIn += tin;
+          turnOut += tout;
+          rollup = usage.addUsage(rollup, { tokens_in: tin, tokens_out: tout, cost, source });
+          // Totals travel with the call: the footer prints tokens next to the cost label,
+          // and a per-call count beside a conversation total reads as a rate.
+          emit(Object.assign({
+            type: 'usage',
+            tokensIn: tin,
+            tokensOut: tout,
+            totalTokensIn: rollup.tokens_in,
+            totalTokensOut: rollup.tokens_out,
+            cost,
+            source,
+          }, costFrame()));
         },
       });
       if (!current.streaming && result.text) {
@@ -526,10 +600,10 @@ function createChat(opts = {}) {
       const durationMs = Date.now() - turnStarted;
       transcript.push({
         type: 'assistant', content: result.text, ts: new Date().toISOString(),
-        model: chosen.model, modelId: chosen.id, durationMs, tokensOut: usage.tokens_out,
+        model: chosen.model, modelId: chosen.id, durationMs, tokensOut: turnOut,
       });
       sessions.save(doc.id, {
-        messages: result.messages, transcript, usage, title: task,
+        messages: result.messages, transcript, usage: rollup, title: task,
         model: chosen, preset: preset.id, target,
       });
       // The turn is decided and stored: a socket closing from here on is a client leaving
@@ -538,18 +612,18 @@ function createChat(opts = {}) {
       emit({
         type: 'done', session: doc.id, text: result.text, stopped: aborted,
         model: chosen.model, modelId: chosen.id, durationMs,
-        usage: { tokensIn: usage.tokens_in, tokensOut: usage.tokens_out, cost: usage.cost },
+        usage: usageFrame(),
       });
     } catch (e) {
       if (stopped) { finished = true; return; }
       const message = String((e && e.message) || e).replace('llama.cpp non raggiungibile', 'provider unreachable');
       transcript.push({ type: 'error', message, ts: new Date().toISOString() });
-      sessions.save(doc.id, { transcript, usage, title: task, model: chosen, preset: preset.id, target });
+      sessions.save(doc.id, { transcript, usage: rollup, title: task, model: chosen, preset: preset.id, target });
       finished = true;
       emit({ type: 'error', message });
       emit({
         type: 'done', session: doc.id, text, stopped: true, error: true,
-        usage: { tokensIn: usage.tokens_in, tokensOut: usage.tokens_out, cost: usage.cost },
+        usage: usageFrame(),
       });
     }
     finished = true;

@@ -7,7 +7,7 @@
 // go with them (history, tab, shift+tab, ctrl chords, backslash-newline).
 //
 // It is deliberately an input surface, not a text editor. Non-TTY callers keep
-// using readline in runtime/tui.js.
+// using readline in runtime/terminal/input.js.
 'use strict';
 
 // Claude Code's palette, not the neon one: neutral chrome, one warm accent.

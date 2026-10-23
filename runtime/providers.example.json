@@ -1,5 +1,6 @@
 {
-  "_comment": "Template for runtime/providers.json (gitignored). Copy it, pick a default profile, and put the KEY IN THE ENVIRONMENT — api_key inline is refused. The key may also live in ~/.config/cyboros/<profile>.env (mode 600, KEY=value or export KEY=value); the environment wins. Cloud profiles need allow_cloud=true here and --allow-cloud on the run, which also connects at launch. type is openai-compatible for v1 (OpenAI, OpenRouter, Groq, Together, DeepSeek, vLLM, llama.cpp, Ollama, LM Studio).",
+  "_comment": "Template for runtime/providers.json (gitignored). Copy it, pick a default profile, and put the KEY IN THE ENVIRONMENT — api_key inline is refused. The key may also live in ~/.config/cyboros/<profile>.env (mode 600, KEY=value or export KEY=value); the environment wins. Cloud profiles need allow_cloud=true here and --allow-cloud on the run, which also connects at launch.",
+  "_capabilities": "A profile declares what its endpoint accepts and local/adapters.js consumes ONLY that. Keys: tool_calls (native|text), tool_choice, parallel_tool_calls (bool|null), reasoning {param,on,off}, reasoning_field (reasoning_content|reasoning|null), reasoning_echo_with_tools, strict_unknown_fields, grammar, timings, stream_options, sampling_extras, context_window_tokens, reserved_output_tokens, context_safety_tokens, max_output_tokens, pricing {input_per_1m,output_per_1m,cached_input_per_1m}. An unknown key is refused at load time, not ignored. Types differ only in defaults: openai-compatible is the bare chat-completions shape (every optional field OFF unless declared), llama-cpp adds the llama.cpp extensions this project uses (grammar, timings, sampling_extras), deepseek assumes a strict cloud endpoint. An unsatisfiable request — a GBNF grammar on a profile that never declared one — is an error, not a silent downgrade.",
   "version": 1,
   "default_profile": "openrouter",
   "allow_cloud": true,
@@ -14,10 +15,18 @@
       "max_tokens": 2048,
       "max_tool_iters": 16,
       "request_timeout_ms": 120000,
+      "capabilities": {
+        "tool_calls": "native",
+        "grammar": false,
+        "stream_options": true,
+        "sampling_extras": false,
+        "reasoning": { "param": "none" },
+        "_note": "openrouter/auto has no single window: a window number here would be a guess. Pin a model and set context_window_tokens; until then the legacy context_char_budget below is a ~15k slice."
+      },
       "context_char_budget": 60000
     },
     "llama": {
-      "type": "openai-compatible",
+      "type": "llama-cpp",
       "base_url": "http://127.0.0.1:8080/v1",
       "model": "local",
       "api_key_env": "CYBOROS_LOCAL_KEY",
@@ -26,7 +35,45 @@
       "max_tokens": 1024,
       "max_tool_iters": 10,
       "request_timeout_ms": 300000,
-      "context_char_budget": 24000
+      "capabilities": {
+        "reasoning": { "param": "chat_template_kwargs", "off": { "enable_thinking": false } },
+        "context_window_tokens": 32768,
+        "reserved_output_tokens": 1024,
+        "context_safety_tokens": 1024,
+        "_note": "type llama-cpp already turns on grammar/timings/stream_options/sampling_extras; naming them again would only repeat the type's defaults. chat_template_kwargs is llama.cpp-only and is sent because THIS profile declares it, never to a cloud endpoint. context_window_tokens must match your llama-server -c."
+      }
+    },
+    "deepseek": {
+      "type": "deepseek",
+      "base_url": "https://api.deepseek.com",
+      "model": "deepseek-flash",
+      "api_key_env": "DEEPSEEK_API_KEY",
+      "egress": "cloud",
+      "temperature": 0.2,
+      "max_tokens": 16384,
+      "max_tool_iters": 24,
+      "request_timeout_ms": 180000,
+      "capabilities": {
+        "tool_calls": "native",
+        "tool_choice": false,
+        "parallel_tool_calls": null,
+        "reasoning_field": "reasoning_content",
+        "reasoning_echo_with_tools": true,
+        "strict_unknown_fields": true,
+        "stream_options": false,
+        "sampling_extras": false,
+        "max_output_tokens": 384000,
+        "context_window_tokens": 1000000,
+        "reserved_output_tokens": 16384,
+        "context_safety_tokens": 2048,
+        "pricing": {
+          "input_per_1m": 0.3,
+          "output_per_1m": 1.2,
+          "cached_input_per_1m": 0.006,
+          "_note": "peak rates, the safe direction for a budget; off-peak is half. Verify against your account."
+        },
+        "_note": "Overridable defaults, not gospel. What this profile claims: thinking toggled with thinking:{type}, reasoning arriving in reasoning_content and echoed back when tools are present, a 1M window with 384K max output, and strict field handling. NONE of it was verified with a live call from this repo — no API key, no request. To replace this paragraph with evidence: `node tools/provider-probe.js plan` then `run --max-requests 24 --yes`; the record applies only to the same base_url|model. What it deliberately does NOT claim (and therefore never sends): chat_template_kwargs, grammar, timings, top_k, stream_options, parallel_tool_calls, tool_choice. Change any key here and the next request follows; delete the block and you get the openai-compatible defaults."
+      }
     }
   }
 }

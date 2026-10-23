@@ -105,13 +105,21 @@ function runCli(args, opts) {
 // Processo figlio ASINCRONO: obbligatorio quando il target è servito da questo stesso processo.
 function runCliAsync(args, opts) {
   const o = opts || {};
+  const hasInput = o.input != null;
   return new Promise((resolve) => {
-    const child = spawn(process.execPath, args, { cwd: o.cwd, env: o.env, stdio: ['ignore', 'pipe', 'pipe'] });
+    const child = spawn(process.execPath, args, {
+      cwd: o.cwd,
+      env: o.env,
+      stdio: [hasInput ? 'pipe' : 'ignore', 'pipe', 'pipe'],
+    });
     let stdout = ''; let stderr = '';
     child.stdout.on('data', (d) => { stdout += d; });
     child.stderr.on('data', (d) => { stderr += d; });
     child.on('error', (e) => resolve({ status: -1, stdout, stderr: String(e) }));
     child.on('close', (status) => resolve({ status, stdout, stderr }));
+    // A scripted surface reads its commands from stdin; without this the child sees EOF
+    // immediately and the test asserts against half a session.
+    if (hasInput) child.stdin.end(String(o.input));
   });
 }
 

@@ -194,6 +194,123 @@ family file plus its read model; and the terminal/streaming side cannot reach in
 data routes. Behaviour is unchanged by the split — the RBAC matrix, the cc-route suite and
 the config/startup checks all run against the same HTTP surface as before.
 
+## Providers declare what they accept
+
+`local/adapters.js` is the seam between "a model endpoint" and the request the loop builds.
+A profile in `providers.json` is a `type` plus a `capabilities` block; `resolveCapabilities()`
+merges the type's defaults with what the profile declares, and `buildRequest()` can only emit
+a field that some capability pays for. The loop no longer names a single provider field:
+`native_tools`, `chat_template_kwargs` and the llama.cpp `grammar` used to be hardcoded
+true/always-on, which worked for exactly one endpoint and 400'd on the others.
+
+The capability matrix (what each key controls, and what happens when it is absent) lives in
+[README.md](../README.md#what-a-profile-declares) and is the only copy: a capability that is
+documented but never read is deleted here rather than described. The parts worth knowing:
+
+- **An unknown key is an error.** `validateCapabilities()` runs at load time in
+  `runtime/live.js` and in `resolveCapabilities()`; a typo (`reasoning_echo_with_tool`) fails
+the config instead of doing nothing at request time.
+- **A strict profile is asserted, not trusted.** With `strict_unknown_fields`, every key in
+the built body must map to a capability (`strictCheck()`), including `tools` and
+`tool_choice`: those are the fields the tool capabilities exist to gate, so they are not
+treated as always-legal.
+- **The adapter arbitrates, and refuses the impossible.** A GBNF grammar and a native tool
+  schema cannot both be offered: a declared grammar withholds the schema, and a grammar
+  requested on a profile that never declared one throws `grammar_unsupported`. The caller
+  hands over both; only this layer decides, so a run can no longer end up with neither.
+- **Reasoning is read tolerantly, written exactly.** `readReasoning()` accepts either field
+  name a vendor has used; `echoReasoning()`/`attachReasoning()` only ever write the declared
+  one, and only when `reasoning_echo_with_tools` says the provider requires it.
+- **The window is the budget.** `context_window_tokens − reserved_output_tokens −
+safety` feeds `local/context.js`; without it the run falls back to the legacy character
+  field and reports `legacy_chars` instead of pretending the context is full.
+
+`runtime/live.js#capabilitiesFor()` returns the resolved `describe()`, and the TUI prints the
+`summary` line it contains — rendering, not interpreting, so a new capability never needs an
+edit in `runtime/terminal/commands.js`. The console passes the same declaration into the loop but carries
+no capability payload in its HTTP frames: nothing rendered it, and an unread field drifts.
+`tools/test-adapters.js` proves the matrix against a fake endpoint that rejects undeclared
+fields, and runs the shipped DeepSeek profile end-to-end through the live path.
+
+## Continuity is a file, not a memory
+
+`events.jsonl` records what happened; it is not something you can resume from. The
+conversation lived in the process, so a kill meant the next process rediscovered the target
+from zero. `runtime/session-state.js` owns one file per session — `state.json`, next to the
+log — holding the history the next turn would send, the facts extracted from it, and the
+run's identity and usage. `runtime/live.js` writes it at the end of every turn (not at
+exit: a crash never reaches `finish`), and `createLive({resume})` loads it *before* the
+session is opened, so the restored history is what the first turn sends.
+
+The facts are `local/context.js#extractFacts()` — the compactor's own extractor — not a
+second classifier of what a finding or a target looks like. That is what lets a trim, a
+repair and a compaction agree about what survives. The rules that make it safe:
+
+- **Verified, not trusted.** The payload is hashed on write and re-hashed on read: a
+  truncated write, an interrupted rename or a hand-edited file is refused with the reason.
+  An absent file is `absent`, never "empty history".
+- **Sendable at the boundary.** A loaded history goes through the same `validate()` the
+  loop applies, and is repaired with `compile()` when it fails (an orphaned tool result is
+  dropped and named); a history that cannot be made valid is refused, not silently reduced.
+- **What is missing is stated.** A file trimmed by the size cap carries a `trimmed` record,
+  so resume inserts the digest of what its kept turns no longer contain. `/resume` prints
+  the messages, targets, findings, artifacts and actions restored, plus any repair.
+- **Stale is a fact.** Past `DEFAULT_MAX_AGE_HOURS` the session is `stale` and unusable
+  without `--allow-stale`: resuming a week-old engagement unnoticed is how a stale map gets
+  treated as current.
+
+## What a run cost is a fact with a source
+
+An operator comparing this harness with an in-house one needs a bill they can defend, so the
+number is not enough: which price produced it, and whether it covers every call, travel with
+it. `runtime/usage.js` owns one rollup — tokens in/out, requests, and cost split into
+`provider` (the endpoint billed itself), `declared` (the profile's `capabilities.pricing`) and
+`unattributed` (a pre-rollup figure whose source was never recorded). `local/llm.js` labels
+each call as it reports usage; `costView()` is the only calculator, so `/cost`, the status bar,
+`/budget`, `/status` and the end-of-turn line cannot disagree about the amount.
+
+Three rules make the display honest rather than merely formatted:
+
+- **Unknown is not zero.** A profile that declares no price table and an endpoint that
+  reports none yields `unknown (N call(s), no price reported or declared)` — never `$0.00`,
+  never a guess. A genuine `0` is still a price, and reads as `$0`.
+- **A partial total says it is partial.** When only some calls were priced, the amount is
+  labelled a floor with the number of unpriced calls; the badge appends `+`. `/cost` also
+  names each bucket, so a mixed session cannot pass for a measured one.
+- **Precision follows magnitude.** Two decimal places at dollars, three at cents, five to six
+  below a cent: a `$0.000004` run stays readable instead of collapsing to `$0.00`.
+
+The rollup is saved with the session (`state.json`), so `--resume` continues the accounting
+of the engagement instead of starting a silent second bill, and a save that carries no usage
+(compaction, metadata) does not reset it. `tools/test-cost.js` proves accumulation across
+turns and across a resume, the unknown and floor cases, and the surfaces themselves through
+the real TUI against a local provider.
+
+Three modules, one direction of data:
+
+| Module | Owns | Does not |
+|---|---|---|
+| `runtime/usage.js` | the rollup's shape, its accumulation rules, unknown/floor, and every rendering of the amount | touch disk, a provider, or the environment |
+| `runtime/session-state.js` | the resumable file — history, facts, integrity, staleness — and the stored rollup by value | define what a bill is, or format one |
+| `runtime/terminal/state.js` · `surfaces.js` · `ledger.js` · `tools/console/chat.js` | a copy of the loop's rollup and where it is shown | compute, reformat or reinterpret an amount |
+
+The terminal keeps the loop's rollup in `state.liveUsage` and reads spend through one
+`budget()` accessor; the scripted demo, which calls no provider, is the only thing that
+advances `state.budget`, so a live number has exactly one owner and cannot drift from a mirror.
+
+`tools/accounting.js` is the other consumer of usage-shaped records, and deliberately not
+this module: it aggregates audit entries per binary and per agent (with durations) for the
+report, sums only what the trail already persisted, and prices nothing. One is the live bill
+of a conversation; the other is a rollup over evidence.
+
+The console chat is a second surface over the same owner. Its conversation store
+(`app/chat/<id>.json`) is deliberately not the CLI's session file — a browser conversation
+has its own lifetime, id space and client — but it keeps `usage` in the rollup's shape and
+accumulates it with `addUsage()`, and its `usage`/`done` frames carry the label and sentence
+`costBadge()`/`costText()` produce. The browser renders that string and cannot format a dollar
+figure itself, so an unpriced console turn shows `cost unknown` and a mixed one shows the
+floor, exactly as `/cost` does.
+
 ## The chat is a turn, not a script
 
 The console chat is the same loop as the CLI, driven from a browser: a turn calls
@@ -226,8 +343,8 @@ only — a client must ignore a `type` it does not know):
 | `tool_result` | `id, tool, ok, exit, durationMs, output, blocked?, reason?` |
 | `approval` | `id, tool, args, command, tier, reason, expiresAt` |
 | `approval_result` | `id, decision` (`approve` · `deny` · `stop` · `timeout`) |
-| `usage` · `timings` · `error` | `{tokensIn, tokensOut, cost}` · `{timings}` · `{message}` |
-| `done` | `session, text, stopped, error?, usage` |
+| `usage` · `timings` · `error` | `{tokensIn, tokensOut, totalTokensIn, totalTokensOut, cost, source, costLabel, costText, costKnown, costPartial}` (this call, then the conversation rollup) · `{timings}` · `{message}` |
+| `done` | `session, text, stopped, error?, usage` — this turn's tokens plus the conversation's cost rollup |
 
 An intrusive tool (its `risk_tier` in `tools/tool-registry.json`, the same table `run.js`
 consults) parks the turn on `POST /api/chat/approval`. Unanswered is denied: a closed tab

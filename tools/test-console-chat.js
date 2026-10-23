@@ -114,7 +114,9 @@ function startFakeProvider() {
       } else {
         frame({ choices: [{ index: 0, delta: { content: 'turn complete' } }] });
         frame({ choices: [{ index: 0, delta: {}, finish_reason: 'stop' }] });
-        frame({ usage: { prompt_tokens: 11, completion_tokens: 3 } });
+        // An endpoint that bills itself reports the amount: the word BILLED in the
+        // conversation is how a test chooses that shape, since the price is the server's.
+        frame({ usage: Object.assign({ prompt_tokens: 11, completion_tokens: 3 }, /BILLED/.test(allText) ? { cost: 0.25 } : {}) });
       }
       res.write('data: [DONE]\n\n');
       res.end();
@@ -144,6 +146,20 @@ function startConsole() {
   child.stdout.on('data', (d) => { out += d.toString(); });
   child.stderr.on('data', (d) => { out += d.toString(); });
   return { child, output: () => out };
+}
+
+// A child whose stdout we collect WITHOUT blocking this process: `spawnSync` would freeze
+// the event loop, and the fake provider this test serves runs on that same loop — the child
+// would time out against a server that cannot answer.
+function runProcess(args, input, env) {
+  return new Promise((resolve) => {
+    const child = spawn(process.execPath, args, { cwd: WS, env: env || process.env });
+    let out = '';
+    child.stdout.on('data', (d) => { out += d.toString(); });
+    child.stderr.on('data', (d) => { out += d.toString(); });
+    child.on('close', (status) => resolve({ status, out }));
+    child.stdin.end(input || '');
+  });
 }
 
 function waitPort(output, ms) {
@@ -245,6 +261,16 @@ async function openTurn(port, cookie, body, opts) {
         request_timeout_ms: 15000,
         context_char_budget: 8000,
       },
+      // The same endpoint with a declared price table: the console must report the source
+      // it used, and the same usage must total the same on the terminal.
+      priced: {
+        type: 'openai-compatible',
+        base_url: `http://127.0.0.1:${fake.port}/v1`,
+        model: 'priced-model',
+        egress: 'local',
+        capabilities: { pricing: { input_per_1m: 1000, output_per_1m: 2000 } },
+        request_timeout_ms: 15000,
+      },
       // Two cloud profiles that differ only in where the key lives: one in the
       // operator's key file, one nowhere. The menu must follow resolveKey — the same
       // resolver the turn uses — or it disables a profile that would have run.
@@ -297,6 +323,8 @@ async function openTurn(port, cookie, body, opts) {
     assert.ok(entry, 'the fake profile appears in the model menu');
     assert.strictEqual(entry.available, true);
     assert.strictEqual(entry.egress, 'local', 'loopback endpoint is classified local');
+    assert.ok(!('capabilities' in entry),
+      'the menu carries no adapter payload: nothing reads it, and a field nobody renders drifts');
 
     const cloudKey = (models.json.models || []).find((m) => m.id === 'cloudkey');
     assert.ok(cloudKey, 'the cloud profile is listed');
@@ -616,6 +644,150 @@ async function openTurn(port, cookie, body, opts) {
     const refused = await call(port, 'POST', '/api/chat', { cookie: viewCookie, body: { messages: [{ role: 'user', content: 'hi' }] } });
     assert.strictEqual(refused.status, 403, 'viewer cannot run tools through chat');
     assert.strictEqual(refused.json.need, 'operator');
+  });
+
+  // One ledger, two surfaces. The console and the terminal must report the same total for
+  // the same usage — and the console must never print a figure it cannot source.
+  await okAsync('the console and the TUI report the same bill for the same usage', async () => {
+    const ledger = require('../runtime/usage');
+    const turn = await openTurn(port, cookie, {
+      model: 'priced',
+      preset: 'pentest',
+      messages: [{ role: 'user', content: 'check the host' }],
+    });
+    const done = await turn.waitDone();
+    await turn.pump;
+
+    // 11 in @ $1000/1M + 3 out @ $2000/1M = $0.017, priced from the profile's table.
+    const usage = turn.events.filter((e) => e.type === 'usage').pop();
+    assert.ok(usage, 'the turn reports usage: ' + turn.events.map((e) => e.type).join(','));
+    assert.strictEqual(usage.tokensIn, 11);
+    assert.strictEqual(usage.tokensOut, 3);
+    assert.strictEqual(usage.source, 'declared', 'the price came from the profile table');
+    assert.strictEqual(usage.costLabel, '$0.017 (declared)', 'the label names its source: ' + usage.costLabel);
+    assert.strictEqual(done.usage.costLabel, usage.costLabel, 'the closing frame carries the same rollup');
+    assert.strictEqual(done.usage.costKnown, true);
+    assert.strictEqual(done.usage.costPartial, false, 'every call was priced, so it is not a floor');
+    assert.ok(Math.abs(done.usage.cost - 0.017) < 1e-12, 'total: ' + done.usage.cost);
+
+    // The conversation store keeps that rollup, so a reload does not forget the bill.
+    const stored = await call(port, 'GET', `/api/chat/sessions/${done.session}`, { cookie });
+    assert.strictEqual(stored.json.usage.requests, 1, 'the store counts the call');
+    assert.strictEqual(ledger.costText(ledger.costView(stored.json.usage)), usage.costText,
+      'the store and the frame are the same ledger');
+
+    // A second turn continues the bill instead of reporting only its own call — the store
+    // used to be overwritten with the last turn's usage on every save.
+    const again = await openTurn(port, cookie, {
+      model: 'priced', session: done.session,
+      messages: [{ role: 'user', content: 'and the next step' }],
+    });
+    const done2 = await again.waitDone();
+    await again.pump;
+    assert.strictEqual(done2.usage.requests, 2, 'the conversation keeps counting');
+    assert.ok(Math.abs(done2.usage.cost - 0.034) < 1e-12, 'total: ' + done2.usage.cost);
+    assert.strictEqual(done2.usage.costLabel, '$0.034 (declared)');
+    assert.strictEqual(done2.usage.tokensOut, 3, 'the turn badge shows this turn, not the total');
+
+    // The footer pairs tokens with the cost label, so the two must be the same quantity:
+    // this call's tokens beside a conversation total read like a rate next to a bill.
+    const frame2 = again.events.filter((e) => e.type === 'usage').pop();
+    assert.strictEqual(frame2.tokensIn, 11, 'the call still reports itself');
+    assert.strictEqual(frame2.totalTokensIn, 22, 'and the conversation total comes with it: ' + frame2.totalTokensIn);
+    assert.strictEqual(frame2.totalTokensOut, 6, 'both directions: ' + frame2.totalTokensOut);
+    const storedAgain = await call(port, 'GET', `/api/chat/sessions/${done.session}`, { cookie });
+    assert.strictEqual(storedAgain.json.usage.requests, 2, 'and the store keeps the running bill');
+
+    // The terminal, over the same provider and the same answer: the badge it prints is the
+    // label the console just sent, not a second formatting of the same number.
+    const tui = await runProcess([
+      path.join(WS, 'runtime', 'tui.js'), '--script', '--no-color',
+      '--config', PROVIDERS, '--profile', 'priced', '--live', '127.0.0.1',
+    ], 'check the host\n/cost\n/quit\n', Object.assign({}, process.env, {
+      NO_COLOR: '1', TERM: 'dumb', SCOPE_JSON: SCOPE,
+      CYBOROS_AGENT_DIR: path.join(T, 'tui-sessions'),
+      CYBOROS_APPROVALS_FILE: path.join(T, 'tui-approvals.jsonl'),
+    }));
+    const flat = (tui.out || '').replace(/\s+/g, ' ');
+    assert.strictEqual(tui.status, 0, flat.slice(-600));
+    assert.ok(flat.includes(usage.costLabel), 'the TUI prints the same total and source: ' + flat.slice(-900));
+    // The dumb terminal maps the separator glyph to '.', so the dot is spelled loosely.
+    assert.ok(/cost \$0\.017\s*[.·]\s*declared prices/.test(flat), '/cost breaks it down the same way: ' + flat.slice(-900));
+  });
+
+  await okAsync('an unpriced console session shows no dollar figure at all', async () => {
+    const turn = await openTurn(port, cookie, {
+      model: 'fake',
+      preset: 'pentest',
+      messages: [{ role: 'user', content: 'check the host' }],
+    });
+    const done = await turn.waitDone();
+    await turn.pump;
+    const usage = turn.events.filter((e) => e.type === 'usage').pop();
+    assert.ok(usage, 'the turn reports usage');
+    assert.strictEqual(usage.cost, null, 'no price was reported and the profile declares none');
+    assert.strictEqual(usage.source, null);
+    assert.strictEqual(usage.costKnown, false);
+    assert.strictEqual(usage.costPartial, true, 'the call is counted as unpriced, not as free');
+    assert.strictEqual(usage.costLabel, 'cost unknown');
+    assert.ok(/^unknown \(\d+ call\(s\), no price reported or declared\)$/.test(usage.costText), usage.costText);
+    assert.ok(!/\$/.test(usage.costLabel + usage.costText), 'not one dollar sign is invented');
+    assert.strictEqual(done.usage.cost, null, 'the closing frame does not turn unknown into 0 either');
+    assert.ok(!/\$/.test(done.usage.costLabel + done.usage.costText), 'and neither does the done frame');
+  });
+
+  await okAsync('a mixed console bill is labelled a floor, end to end', async () => {
+    // One priced call, then the conversation continues on an unpriced endpoint: the
+    // request named exactly this case and only the units were proven, never the frames.
+    const first = await openTurn(port, cookie, {
+      model: 'priced', preset: 'pentest',
+      messages: [{ role: 'user', content: 'check the host' }],
+    });
+    const done1 = await first.waitDone();
+    await first.pump;
+    assert.strictEqual(done1.usage.costLabel, '$0.017 (declared)');
+
+    const switched = await call(port, 'POST', `/api/chat/sessions/${done1.session}`, { cookie, body: { model: 'fake' } });
+    assert.strictEqual(switched.status, 200, JSON.stringify(switched.json));
+
+    const second = await openTurn(port, cookie, {
+      model: 'fake', session: done1.session,
+      messages: [{ role: 'user', content: 'and the next step' }],
+    });
+    const done2 = await second.waitDone();
+    await second.pump;
+    const usage = second.events.filter((e) => e.type === 'usage').pop();
+    assert.ok(usage, 'the second call reports usage');
+    assert.strictEqual(usage.cost, null, 'this call had no price of its own');
+    assert.strictEqual(usage.costKnown, true, 'the conversation still has a priced part');
+    assert.strictEqual(usage.costPartial, true, 'and it is incomplete');
+    assert.strictEqual(usage.costLabel, '$0.017+ (declared)', 'the floor is marked and sourced: ' + usage.costLabel);
+    assert.ok(/\$0\.017/.test(usage.costText), usage.costText);
+    assert.ok(/1 call\(s\) unpriced/.test(usage.costText), 'the missing call is named: ' + usage.costText);
+    assert.ok(/floor/.test(usage.costText), 'and the amount is called a floor: ' + usage.costText);
+    assert.strictEqual(done2.usage.requests, 2);
+    assert.strictEqual(done2.usage.costPartial, true, 'the closing frame cannot pass it off as measured');
+    assert.ok(Math.abs(done2.usage.cost - 0.017) < 1e-12, 'the priced part is kept: ' + done2.usage.cost);
+  });
+
+  await okAsync('a price the endpoint reports is used, and named as provider-reported', async () => {
+    // The provider bucket was only ever exercised through the CLI loop; this proves the
+    // console takes the reported amount instead of pricing the call from a table.
+    const turn = await openTurn(port, cookie, {
+      model: 'fake', preset: 'pentest',
+      messages: [{ role: 'user', content: 'BILLED check the host' }],
+    });
+    const done = await turn.waitDone();
+    await turn.pump;
+    const usage = turn.events.filter((e) => e.type === 'usage').pop();
+    assert.ok(usage, 'the turn reports usage');
+    assert.strictEqual(usage.source, 'provider', 'the endpoint billed itself: ' + JSON.stringify(usage));
+    assert.strictEqual(usage.cost, 0.25, 'the reported amount is used as-is');
+    assert.strictEqual(usage.costLabel, '$0.25', 'no (declared) suffix when the endpoint priced it');
+    assert.ok(/^\$0\.25 · provider-reported/.test(usage.costText), usage.costText);
+    assert.strictEqual(done.usage.costKnown, true);
+    assert.strictEqual(done.usage.costPartial, false);
+    assert.ok(Math.abs(done.usage.cost - 0.25) < 1e-12, 'total: ' + done.usage.cost);
   });
 
   // The transcript renderer runs in the browser, so it is exercised headless: load the

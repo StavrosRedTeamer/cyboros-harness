@@ -5,32 +5,18 @@
 
 'use strict';
 
+// Context management lives in ./context: token accounting (including tool_calls
+// argument payloads), atomic tool exchanges, and a state digest for what compaction
+// drops. `trimContext` is re-exported below so the old call sites and docs keep
+// working — it now routes through the structural compiler instead of slicing by chars.
+const { ContextManager, estimateTokens, trimContext } = require('./context');
+// What the endpoint actually accepts is declared per profile and consumed by one builder
+// (local/adapters.js). The loop below no longer knows any provider-specific field name.
+const { resolveAdapter } = require('./adapters');
+
 function clip(s, n) {
   s = (s == null) ? '' : String(s);
   return s.length <= n ? s : s.slice(0, n) + `\n…[troncato, ${s.length - n} char in piu']`;
-}
-
-// Stima grezza dei caratteri di una conversazione (proxy dei token, ~4 char/token).
-function convChars(messages) {
-  let c = 0;
-  for (const m of messages) c += (m.content ? String(m.content).length : 0) + 24;
-  return c;
-}
-
-// Taglio duro del contesto: tiene system + gli ultimi turni finche' sta nel budget.
-function trimContext(messages, budget) {
-  if (convChars(messages) <= budget) return messages;
-  const sys = messages.filter((m) => m.role === 'system');
-  const rest = messages.filter((m) => m.role !== 'system');
-  const kept = [];
-  let c = convChars(sys);
-  for (let i = rest.length - 1; i >= 0; i--) {
-    const add = (rest[i].content ? String(rest[i].content).length : 0) + 24;
-    if (c + add > budget && kept.length > 0) break;
-    kept.unshift(rest[i]);
-    c += add;
-  }
-  return [...sys, ...kept];
 }
 
 class LocalLLM {
@@ -41,6 +27,25 @@ class LocalLLM {
     this.key = cfg.endpoint.api_key || 'sk-local';
     this.s = cfg.sampling || {};
     this.rt = cfg.runtime || {};
+    this.adapter = resolveAdapter({ ...cfg, runtime: this.rt });
+    // A declared window is the context manager's business, not the adapter's: hand the
+    // resolved capability through so the budget is sized off the model, not a guess.
+    for (const k of ['context_window_tokens', 'reserved_output_tokens', 'context_safety_tokens']) {
+      if (this.adapter.caps[k] != null && this.rt[k] == null) this.rt[k] = this.adapter.caps[k];
+    }
+    // A profile that declares text tool-calling has no schema to send, so the parser is
+    // the only way its ``ACTION:`` lines become actions. The capability turns it on; a
+    // profile that declares native tools keeps the flag as the model's own safety net.
+    if (this.adapter.toolMode === 'text' && this.rt.text_protocol_fallback == null) {
+      this.rt.text_protocol_fallback = true;
+    }
+    // One manager per model instance: it owns the token budget, the calibration
+    // learned from the provider's own `prompt_tokens`, and the statistics the TUI
+    // and the console report instead of inventing them.
+    this.ctxm = new ContextManager(this.rt, this.s);
+    this.ctxStats = null;
+    this._lastSent = null;
+    this._lastSentTools = null;
   }
 
   async _post(body) {
@@ -119,7 +124,7 @@ class LocalLLM {
           const ch = json.choices && json.choices[0];
           if (ch) {
             const delta = ch.delta || {};
-            const rsn = delta.reasoning_content || delta.reasoning;
+            const rsn = this.adapter.readReasoning(delta);
             if (rsn) {
               reasoning += rsn;
               if (handlers.onThinkingDelta) handlers.onThinkingDelta(rsn);
@@ -141,8 +146,7 @@ class LocalLLM {
       }
     } finally { clearTimeout(to); }
 
-    const message = { role: 'assistant', content };
-    if (reasoning) message.reasoning_content = reasoning;
+    const message = this.adapter.attachReasoning({ role: 'assistant', content }, reasoning);
     const tcs = toolAcc.filter(Boolean);
     if (tcs.length) {
       tcs.forEach((t, i) => { if (!t.id) t.id = `call_${Date.now()}_${i}`; });
@@ -151,29 +155,34 @@ class LocalLLM {
     return { message, timings: lastTimings, finishReason, usage: streamUsage };
   }
 
-  _completionBody(messages, tools, grammar) {
-    const body = {
+  _completionBody(messages, tools, grammar, opts = {}) {
+    // The tool schema is sent on every request, so it is part of the bill: count it
+    // against the same budget instead of pretending the conversation is all that ships.
+    // `offersSchema` is the adapter's own rule, so the accounting and the wire agree by
+    // construction — a profile in text mode, and the grammar path that withholds the
+    // schema, are billed for what they actually send.
+    const schemaExpense = this.adapter.offersSchema({ tools, grammar })
+      ? estimateTokens(JSON.stringify(tools))
+      : 0;
+    const prepared = this.ctxm.prepare(messages, { extraTokens: schemaExpense });
+    this.ctxStats = prepared.stats;
+    this._lastSent = prepared.messages;
+    this._lastSentTools = Array.isArray(tools) && tools.length ? tools : null;
+    // Every optional field below is paid for by a declared capability; nothing here is
+    // provider-specific by assumption. `tools` and `grammar` are both handed over and the
+    // ADAPTER arbitrates: a declared grammar wins over the schema, and asking for a grammar
+    // the profile never declared throws instead of silently offering neither (the run would
+    // then have no way to call a tool at all).
+    const built = this.adapter.buildRequest({
       model: this.model,
-      messages: trimContext(messages, this.rt.context_char_budget ?? 24000),
-      temperature: this.s.temperature ?? 0.4,
-      top_p: this.s.top_p ?? 0.9,
-      max_tokens: this.s.max_tokens ?? 1024,
-      stream: false,
-    };
-    if (this.s.top_k != null) body.top_k = this.s.top_k; // llama.cpp accetta top_k extra
-    if (this.s.presence_penalty != null) body.presence_penalty = this.s.presence_penalty;
-    if (this.s.frequency_penalty != null) body.frequency_penalty = this.s.frequency_penalty;
-    if (this.s.repeat_penalty != null) body.repeat_penalty = this.s.repeat_penalty;
-    // Determinismo: se allow_thinking è false, disattiva il blocco <think> del modello
-    // reasoning (Qwen) via chat_template_kwargs. Evita che la chat/tool-loop rallenti
-    // ragionando a lungo. Vale sia sul path GBNF sia su quello a tool nativi.
-    if (this.rt.allow_thinking === false) body.chat_template_kwargs = { enable_thinking: false };
-    // Grammatica GBNF: forza il protocollo testuale (ACTION/FINAL) sempre parsabile.
-    // È incompatibile con la grammatica interna dei tool nativi, quindi in questa
-    // modalità NON inviamo `tools` e ci affidiamo al branch di parsing testuale.
-    if (grammar) { body.grammar = grammar; return body; }
-    if (tools && tools.length && this.rt.native_tools) { body.tools = tools; body.tool_choice = 'auto'; }
-    return body;
+      messages: prepared.messages,
+      tools,
+      grammar,
+      sampling: this.s,
+      runtime: this.rt,
+      stream: opts.stream === true,
+    });
+    return built.body;
   }
 
   // Un giro agente completo: system+instructions+task, tool-loop finche' il modello
@@ -253,7 +262,10 @@ class LocalLLM {
     // La grammatica è attiva solo se richiesta E abilitata in config. Si spegne da sola
     // se il server la rifiuta (fallback ai tool nativi + parsing testuale).
     let grammarActive = !!(grammar && this.rt.use_grammar);
-    let reasoningAll = ''; // reasoning del modello, accumulato per il caller (mai rimandato al modello)
+    // Reasoning del modello, accumulato per il caller. Non viene mai *mostrato* al modello
+    // come prosa; torna indietro solo dove il provider lo esige per proseguire un turno con
+    // tool (capability `reasoning_echo_with_tools`), e in quel caso nel campo dichiarato.
+    let reasoningAll = '';
 
     // --- TOOL BUDGET: un limite che FORZA la conclusione. La loop-guard qui sopra vede le
     // ripetizioni che sa riconoscere; `exempt_tools: ['run_tool']` esenta le chiamate da
@@ -277,6 +289,21 @@ class LocalLLM {
       if (closingIdx >= 0) messages.splice(closingIdx, 1);
       return { text: finalText, messages, reasoning: reasoningAll };
     };
+    // The provider's own count is the only ground truth for token accounting. Feeding it
+    // back is what turns the estimator into a measurement: without it the budget is a
+    // guess that drifts, and a drifting budget either overflows or wastes the window.
+    const reportUsage = (u) => {
+      if (!u) return;
+      if (u.prompt_tokens != null) this.ctxm.calibrate(u.prompt_tokens, this._lastSent, this._lastSentTools);
+      if (!onUsage) return;
+      // A provider that reports cost is authoritative. One that does not gets the
+      // profile's declared price table, or null — never an invented number. The source
+      // travels with the amount: `cost_source` is what lets a rollup say whether it is
+      // reporting a bill or an estimate, and refuse to total the two silently.
+      if (u.cost != null) { onUsage({ ...u, cost_source: 'provider' }); return; }
+      const cost = this.adapter.costOf(u);
+      onUsage(cost == null ? { ...u, cost_source: null } : { ...u, cost, cost_source: 'declared' });
+    };
 
     for (let iter = 0; iter <= maxIters; iter++) {
       // L'ultima iterazione (e ogni iterazione a budget speso) è la richiesta di chiusura.
@@ -292,13 +319,9 @@ class LocalLLM {
       const useStream = !!stream && !grammarActive;
       let msg;
       if (useStream) {
-        const body = this._completionBody(messages, offeredTools, null);
-        body.stream = true;
-        // llama.cpp-specific: many OpenAI-compatible gateways reject it with HTTP 400 and the
-        // run would silently fall back to non-stream. Opt-in, never sent by default.
-        if (this.rt.timings_per_token) body.timings_per_token = true;
-        // OpenAI-compatible: ask for the usage chunk on the stream (the gateway reports cost there).
-        if (this.rt.stream_usage) body.stream_options = { include_usage: true };
+        // Streaming options (usage chunk, llama.cpp timings) are emitted by the builder
+        // only where the profile declares the endpoint accepts them.
+        const body = this._completionBody(messages, offeredTools, null, { stream: true });
         let sres;
         try {
           sres = await this._postStream(body, { onToken, onTimings, onFirstToken, onThinkingDelta, onThinkingDone });
@@ -307,11 +330,11 @@ class LocalLLM {
           const resp = await this._post(this._completionBody(messages, offeredTools, null));
           msg = resp && resp.choices && resp.choices[0] && resp.choices[0].message;
           if (resp && resp.timings && onTimings) onTimings(normTimings(resp.timings));
-          if (resp && resp.usage && onUsage) onUsage(resp.usage);
+          if (resp && resp.usage) reportUsage(resp.usage);
         }
         if (sres) {
           msg = sres.message;
-          if (sres.usage && onUsage) onUsage(sres.usage);
+          if (sres.usage) reportUsage(sres.usage);
         }
       } else {
         let resp;
@@ -320,6 +343,11 @@ class LocalLLM {
           // di chiusura, dove il modello deve solo scrivere la risposta.
           resp = await this._post(this._completionBody(messages, offeredTools, !mustConclude && grammarActive ? grammar : null));
         } catch (e) {
+          // A contract error from the adapter must NEVER take the grammar-fallback path:
+          // its message names "grammar", so `looksLikeGrammarError` would classify it as
+          // the server rejecting GBNF, disable the grammar and retry — turning a loud
+          // failure back into the silent downgrade this guard exists to prevent.
+          if (e && e.code === 'grammar_unsupported') throw e;
           if (grammarActive && looksLikeGrammarError(e)) {
             if (onStep) onStep({ tool: '(grammar disattivata: il server l\'ha rifiutata)', args: {} });
             grammarActive = false; iter--; continue; // riprova lo stesso giro senza grammatica
@@ -328,10 +356,10 @@ class LocalLLM {
         }
         msg = resp && resp.choices && resp.choices[0] && resp.choices[0].message;
         if (resp && resp.timings && onTimings) onTimings(normTimings(resp.timings));
-        if (resp && resp.usage && onUsage) onUsage(resp.usage);
+        if (resp && resp.usage) reportUsage(resp.usage);
       }
       if (!msg) throw new Error('Risposta LLM vuota/malformata.');
-      const rsn = msg.reasoning_content || msg.reasoning || '';
+      const rsn = this.adapter.readReasoning(msg);
       if (rsn) {
         reasoningAll += (reasoningAll ? '\n' : '') + rsn;
         // `onThinkingDone` riceve il testo completo del giro, anche quando i delta sono
@@ -354,14 +382,16 @@ class LocalLLM {
           // direttiva. NON si esegue (il budget è un limite, non un suggerimento) e la
           // correzione torna nel contesto; se anche l'ultimo giro non produce testo, il
           // turno finisce dicendolo invece di far finta di aver risposto.
-          messages.push({ role: 'assistant', content: msg.content || '', tool_calls: msg.tool_calls });
+          messages.push(this.adapter.echoReasoning({ role: 'assistant', content: msg.content || '', tool_calls: msg.tool_calls }, rsn));
           for (const tc of msg.tool_calls) {
             messages.push({ role: 'tool', tool_call_id: tc.id, content: 'NOT EXECUTED: the tool budget is exhausted for this turn. Answer with text only.' });
           }
           if (iter === maxIters) break;
           continue;
         }
-        messages.push({ role: 'assistant', content: msg.content || '', tool_calls: msg.tool_calls });
+        // Echoing the reasoning is what lets a tool-using turn be continued by providers
+        // that require it (declared per profile); for the rest this is a no-op.
+        messages.push(this.adapter.echoReasoning({ role: 'assistant', content: msg.content || '', tool_calls: msg.tool_calls }, rsn));
         callsMade += msg.tool_calls.length;   // ogni chiamata conta, anche se poi viene bloccata
         for (const tc of msg.tool_calls) {
           let args = {};
@@ -422,12 +452,27 @@ class LocalLLM {
       // l'ultima risposta del modello — la conversazione sembra sospesa a meta'.
       const finalText = stripFinal(text);
       if (onTrace) onTrace({ type: 'final', iter, text: finalText });
-      if (finalText) messages.push({ role: 'assistant', content: finalText });
+      if (finalText) messages.push(this.adapter.echoReasoning({ role: 'assistant', content: finalText }, rsn));
       return finish(finalText);
     }
     return finish(callsMade
       ? `[budget esaurito dopo ${callsMade} tool: il modello non ha prodotto una risposta]`
       : '[il modello non ha prodotto una risposta]');
+  }
+
+  // The same compaction the next request will run, exposed so a surface can apply it
+  // and report the real numbers instead of a hardcoded string.
+  prepareContext(messages, opts = {}) {
+    return this.ctxm.prepare(messages, opts);
+  }
+
+  contextStats() {
+    return this.ctxm.stats();
+  }
+
+  // What the profile declared, for the session card and the trace. No secrets.
+  modelInfo() {
+    return this.adapter.describe();
   }
 }
 

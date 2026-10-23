@@ -160,9 +160,36 @@ bash local/agent-local.sh --check              # smoke test offline
 
 - `endpoint`: `base_url`, `model`, `api_key` (llama.cpp ignora la chiave).
 - `sampling`: temperatura bassa (0.4) per tool-calling pulito; `max_tokens` per turno.
-- `runtime`: `max_tool_iters`, `context_char_budget` (taglio duro del contesto),
-  `tool_output_clip_chars`, `native_tools` (function-calling OpenAI) con
-  `text_protocol_fallback` (il modello emette `ACTION: {json}` se non fa tool_calls nativi).
+- `capabilities`: cosa l'endpoint **accetta** — è l'unica cosa che `local/adapters.js`
+  spedisce (matrice completa in `README.md`, sezione *What a profile declares*). Qui sono
+  dichiarate esplicitamente `grammar`, `timings`, `stream_options`, `sampling_extras` e la
+  forma del thinking (`chat_template_kwargs`): il tipo `llama-cpp` le accenderebbe già, ma
+  esplicite restano leggibili. Senza dichiarazione quei campi non partono, una capability
+  sconosciuta è un errore al load, e chiedere una grammatica a un profilo che non la dichiara
+  è un errore — non un run che perde in silenzio sia la grammatica sia lo schema dei tool.
+- `runtime`: `max_tool_iters`, `tool_output_clip_chars`, `text_protocol_fallback` (il modello
+  emette `ACTION: {json}` se non fa tool_calls nativi). Il vecchio `native_tools` resta come
+  override legacy: se il profilo dichiara `capabilities.tool_calls`, vince la dichiarazione.
+- **Dichiarato ≠ misurato.** Ciò che `capabilities` dichiara è un default finché qualcuno non
+  interroga l'endpoint: `node tools/provider-probe.js plan` (zero richieste, costo stimato) e
+  `... run --max-requests N --yes` misurano rifiuto dei campi sconosciuti, `tool_choice`,
+  grammatica, forma del reasoning e obbligo di echo con i tool, usage in streaming e la
+  finestra usabile (per sonda, non letta dal profilo). Ogni voce è `measured` con l'evidenza,
+  oppure `unknown` col motivo; senza chiave o endpoint raggiungibile il record è `unmeasured`
+  e **non contiene numeri**. L'esito va in `reports/provider-measurements.json` e vale solo
+  per lo stesso `base_url|model` (hash); l'adapter lo applica nella sola direzione sicura.
+- `runtime.context_window_tokens` (**preferito**): la finestra reale del modello. Il budget del
+  turno diventa `context_window_tokens - reserved_output_tokens - context_safety_tokens`.
+  Senza, resta `context_char_budget`, onorato ma riportato come `legacy_char_budget`
+  (~15k token con 60000 char) — è 1,5% di una finestra moderna, e ora lo dice invece di
+  far credere di essere pieno.
+- Il contesto è gestito da `local/context.js`: contabilità a token (compresi i payload
+  `tool_calls[].function.arguments`, che prima non contavano nulla), uno **scambio di tool è
+  atomico** (assistant `tool_calls` + i suoi risultati si tengono o si scartano insieme, mai
+  spezzati: mezzo scambio è un HTTP 400 su ogni provider stretto), e ciò che la compattazione
+  scarta viene sostituito da un **digest di stato** estratto verbatim dal transcript — host
+  toccati, artefatti, finding registrati — mai una parafrasi del modello. `prepare()` rivalida
+  l'output al confine di invio, quindi nemmeno una history già rotta può essere spedita.
 - `runtime.use_grammar` (**consigliato: true**): vincola l'output a `ACTION:{json}|FINAL`
   con una **grammatica GBNF** (`local/grammar.js`), costruita per fase sui tool ammessi.
   È la leva che rende affidabile il tool-calling su un modello debole senza addestrare nulla:
@@ -275,7 +302,9 @@ Comandi: /target /phase /class /tools /scope /auto /reset /state /help /quit.
 Cambiare fase/target/classe azzera la conversazione (system per-fase diverso).
 
 Modifiche additive richieste (retro-compatibili, run-local invariato): local/llm.js — runAgent
-accetta `history` (multi-turno); _completionBody onora allow_thinking via chat_template_kwargs.
+accetta `history` (multi-turno); _completionBody costruisce la richiesta dalle capability
+dichiarate dal profilo (`local/adapters.js`), quindi il thinking non è più un campo
+`chat_template_kwargs` cablato ma la forma che quel profilo dichiara.
 
 ### Metriche live + estetica "agent terminal" (2026-09-14)
 

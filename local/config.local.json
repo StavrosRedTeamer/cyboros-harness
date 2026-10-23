@@ -15,6 +15,15 @@
     "max_tokens": 1024,
     "_note": "temperatura bassa: per un modello ~3B attivi il pentest vuole determinismo e tool-calling pulito, non creativita'. presence/frequency_penalty: primo freno soft ai loop (DRY lato server non vede le chiamate tool ripetute tra turni diversi). max_tokens per turno agente contenuto."
   },
+  "capabilities": {
+    "tool_calls": "native",
+    "grammar": true,
+    "timings": true,
+    "stream_options": true,
+    "sampling_extras": true,
+    "reasoning": { "param": "chat_template_kwargs", "off": { "enable_thinking": false } },
+    "_note": "Endpoint locale llama.cpp: chat_template_kwargs, GBNF e timings sono estensioni llama.cpp e vengono inviate SOLO perché questa sezione le dichiara (local/adapters.js). reasoning.off è il payload mandato quando runtime.allow_thinking è false; senza `on`, non forziamo mai il thinking ad acceso."
+  },
   "runtime": {
     "max_tool_iters": 8,
     "loop_guard": {
@@ -28,11 +37,10 @@
     "retry_backoff_ms": 3000,
     "context_char_budget": 24000,
     "tool_output_clip_chars": 4000,
-    "native_tools": true,
     "text_protocol_fallback": true,
     "use_grammar": true,
     "allow_thinking": false,
-    "_note": "context_char_budget: taglio duro del contesto passato al modello debole (grep-first + clip). native_tools: function-calling OpenAI. use_grammar: vincola l'output a ACTION:{json}|FINAL via GBNF (local/grammar.js) — massima affidabilita' del tool-calling su modelli deboli; forza il protocollo testuale e disattiva i tool nativi per quella chiamata; si spegne da sola se il server rifiuta la grammatica. allow_thinking: consenti un blocco <think> iniziale (modelli reasoning) — tienilo false per determinismo. text_protocol_fallback: parsing ACTION: anche senza grammatica."
+    "_note": "context_char_budget: taglio duro del contesto passato al modello debole (grep-first + clip); lo stile di tool-calling non è più qui — lo dichiara capabilities.tool_calls. use_grammar: vincola l'output a ACTION:{json}|FINAL via GBNF (local/grammar.js) — massima affidabilita' del tool-calling su modelli deboli; forza il protocollo testuale e disattiva i tool nativi per quella chiamata; si spegne da sola se il server rifiuta la grammatica. allow_thinking: consenti un blocco <think> iniziale (modelli reasoning) — tienilo false per determinismo. text_protocol_fallback: parsing ACTION: anche senza grammatica."
   },
   "embeddings": {
     "enabled": false,

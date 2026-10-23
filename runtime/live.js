@@ -20,11 +20,14 @@ const path = require('node:path');
 const crypto = require('node:crypto');
 const { LocalLLM } = require('../local/llm');
 const { SCHEMA, makeDispatch } = require('../local/tools-bridge');
+const { resolveAdapter, resolveCapabilities } = require('../local/adapters');
+const sessionState = require('./session-state');
+// The bill is its own owner (runtime/usage.js); the session file only stores it.
+const usage = require('./usage');
 
 const WS = path.join(__dirname, '..');
 const DEFAULT_CONFIG = path.join(__dirname, 'providers.json');
 const EXAMPLE_CONFIG = path.join(__dirname, 'providers.example.json');
-const DEFAULT_SESSIONS = path.join(WS, 'reports', 'agent', 'sessions');
 const DEFAULT_APPROVALS = path.join(WS, 'reports', 'approvals.jsonl');
 
 let REGISTRY = {};
@@ -131,8 +134,16 @@ function loadConfig(file) {
       throw new LiveError('config_inline_key',
         `profile "${name}": inline api_key is refused — use "api_key_env" and put the key in the environment`);
     }
-    if (p.type !== 'openai-compatible') {
-      throw new LiveError('config_invalid', `profile "${name}": v1 supports type "openai-compatible" only`);
+    // A provider is a declared type plus declared capabilities, and the rules live in ONE
+    // place: `resolveCapabilities()` is the same function the request builder runs, so a
+    // profile this file accepts cannot be one the builder later refuses (and vice versa).
+    // This wrapper only adds the profile name — re-implementing the checks here is how the
+    // two copies drift apart.
+    try {
+      resolveCapabilities(p);
+    } catch (e) {
+      const code = e.code === 'type_unknown' ? 'config_invalid' : 'capabilities_invalid';
+      throw new LiveError(code, `profile "${name}": ${e.message}`);
     }
     if (!p.base_url || !/^https?:\/\//i.test(String(p.base_url))) {
       throw new LiveError('config_invalid', `profile "${name}": base_url must be http(s)`);
@@ -143,6 +154,36 @@ function loadConfig(file) {
     }
   }
   return { cfg, file: p, text };
+}
+
+// ── measurements ────────────────────────────────────────────────────────────
+// `tools/provider-probe.js` writes what it actually observed against an endpoint. The
+// record is keyed by profile AND by the endpoint it was measured on, because a measurement
+// taken against one base_url/model says nothing about another: a hash mismatch is ignored
+// rather than applied to whatever the profile points at today.
+function measurementFile() {
+  return process.env.CYBOROS_PROVIDER_MEASUREMENTS
+    || path.join(WS, 'reports', 'provider-measurements.json');
+}
+function endpointHash(p = {}) {
+  return sha256(`${p.base_url || ''}|${p.model || ''}`).slice(0, 16);
+}
+function measurementsFor(name, p) {
+  let doc;
+  try { doc = JSON.parse(fs.readFileSync(measurementFile(), 'utf8')); } catch { return null; }
+  const entry = doc && doc.profiles && doc.profiles[name];
+  if (!entry || entry.status !== 'measured') return null;
+  if (entry.endpoint_hash && p && entry.endpoint_hash !== endpointHash(p)) return null;
+  return entry;
+}
+
+// What a profile DECLARES (plus what the probe MEASURED, where a measurement exists and the
+// endpoint still matches), resolved through the adapter — the same answer the request
+// builder will use. Every surface that lists or switches profiles (the TUI's /model) shows
+// this instead of re-deriving it. Returns the summary only: never a key, never a prompt.
+function capabilitiesFor(profile = {}, name) {
+  const measured = name ? measurementsFor(name, profile) : null;
+  return resolveAdapter({ ...profile, measured }).describe();
 }
 
 function resolveProfile(cfg, name) {
@@ -238,15 +279,25 @@ function systemFor(ctx) {
 }
 
 // ── session / approvals ────────────────────────────────────────────────────
-function startSession(info, ctx) {
-  const root = process.env.CYBOROS_AGENT_DIR || DEFAULT_SESSIONS;
+// `opts.dir` continues an existing session directory (a resume) instead of inventing one:
+// the history is written next to the log it came from, not into a second session that
+// would split the engagement in two.
+function startSession(info, ctx, opts = {}) {
+  const root = sessionState.sessionsRoot();
   const stamp = new Date().toISOString().replace(/[-:.TZ]/g, '').slice(0, 14);
-  const id = `${stamp}-${crypto.randomBytes(3).toString('hex')}`;
-  const dir = path.join(root, id);
+  const id = opts.id || `${stamp}-${crypto.randomBytes(3).toString('hex')}`;
+  const dir = opts.dir || path.join(root, id);
   fs.mkdirSync(dir, { recursive: true });
+  let prevMeta = null;
+  if (opts.dir) {
+    try { prevMeta = JSON.parse(fs.readFileSync(path.join(dir, 'meta.json'), 'utf8')); } catch { /* a state-only session */ }
+  }
   const meta = {
+    ...(prevMeta || {}),
     id,
-    started_at: new Date().toISOString(),
+    started_at: (prevMeta && prevMeta.started_at) || new Date().toISOString(),
+    ...(prevMeta ? { resumed_at: new Date().toISOString() } : {}),
+    status: 'open',
     host: ctx.target || null,
     phase: ctx.phase || null,
     class: ctx.klass || null,
@@ -268,7 +319,19 @@ function startSession(info, ctx) {
       try { fs.appendFileSync(eventsFile, JSON.stringify(row) + '\n'); } catch { /* the run must not die on logging */ }
       return row;
     },
-    finish(status = 'ok') { this.event('run_end', { status }); },
+    // The session list reads meta.json, so a run that ends must say so there too — an
+    // always-'unknown' status is why an interrupted session looked identical to a done one.
+    setMeta(patch = {}) {
+      Object.assign(this.meta, patch);
+      try {
+        fs.writeFileSync(path.join(dir, 'meta.json'), JSON.stringify(this.meta, null, 2) + '\n');
+      } catch { /* best-effort, like the event log */ }
+      return this.meta;
+    },
+    finish(status = 'ok') {
+      this.event('run_end', { status });
+      this.setMeta({ status, ended_at: new Date().toISOString() });
+    },
   };
 }
 
@@ -311,7 +374,58 @@ function summarize(text, n = 600) {
 }
 
 // ── live instance ──────────────────────────────────────────────────────────
-function createLive(opts = {}) {
+// One construction site for the client, shared by the live loop and the conformance probe:
+// a probe that built its own request object could measure something the run never sends.
+function clientConfig(p = {}, key = '', measured = null) {
+  return {
+    type: p.type || 'openai-compatible',
+    capabilities: p.capabilities,
+    measured,
+    endpoint: {
+      base_url: p.base_url,
+      model: p.model,
+      api_key: key || 'sk-local',
+    },
+    sampling: {
+      temperature: p.temperature ?? 0.2,
+      top_p: p.top_p ?? 0.9,
+      max_tokens: p.max_tokens ?? 2048,
+    },
+    runtime: {
+      max_tool_iters: p.max_tool_iters ?? 12,
+      max_tool_calls: p.max_tool_calls,
+      // Tool-calling style is a declared capability, not a hardcoded true. The text
+      // protocol stays available as the model's own fallback when it emits ACTION:.
+      text_protocol_fallback: true,
+      use_grammar: false,
+      context_char_budget: p.context_char_budget ?? 40000,
+      // Preferred over the legacy char budget: the model's real window minus the output
+      // we are about to ask for. Without it the run sizes itself off a ~15k-token
+      // assumption and leaves a modern 1M-token window almost entirely unused.
+      context_window_tokens: p.context_window_tokens,
+      reserved_output_tokens: p.reserved_output_tokens,
+      context_safety_tokens: p.context_safety_tokens,
+      tool_output_clip_chars: p.tool_output_clip_chars ?? 4000,
+      request_timeout_ms: p.request_timeout_ms ?? 120000,
+      timings_per_token: p.timings_per_token === true,
+      stream_usage: p.stream_usage !== false,
+      retries: p.retries ?? 2,
+      retry_backoff_ms: p.retry_backoff_ms ?? 2000,
+      // run_tool is a command line: two probes that differ in URL or identity header are new
+      // evidence, not a variant-loop. Exact repeats are still deduplicated.
+      loop_guard: p.loop_guard || { max_repeats: 1, fuzzy: true, fuzzy_threshold: 0.85, exempt_tools: ['run_tool'] },
+    },
+  };
+}
+
+function buildClient(p, key, measured = null) {
+  return new LocalLLM(clientConfig(p, key, measured));
+}
+
+// Config, profile, cloud consent and credential in one place. `createLive` and the
+// conformance probe both need exactly this gate set, and a probe that skipped the cloud gate
+// would be a way to reach a cloud endpoint without consent: same function, same answer.
+function resolveAuth(opts = {}) {
   const { cfg, file, text } = loadConfig(opts.configPath);
   const { profile, p, egress } = resolveProfile(cfg, opts.profile);
 
@@ -334,41 +448,35 @@ function createLive(opts = {}) {
       `provider key missing: export ${keyEnv || 'OPENROUTER_API_KEY'}=…, or put it in `
       + `${keyFileFor(profile)} (chmod 600)`);
   }
+  return { cfg, file, text, profile, p, egress, key, keyEnv };
+}
 
-  const llm = new LocalLLM({
-    endpoint: {
-      base_url: p.base_url,
-      model: p.model,
-      api_key: key || 'sk-local',
-    },
-    sampling: {
-      temperature: p.temperature ?? 0.2,
-      top_p: p.top_p ?? 0.9,
-      max_tokens: p.max_tokens ?? 2048,
-    },
-    runtime: {
-      max_tool_iters: p.max_tool_iters ?? 12,
-      max_tool_calls: p.max_tool_calls,
-      native_tools: true,
-      text_protocol_fallback: true,
-      use_grammar: false,
-      context_char_budget: p.context_char_budget ?? 40000,
-      tool_output_clip_chars: p.tool_output_clip_chars ?? 4000,
-      request_timeout_ms: p.request_timeout_ms ?? 120000,
-      timings_per_token: p.timings_per_token === true,
-      stream_usage: p.stream_usage !== false,
-      retries: p.retries ?? 2,
-      retry_backoff_ms: p.retry_backoff_ms ?? 2000,
-      // run_tool is a command line: two probes that differ in URL or identity header are new
-      // evidence, not a variant-loop. Exact repeats are still deduplicated.
-      loop_guard: p.loop_guard || { max_repeats: 1, fuzzy: true, fuzzy_threshold: 0.85, exempt_tools: ['run_tool'] },
-    },
-  });
+function createLive(opts = {}) {
+  const { cfg, file, text, profile, p, egress, key, keyEnv } = resolveAuth(opts);
+  const llm = buildClient(p, key, measurementsFor(profile, p));
+
+  // A continuation loads the saved state BEFORE the session is opened, so the history
+  // and the facts it restores are what the first turn sends. An unusable file (rejected,
+  // stale without consent, absent) is a refusal with a reason — never a silent fresh start
+  // that looks like a resume.
+  const root = sessionState.sessionsRoot();
+  let resumed = null;
+  if (opts.resume) {
+    const dir = path.join(root, String(opts.resume));
+    if (!fs.existsSync(dir)) {
+      throw new LiveError('session_unknown', `no session ${opts.resume} under ${path.relative(WS, root) || root}`);
+    }
+    resumed = sessionState.load(dir, { allowStale: opts.allowStale, maxAgeHours: opts.maxAgeHours });
+    if (!resumed.usable) {
+      const code = resumed.status === 'absent' ? 'session_no_state' : `session_${resumed.status}`;
+      throw new LiveError(code, `cannot resume ${opts.resume}: ${resumed.reason}`);
+    }
+  }
 
   const ctx = {
-    target: opts.target || null,
-    phase: opts.phase || 'web-test',
-    klass: opts.klass || null,
+    target: opts.target || (resumed && resumed.host) || null,
+    phase: opts.phase || (resumed && resumed.phase) || 'web-test',
+    klass: opts.klass || (resumed && resumed.klass) || null,
     egress,
   };
   const info = {
@@ -381,10 +489,74 @@ function createLive(opts = {}) {
     configFile: file,
     configHash: sha256(text),
     promptSha: sha256(systemFor(ctx)),
+    capabilities: llm.modelInfo(),
   };
-  const session = startSession(info, ctx);
+  const session = resumed
+    ? startSession(info, ctx, { dir: path.join(root, String(opts.resume)), id: resumed.id })
+    : startSession(info, ctx);
   let started = false;
-  let usage = { tokens_in: 0, tokens_out: 0, cost: 0 };
+  // The rollup (not a bare token count) is the session's accounting: a resumed engagement
+  // continues its total instead of starting a second, invisible one.
+  let rollup = resumed ? usage.normalizeUsage(resumed.usage) : usage.emptyUsage();
+  // The conversation the next turn continues. On a fresh session this stays null until the
+  // first turn returns its messages.
+  let history = resumed ? resumed.messages : null;
+  let turns = resumed ? resumed.report.turns : 0;
+  let lastSave = null;
+
+  if (resumed) {
+    session.event('session_resume', {
+      resumed_from: resumed.id,
+      saved_at: resumed.report.saved_at,
+      messages: resumed.report.messages,
+      facts: resumed.report.facts,
+      repaired: resumed.report.repaired.length,
+      dropped_messages: resumed.report.droppedMessages,
+      age_hours: resumed.report.ageHours,
+    });
+  }
+
+  let lastUser = resumed ? resumed.report.last_user : null;
+
+  // Best-effort by design: a failure to persist must not kill a run that is going well,
+  // but it must be visible, so it becomes an event and `lastSave()` reports it.
+  function persist(status, messagesOverride) {
+    const snapshot = Array.isArray(messagesOverride) ? messagesOverride : history;
+    if (!Array.isArray(snapshot) || !snapshot.length) return null;
+    try {
+      const saved = sessionState.save(session.dir, {
+        id: session.id,
+        host: ctx.target,
+        phase: ctx.phase,
+        klass: ctx.klass,
+        profile: info.profile,
+        model: info.model,
+        egress: info.egress,
+        status: status || session.meta.status || 'open',
+        turns,
+        last_user: lastUser,
+        usage: rollup,
+        messages: snapshot,
+      });
+      lastSave = { ...saved, at: new Date().toISOString() };
+      session.event('state_saved', {
+        messages: saved.messages,
+        bytes: saved.bytes,
+        dropped_messages: saved.droppedMessages,
+        facts: {
+          hosts: saved.facts.hosts.length,
+          files: saved.facts.files.length,
+          findings: saved.facts.findings.length,
+          actions: saved.facts.actions.length,
+        },
+      });
+      return lastSave;
+    } catch (e) {
+      lastSave = { error: String((e && e.message) || e), at: new Date().toISOString() };
+      session.event('state_save_failed', { message: lastSave.error });
+      return lastSave;
+    }
+  }
 
   // Evidence must be fresh: a cached failure from a previous target state would be
   // replayed as if it were the current response. The live loop opts out of the cache.
@@ -474,7 +646,9 @@ function createLive(opts = {}) {
         task,
         tools: SCHEMA,
         dispatch: guarded,
-        history: runOpts.history || undefined,
+        // The instance's own history is the default: a resumed session continues itself
+        // even when the caller passes nothing (a fresh TUI, a one-shot --resume run).
+        history: runOpts.history || history || undefined,
         stream: true,
         onToken: runOpts.onToken,
         onFirstToken: runOpts.onFirstToken,
@@ -490,17 +664,25 @@ function createLive(opts = {}) {
         onUsage: (u) => {
           const tin = Number(u.prompt_tokens ?? u.tokens_in ?? 0) || 0;
           const tout = Number(u.completion_tokens ?? u.tokens_out ?? 0) || 0;
-          const cost = Number(u.cost);
-          usage.tokens_in += tin;
-          usage.tokens_out += tout;
-          if (Number.isFinite(cost)) usage.cost += cost;
-          session.event('provider_call', { usage: { tokens_in: tin, tokens_out: tout, cost: Number.isFinite(cost) ? cost : null, source: 'provider' } });
-          if (runOpts.onUsage) runOpts.onUsage({ tokens_in: tin, tokens_out: tout, cost: Number.isFinite(cost) ? cost : null });
+          const hasCost = u.cost != null && Number.isFinite(Number(u.cost));
+          const cost = hasCost ? Number(u.cost) : null;
+          const source = hasCost ? (u.cost_source || null) : null;
+          rollup = usage.addUsage(rollup, { tokens_in: tin, tokens_out: tout, cost, source });
+          session.event('provider_call', { usage: { tokens_in: tin, tokens_out: tout, cost, source: source || 'unknown' } });
+          if (runOpts.onUsage) runOpts.onUsage({ tokens_in: tin, tokens_out: tout, cost, source, rollup });
         },
         onTrace: runOpts.onTrace,
       });
       session.event('assistant', { content: res.text });
-      return { text: res.text, messages: res.messages, usage, reasoning: res.reasoning || '' };
+      if (Array.isArray(res.messages) && res.messages.length) {
+        history = res.messages;
+        turns += 1;
+        lastUser = String(task || '');
+        // Persist here, not only on finish: a kill -9 or a closed terminal never reaches
+        // `finish`, and the turn that just completed is exactly what must survive it.
+        persist('open');
+      }
+      return { text: res.text, messages: res.messages, usage: { ...rollup }, reasoning: res.reasoning || '' };
     } catch (e) {
       const message = String((e && e.message) || e).replace('llama.cpp non raggiungibile', 'provider unreachable');
       session.event('error', { class: 'provider_error', message });
@@ -511,10 +693,30 @@ function createLive(opts = {}) {
   return {
     info,
     session,
-    usage: () => ({ ...usage }),
+    // One accounting object, shared with the session file: no second accumulator to drift.
+    usage: () => usage.normalizeUsage(rollup),
+    rollup: () => usage.normalizeUsage(rollup),
+    turns: () => turns,
     systemFor: () => systemFor(ctx),
     run,
-    finish(status = 'ok') { session.finish(status); },
+    // The same compaction the next request will apply. The TUI's /compact calls this,
+    // so the numbers it prints are the ones the loop actually used.
+    compact: (held) => llm.prepareContext(held || []),
+    contextStats: () => llm.contextStats(),
+    // What a continuation is built from. `null` means "this session has no model context
+    // yet", which is a fact the TUI reports instead of guessing.
+    history: () => history,
+    resumed: () => resumed,
+    stateFile: () => sessionState.statePath(session.dir),
+    lastSave: () => lastSave,
+    // Persist a history the caller just rewrote (the TUI's /compact). Without this the file
+    // keeps the pre-compaction history, and a restart right after /compact would resume a
+    // conversation the operator already trimmed.
+    saveState: (messages) => persist(session.meta.status || 'open', messages),
+    finish(status = 'ok') {
+      persist(status);
+      session.finish(status);
+    },
   };
 }
 
@@ -522,6 +724,13 @@ module.exports = {
   createLive,
   loadConfig,
   resolveProfile,
+  capabilitiesFor,
+  clientConfig,
+  buildClient,
+  resolveAuth,
+  measurementFile,
+  endpointHash,
+  measurementsFor,
   resolveKey,
   keyFileFor,
   systemFor,

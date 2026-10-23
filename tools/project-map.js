@@ -215,8 +215,8 @@ const AREAS = [
   },
   {
     id: 'lab', name: 'Laboratorio e benchmark', accent: '#8892a6',
-    blurb: 'Il modello locale senza cloud e la misura: il benchmark contaminazione-proof e la sua provenienza.',
-    modules: ['gen-bench', 'eval-juice-shop', 'bench-provenance'],
+    blurb: 'Il modello locale senza cloud e la misura: cosa l\'endpoint accetta davvero, e il benchmark contaminazione-proof con la sua provenienza.',
+    modules: ['gen-bench', 'eval-juice-shop', 'bench-provenance', 'provider-probe'],
     files: ['BENCHMARK.md', 'local/README-local.md', 'docs/RECORDING.md'],
   },
   {

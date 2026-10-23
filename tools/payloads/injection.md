@@ -8,6 +8,9 @@ injection (CRLF), and open redirect. Driven by `tools/repeater.js` (tamper + `--
 > BENIGN marker only (echo of a unique token, `whoami`-level echo, arithmetic time cap ≤ 7s).
 > Never destructive commands, never write/remove — an actual RCE payload chain is confirm-tier
 > (`--confirm "<reason>"` + explicit per-action approval, knowledge.md rule 2).
+>
+> **Detection-only.** Wildcards and boolean oracles only; reading a directory entry or a certificate
+> the filter should have excluded is the furthest a detection run goes.
 
 ## 1. OS command injection
 
@@ -83,7 +86,32 @@ Evidence: response status 3xx with `Location` pointing where you asked (`repeate
 raw headers). Chain note: open redirect + OAuth `redirect_uri` or token-in-URL = chain candidate for
 `chain.js` (report the pair, don't exploit the chain without approval).
 
+## 4. 2026: LDAP and XPath injection
+
+Directory and XML-query filters are string-built more often than SQL is — the operators
+(`(|(uid=*))`, `//item[@id='…']`) accept metacharacters that never reach a SQL parser. Three
+probe shapes cover the rows below:
+
+- **Result widening** in a search/filter parameter: `*)(uid=*` against a baseline, and read the row
+  count rather than the page;
+- **Session bypass** where an identifier reaches a bind filter: `*` in the identity field, and look
+  for a changed error class (never a real account);
+- **XML-query injection**: `' or '1'='1` / `'] | //* | //*['` in the search field — an error page
+  naming XPath is `triggered`, extra results are `exploited`.
+
+| Technique | CVE / advisory | Date | Affected | Probe |
+|---|---|---|---|---|
+| LDAP filter injection (`_queryId`) | CVE-2026-41573 | 2026-06 | OpenAM ≤16.0.6 | `*)(uid=*` vs baseline result count |
+| LDAP injection in MSISDN auth | CVE-2026-46619 | 2026-06 | OpenAM CE ≤16.0.6 | `*` as identity; error-class change |
+| LDAP filter in XKMS repo | CVE-2026-44930 | 2026-05 | CXF 4.2.0; 4.1.0–<4.1.6; <3.6.11 (fix 4.2.1/4.1.6/3.6.11) | wildcard in cert lookup |
+| XPath injection | CVE-2026-44962 | 2026-05 | Plesk Obsidian 18.x <18.0.75.1 | `' or '1'='1` in APS catalog search |
+
+Record with class `"injection"`: `cwe: "CWE-90"` for LDAP, `"CWE-643"` for XPath. A wildcard that
+only widens the search is `triggered`; reading an entry the filter should have excluded is
+`exploited`.
+
 ## Reporting
 
-Class names (record-finding.js): `injection` (command/header), `redirect` (open redirect). Attach the
-raw request/response as `poc`; verification level per knowledge.md (unverified = `suspected`).
+Class names (record-finding.js): `injection` (command/header/LDAP/XPath), `redirect` (open redirect).
+Attach the raw request/response as `poc`; verification level per knowledge.md (unverified =
+`suspected`).

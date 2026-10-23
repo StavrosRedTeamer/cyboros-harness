@@ -81,7 +81,22 @@ an equivalent form before concluding anything:
 Do not build a bypass ladder: three probes per parameter is the budget, and every extra
 request is noise plus rate-limit risk.
 
-## 4. Record
+## 4. 2026 expression-injection disclosures
+
+These sit beside SSTI but are a different class (`injection`, CWE-917): the expression is evaluated
+by the framework's own expression language, not by a template engine. The probe is the same math
+marker as §2 — what changes is where the evaluator is reachable.
+
+| Context | CVE / advisory | Date | Affected | Check |
+|---|---|---|---|---|
+| SpEL in vector-store filter **keys** | CVE-2026-22738 / GHSA-fvh3-672c-7p6c | 2026-03 | Spring AI 1.0.0–<1.0.5, 1.1.0-M1–<1.1.4 | keys, not values, reach `SimpleVectorStore` expression evaluation |
+| SpEL safety guard bypassed when the compiler is active | CVE-2026-59283 / GHSA-m843-fc87-4v2m | 2026-08 | Spring Framework 7.0.0–7.0.8, 6.2.0–6.2.19, 6.1.0–6.1.28, 6.0.0–6.0.30, 5.3.0–5.3.49, ≤5.2.25.RELEASE | `SimpleEvaluationContext` with compilation enabled: `${7*7}` → 49 |
+| OGNL in the legacy RESTful action mapper | CVE-2026-104711 | 2026-10 | Struts with the legacy RESTful action mapper (fix 6.12.0 / 7.4.0); Struts 7 only with the OGNL allowlist disabled | `%{7*7}` in action-mapper input |
+
+A math marker is `triggered`; class access (`T(java.lang.Math)`) that evaluates is a stronger signal
+but still not code execution — stop there and report, never walk a gadget chain on a live target.
+
+## 5. Record
 
 | Observation | Class | verify_level |
 |---|---|---|

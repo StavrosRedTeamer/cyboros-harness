@@ -491,7 +491,16 @@
     t.style.height = Math.max(24, Math.min(t.scrollHeight, 200)) + 'px';
   }
 
-  function setFoot(txt) { var f = byId('chat-foot'); if (f) f.textContent = txt; }
+  function setFoot(txt, title) {
+    var f = byId('chat-foot');
+    if (!f) return;
+    f.textContent = txt;
+    // The full sentence (source, floor, unpriced count) hangs off the footer: the short
+    // label stays readable, the detail is one hover away. Clearing the footer clears it
+    // too, so a new conversation cannot inherit the last bill's sentence.
+    if (title !== undefined) f.title = title;
+    else if (!txt) f.title = '';
+  }
 
   function uiBusy(busy) {
     S.streaming = !!busy;
@@ -650,8 +659,17 @@
       return;
     }
     if (ev.type === 'usage') {
-      S.usage = { tokensIn: ev.tokensIn, tokensOut: ev.tokensOut, cost: ev.cost };
-      setFoot(ev.tokensIn + ' in · ' + ev.tokensOut + ' out' + (Number.isFinite(Number(ev.cost)) && ev.cost ? ' · $' + Number(ev.cost).toFixed(4) : ''));
+      S.usage = { tokensIn: ev.tokensIn, tokensOut: ev.tokensOut, cost: ev.cost, costLabel: ev.costLabel };
+      // Tokens and money are the same quantity here: both come from the conversation's
+      // rollup, so the footer never prints this call's tokens beside the engagement's total.
+      // The label is the server's (runtime/usage.js), which owns the ledger, the
+      // unknown/floor rules and the source name. This file deliberately cannot build a
+      // dollar figure from a bare number: a client-side `$' + cost.toFixed(4)` shows an
+      // unsourced amount for an unpriced call, which is the lie the rollup exists to stop.
+      var label = ev.costLabel || '';
+      var tin = ev.totalTokensIn != null ? ev.totalTokensIn : ev.tokensIn;
+      var tout = ev.totalTokensOut != null ? ev.totalTokensOut : ev.tokensOut;
+      setFoot(tin + ' in · ' + tout + ' out' + (label ? ' · ' + label : ''), ev.costText || '');
       return;
     }
     if (ev.type === 'timings') {

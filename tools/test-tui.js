@@ -140,6 +140,8 @@ ok('a missing scope.json authorizes nothing (fail-closed)', () => {
   assert.strictEqual(r.status, 0);
   assert.ok(r.out.includes('MISSING'), 'badge says the file is missing');
   assert.ok(r.out.includes('scope.json missing'), 'explains the consequence');
+  assert.ok(/verdict\s+scope\.json missing/.test(r.out),
+    'the refusal names the missing file instead of calling it empty');
   assert.ok(r.out.includes('app.example.com is out of scope'), 'refuses the target');
 });
 
@@ -200,6 +202,23 @@ ok('unknown commands and invalid phases are rejected without exiting', () => {
   assert.ok(r.out.includes('no-such-providers.json not found'), 'provider config is reported honestly');
 });
 
+ok('--phase and --class are validated at launch like the commands that set them', () => {
+  const phase = run(['--script', '--phase', 'web-testt'], { input: '/quit\n' });
+  assert.strictEqual(phase.status, 2, 'a typo is a usage error');
+  assert.ok(phase.out.includes('unknown phase "web-testt"'), 'names the typo');
+  const klass = run(['--script', '--class', 'sqlii'], { input: '/quit\n' });
+  assert.strictEqual(klass.status, 2, 'a typo is a usage error');
+  assert.ok(klass.out.includes('unknown class "sqlii"'), 'names the typo');
+});
+
+ok('/demo rejects an unknown mode, and /clear does not claim a clear it did not do', () => {
+  const r = run(['--script'], { input: '/demo xss\n/clear\n/quit\n' });
+  assert.strictEqual(r.status, 0);
+  assert.ok(r.out.includes('/demo [sqli|idor]'), 'an unknown mode prints usage');
+  assert.ok(!r.out.includes('Test SQL injection'), 'no walkthrough was run instead');
+  assert.ok(r.out.includes('nothing to clear'), 'a non-TTY clear says it cleared nothing');
+});
+
 ok('/thinking toggles the reasoning renderer and rejects a bad argument', () => {
   const r = run(['--script'], { input: '/thinking off\n/thinking\n/thinking bogus\n/quit\n' });
   assert.strictEqual(r.status, 0);
@@ -224,7 +243,79 @@ ok('/findings reads the ledger read-only and wraps long rows', () => {
 ok('/findings says so when the ledger is absent', () => {
   const r = run(['--script'], { input: '/findings\n/quit\n', env: { FINDINGS_JSONL: MISSING_FINDINGS } });
   assert.strictEqual(r.status, 0);
-  assert.ok(r.out.includes('no readable findings ledger'), 'does not invent findings');
+  assert.ok(r.out.includes('no findings ledger yet'), 'does not invent findings');
+  assert.ok(!r.out.includes('corrupt'), 'absence is not corruption');
+});
+
+ok('/findings distinguishes a corrupt ledger from an absent one', () => {
+  const bad = path.join(DIR, 'corrupt-findings.jsonl');
+  fs.writeFileSync(bad, JSON.stringify({ severity: 'Low', title: 'one good row', verify_level: 'suspected' }) + '\n{not json\n');
+  const r = run(['--script'], { input: '/findings\n/gate\n/quit\n', env: { FINDINGS_JSONL: bad } });
+  assert.strictEqual(r.status, 0);
+  assert.ok(r.out.includes('the findings ledger is corrupt'), 'names corruption');
+  assert.ok(r.out.includes('line 2 is not JSON'), 'names the line');
+  assert.ok(r.out.includes('shown as a warning, not a pass'), 'does not present the readable rows as the ledger');
+  assert.ok(r.out.includes('one good row'), 'still shows the rows it could read');
+  assert.ok(!r.out.includes('no findings ledger yet'), 'does not call corruption absence');
+  assert.ok(r.out.includes('the findings ledger cannot be read'), '/gate refuses to count pending');
+});
+
+ok('a ledger line that parses but is not a finding object is a verdict, not a crash', () => {
+  // JSON.parse accepts `null`: rendering it threw on the first property read and took the
+  // REPL with it (exit 1). The other scalar shapes hit the same guard, asserted below.
+  const file = path.join(DIR, 'not-a-finding.jsonl');
+  fs.writeFileSync(file, 'null\n');
+  const r = run(['--script'], { input: '/findings\n/gate\n/quit\n', env: { FINDINGS_JSONL: file } });
+  assert.strictEqual(r.status, 0, 'the REPL survives');
+  assert.ok(!r.out.includes('fatal:'), 'no exception escaped the read');
+  assert.ok(r.out.includes('line 1 is not a finding object'), 'names the shape');
+  assert.ok(r.out.includes('the findings ledger cannot be read'), '/gate refuses to count');
+});
+
+ok('readFindings returns one verdict shape whatever the outcome', () => {
+  // Three shapes meant each caller had to know which fields a verdict carried; a caller
+  // asking for a field another outcome omits is a crash waiting for a corrupt file.
+  // The probe loads the module by resolved path: it is a new file not yet committed, so a
+  // literal require here would (rightly) fail tools/test-lint.js.
+  const ledgerMod = path.join(__dirname, '..', 'runtime', 'findings.js');
+  if (!fs.existsSync(ledgerMod)) { console.log('    SKIP runtime/findings.js non presente in questo checkout'); return; }
+  const good = path.join(DIR, 'shape-good.jsonl');
+  fs.writeFileSync(good, JSON.stringify({ severity: 'Low', title: 'x' }) + '\n');
+  const scalars = ['null\n', '124\n', '"str"\n', '[]\n'].map((body, i) => {
+    const p = path.join(DIR, `shape-scalar-${i}.jsonl`);
+    fs.writeFileSync(p, body);
+    return p;
+  });
+  const probe = spawnSync(process.execPath, ['-e', `
+    const { readFindings } = require(process.argv[1]);
+    const files = process.argv.slice(2);
+    process.stdout.write(JSON.stringify(files.map((p) => readFindings(p))));
+  `, ledgerMod, good, MISSING_FINDINGS, ...scalars, DIR], {
+    cwd: path.join(__dirname, '..'), encoding: 'utf8',
+    env: Object.assign({}, process.env, { NO_COLOR: '1', TERM: 'dumb' }),
+  });
+  const expected = 'detail,error,kind,line,ok,rows';
+  const kinds = ['ok', 'absent', ...scalars.map(() => 'corrupt'), 'unreadable'];
+  const verdicts = JSON.parse(probe.stdout);
+  verdicts.forEach((v, i) => {
+    assert.strictEqual(Object.keys(v).sort().join(','), expected, `${kinds[i]}: same keys`);
+    assert.strictEqual(v.kind, kinds[i], `${kinds[i]}: names the verdict`);
+    if (kinds[i] === 'corrupt') {
+      assert.strictEqual(v.detail, 'is not a finding object', `scalar ${i}: names the shape`);
+      assert.strictEqual(v.line, 1);
+    }
+  });
+  assert.strictEqual(verdicts[0].rows.length, 1);
+});
+
+ok('a session id is one directory name, not a path', () => {
+  // `path.join(root, id)` would resolve `..`, so a traversal id used to load a
+  // state.json from outside the sessions root while claiming to read inside it.
+  const r = run(['--script'], { input: '/resume ../../../../../../../tmp/escape\n/quit\n' });
+  assert.strictEqual(r.status, 0);
+  assert.ok(r.out.includes('is not a session id'), 'refuses a path as an id');
+  assert.ok(r.out.includes('one directory name'), 'says what an id is');
+  assert.ok(!r.out.includes('OK ../../'), 'nothing was attached');
 });
 
 ok('/sessions lists meta.json and refuses an unknown id', () => {
@@ -236,7 +327,9 @@ ok('/sessions lists meta.json and refuses an unknown id', () => {
   assert.strictEqual(r.status, 0);
   assert.ok(r.out.includes('s1'), 'lists the session id');
   assert.ok(r.out.includes('web-test/sqli'), 'shows phase/class');
-  assert.ok(r.out.includes('resume lands in M1'), 'is explicit about the boundary');
+  // A session with a log but no state file cannot be continued, and says so instead of
+  // attaching to nothing.
+  assert.ok(r.out.includes('no state'), 'marks a session without saved state as not resumable');
   assert.ok(r.out.includes('is not a session'), 'refuses an unknown id');
 });
 
@@ -272,6 +365,67 @@ ok('/todos shows the phase ladder when no run has seeded a plan', () => {
   assert.ok(r.out.includes('Todos'), 'the panel is titled');
   assert.ok(r.out.includes('[~] recon-map'), 'the current phase is in progress');
   assert.ok(r.out.includes('[ ] report'), 'later phases are pending');
+});
+
+ok('a refused cloud profile says it is an authorization, not a failed run', () => {
+  const write = (name, allowCloud) => {
+    const file = path.join(DIR, name);
+    fs.writeFileSync(file, JSON.stringify({
+      version: 1,
+      default_profile: 'cloud',
+      ...(allowCloud === undefined ? {} : { allow_cloud: allowCloud }),
+      profiles: {
+        cloud: {
+          type: 'openai-compatible', base_url: 'https://example.invalid/v1',
+          model: 'm', api_key_env: 'NO_SUCH_KEY', egress: 'cloud',
+        },
+      },
+    }));
+    return file;
+  };
+  // The shipped shape: the config allows cloud, this run has not authorized it.
+  const flag = run(['--task', 'hello', '--config', write('cloud-allow.json', true)]);
+  assert.strictEqual(flag.status, 5, 'the provider-config exit code is unchanged');
+  assert.ok(flag.out.includes('uses cloud egress'), 'names the reason');
+  assert.ok(flag.out.includes('not a failed run'), 'does not read as a run failure');
+  assert.ok(flag.out.includes('nothing was sent'), 'says nothing left the host');
+  // The config itself forbids it: --allow-cloud is not the remedy, and the message says so.
+  const disabled = run(['--task', 'hello', '--config', write('cloud-disabled.json', false)]);
+  assert.strictEqual(disabled.status, 5);
+  assert.ok(disabled.out.includes('not a failed run'), 'still not a run failure');
+  assert.ok(disabled.out.includes('cannot override'), 'does not offer a flag that cannot work');
+  // These two exited 5 with no explanation at all: the reassurance belonged to two causes
+  // instead of to the refusal. The mapping now carries the text with the status.
+  const missing = run(['--task', 'hello', '--config', path.join(DIR, 'no-providers.json')]);
+  assert.strictEqual(missing.status, 5);
+  assert.ok(missing.out.includes('provider config not found'), 'names the missing file');
+  assert.ok(missing.out.includes('not a failed run'), 'a missing config is not a failed run');
+  assert.ok(missing.out.includes('copy the template'), 'names the remedy');
+  const noKey = run(['--task', 'hello', '--allow-cloud', '--config', write('cloud-key.json', true)]);
+  assert.strictEqual(noKey.status, 5);
+  assert.ok(noKey.out.includes('provider key missing'), 'names the missing key');
+  assert.ok(noKey.out.includes('not a failed run'), 'a missing key is not a failed run');
+  assert.ok(noKey.out.includes('export the key'), 'says where the key comes from');
+  // The table has a generic entry, so a cause added to live.js later cannot go silent.
+  const fallback = spawnSync(process.execPath, ['-e', `
+    const { refusal } = require(process.argv[1]);
+    process.stdout.write(JSON.stringify(refusal({ code: 'a_new_cause' })));
+  `, path.join(__dirname, '..', 'runtime', 'terminal', 'turn.js')], {
+    cwd: path.join(__dirname, '..'), encoding: 'utf8',
+    env: Object.assign({}, process.env, { NO_COLOR: '1', TERM: 'dumb' }),
+  });
+  const mapped = JSON.parse(fallback.stdout);
+  assert.strictEqual(mapped.exit, 5, 'an unmapped cause keeps the provider status');
+  assert.ok(mapped.text.includes('not a failed run'), 'and still says it was not the run');
+  assert.ok(mapped.text.includes('was not authorized'), 'and names authorization as the cause');
+});
+
+ok('the demo refuses a path as a resume id and says it reads no session file', () => {
+  const r = run(['--script'], { input: '/demo idor\n/resume ../escape\n/resume 01J8Z…\n/quit\n' });
+  assert.strictEqual(r.status, 0);
+  assert.ok(r.out.includes('is not a session id'), 'a path is refused in the demo too');
+  assert.ok(!r.out.includes('attached ../escape'), 'nothing was attached');
+  assert.ok(/prototype\s*[.·]\s*no session file is read/.test(r.out), 'the synthetic attach is explained');
 });
 
 ok('/help lists the /todos command', () => {

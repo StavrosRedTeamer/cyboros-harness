@@ -19,9 +19,10 @@ Look for `X-Powered-By: Next.js`, `__NEXT_DATA__`, `/_next/static/…`, and the 
 version in the build manifest or the `x-nextjs-*` / `Vary: RSC, Next-Router-State-Tree`
 headers. A version is the whole PoC for CVE-2025-55182 / CVE-2025-66478 (see §4).
 
-## 1. Middleware is not an authorization boundary (CVE-2025-29927)
+## 1. Middleware is not an authorization boundary (CVE-2025-29927, 2025-03)
 
-Next.js ≤ 15.2.2 honored an externally supplied internal header. If the app protects routes
+Affected: `11.1.4–<12.3.5`, `13.0.0–<13.5.9`, `14.0.0–<14.2.25`, `15.0.0–<15.2.3`. Next.js
+honored an externally supplied internal header. If the app protects routes
 in middleware alone, request a **protected canary route** with the header set:
 
 ```
@@ -38,7 +39,7 @@ Interpretation, in order:
 Repeat once with the header in mixed case and once with a duplicated header — proxies
 normalize differently and the edge is where the bug lives.
 
-## 2. Image optimizer (CVE-2025-55173 / CVE-2025-57752)
+## 2. Image optimizer (CVE-2025-55173 / CVE-2025-57752, 2025-08; `<14.2.31`, `15.0.0–15.4.4`)
 
 The optimizer fetches remote images and caches the result. Two conditions matter:
 
@@ -46,9 +47,10 @@ The optimizer fetches remote images and caches the result. Two conditions matter
 node tools/repeater.js --url "<url>/_next/image?url=<approved_local_path>&w=64&q=75"
 ```
 
-- **Content injection / download priming** (55173): the optimizer returns attacker-chosen
-  content or a `Content-Disposition` attachment for a same-origin-looking URL. Confirm with a
-  harmless local asset only — never a remote host you do not control.
+- **Content injection / download priming** (55173): an attacker-controlled external image
+  response becomes content the site serves, or primes a `Content-Disposition` download. Confirm
+  with a harmless local asset only — never a remote host you do not control. This is content
+  injection, not SSRF: the advisory does not describe a server-side fetch of an internal host.
 - **Cache-key confusion** (57752): images served under `Cookie`/`Authorization` can be cached
   and returned to another identity. Test with **two identities and two markers**:
   request as A, then as B, and check whether B's response contains A's marker. A cross-identity
@@ -73,7 +75,10 @@ same checks as the UI? A `200` with an unexpected state change from an unauthent
 low-privilege identity is a BOLA/BFLA finding (class `bola`/`bfla`), not `nextjs`. Do not send
 crafted multi-part RSC streams to try to trigger code execution.
 
-## 4. RSC deserialization (CVE-2025-55182 / Next.js CVE-2025-66478)
+## 4. RSC deserialization (CVE-2025-55182 / Next.js CVE-2025-66478, 2025-12)
+
+Affected: `react-server-dom-webpack`/`-parcel`/`-turbopack` 19.0.0, 19.1.0, 19.1.1, 19.2.0; Next.js
+15.x, 16.x, and 14.3.0-canary.77+ using the App Router.
 
 **Prove it from the SBOM, not the wire.** Check the lockfile / dependency inventory for
 `react-server-dom-*` and the Next.js App Router version; React's advisory says apps that

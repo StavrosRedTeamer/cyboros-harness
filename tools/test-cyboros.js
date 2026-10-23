@@ -6,6 +6,7 @@ const assert = require('assert');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
+const { spawnSync } = require('child_process');
 const state = require('./state');
 const cyboros = require('./cyboros');
 
@@ -116,7 +117,29 @@ function fakeRunBin(bin) {
   const rep = cyboros.report(db, { findingsFile: path.join(tmpDir, 'findings-empty.jsonl') });
   assert.strictEqual(rep.targets.length, 2, 'both targets consolidated');
   assert.strictEqual(rep.findings_count, 0, 'no findings file yet');
-  assert.strictEqual(rep.run.status, 'done', 'report closes the current run');
+  assert.strictEqual(rep.findings_status, 'absent', 'a missing ledger is absent, not corrupt');
+  // Reading evidence must not change what it reads: `report` used to finish the running
+  // run on its way out, and print `done` regardless of the row it had just read.
+  assert.strictEqual(rep.run.status, 'running', 'report reads the status it finds');
+  assert.strictEqual(state.lastRun(db).status, 'running', 'reading the report leaves the run untouched');
+  // A partial read must never look complete: the count is what is readable, and the
+  // verdict plus the error say why it is not the whole ledger.
+  const clean = path.join(tmpDir, 'findings-clean.jsonl');
+  fs.writeFileSync(clean, JSON.stringify({ severity: 'Low', title: 'a' }) + '\n' + JSON.stringify({ severity: 'High', title: 'b' }) + '\n');
+  const cleanRep = cyboros.report(db, { findingsFile: clean });
+  assert.strictEqual(cleanRep.findings_status, 'ok', 'a clean ledger says so');
+  assert.strictEqual(cleanRep.findings_count, 2);
+  assert.strictEqual(cleanRep.findings_error, null);
+  const corruptFile = path.join(tmpDir, 'findings-corrupt.jsonl');
+  fs.writeFileSync(corruptFile, JSON.stringify({ severity: 'Low', title: 'kept' }) + '\n{oops\n');
+  const corruptRep = cyboros.report(db, { findingsFile: corruptFile });
+  assert.strictEqual(corruptRep.findings_status, 'corrupt', 'a corrupt ledger is named');
+  assert.strictEqual(corruptRep.findings_count, 1, 'the readable prefix is still usable');
+  assert.match(corruptRep.findings_error, /line 2 is not JSON/);
+  const unreadableRep = cyboros.report(db, { findingsFile: tmpDir });   // a directory: EISDIR
+  assert.strictEqual(unreadableRep.findings_status, 'unreadable', 'an unreadable ledger is named');
+  assert.strictEqual(unreadableRep.findings_count, 0);
+  assert.ok(unreadableRep.findings_error, 'carries the OS error instead of a clean zero');
 
   db.close();
 })().then(() => {
@@ -191,6 +214,14 @@ function fakeRunBin(bin) {
     assert.rejects(cyboros.defaultRunBin('echo', ['evil.com']), /out-of-scope/),
     assert.rejects(cyboros.defaultRunBin('echo', []), /no target host/),
   ]);
+}).then(() => {
+  // ---- a piped TUI launch says it needs a terminal, not just "usage" ----
+  const r = spawnSync(process.execPath, [path.join(__dirname, 'cyboros.js'), '--demo'], {
+    encoding: 'utf8', input: '', timeout: 15000,
+  });
+  assert.strictEqual(r.status, 2, 'a pipe is still the usage exit code');
+  assert.match(String(r.stderr), /needs a terminal/, 'says the TUI needs a terminal: ' + r.stderr);
+  assert.match(String(r.stderr), /cyboros scan/, 'points at a pipeline subcommand for pipes');
 }).then(() => {
   delete process.env.SCOPE_JSON;
   fs.rmSync(tmpDir, { recursive: true, force: true });
