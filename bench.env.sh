@@ -59,12 +59,18 @@ export ORACLE_ARTIFACTS="$PWD/artifacts/bench-oracle-$BENCH_SEED"
 mkdir -p "$PWD/reports/bench-tmp-$BENCH_SEED" "$ORACLE_ARTIFACTS"
 export BENCH_FINDINGS_EFFECTIVE="$PWD/reports/bench-effective-$BENCH_SEED.json"
 
+# ── claim ledger: cosa ha chiesto l'agente PRIMA del cap in record-finding.js's validate() ───
+# Opt-in, additivo, inerte se non settato in produzione — qui lo accendiamo per misurare quanto
+# l'evidence cap ha effettivamente trattenuto (benchmark counterfactual-overstatement).
+export CLAIM_LEDGER="$PWD/reports/bench-tmp-$BENCH_SEED/claim-ledger.jsonl"
+
 cat <<EOF
 bench env pronto — target http://127.0.0.1:$BENCH_PORT · seed $BENCH_SEED
   dir       : $BENCH_DIR
   scope     : $SCOPE_JSON (pin: http://127.0.0.1:$BENCH_PORT)
   findings  : $FINDINGS_JSONL
   effettivi : $BENCH_FINDINGS_EFFECTIVE
+  ledger    : $CLAIM_LEDGER (claim grezza vs esito, per il benchmark counterfactual-overstatement)
   NON leggere $BENCH_DIR/manifest.full.json — è la risposta, non il bersaglio.
 
 Prima di partire, questo DEVE dire ok:true:

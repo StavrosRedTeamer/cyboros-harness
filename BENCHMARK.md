@@ -29,7 +29,7 @@ node tools/gen-bench.js start ~/bench/bench-4242-84e8
   JS-analysis surface rather than a leak.
 - Same seed → byte-identical routes, so a score is reproducible.
 
-## The three metrics
+## The four metrics
 
 `node tools/gen-bench.js eval <benchdir>` reports:
 
@@ -38,9 +38,37 @@ node tools/gen-bench.js start ~/bench/bench-4242-84e8
 | **recall** (`detectedPct`) | ground-truth classes with at least one matching finding | Can it find things at all? |
 | **precision** (`precisionPct`) | reported findings that map to a seeded class, over findings attributed to the target | **Was anything it said real?** |
 | **verification rate** (`verifiedPct`) | of classes found, the share whose finding reached `verified` / `exploited` / `proven_impact` | Does finding equal proving? |
+| **overstatement** (`overstatement.rejectedPct`, opt-in via `--claim-ledger`) | of every claim the agent *submitted* to `record-finding.js`, the share the evidence cap rejected outright | What would it have gotten away with? |
 
 Plus `routeConfirmed` (the finding names the correct route, not just the class) and a
 triage list of the false positives by title.
+
+### The fourth metric: what the cap actually stopped
+
+The first three metrics score what made it into `findings.jsonl`. They say nothing about
+what the agent *tried* to claim before `validate()` turned it down — and that number is
+exactly the gap `docs/TOOL-LANDSCAPE.md` names: "nothing measures whether a tool was
+capable of overstating severity... because no widely-used tool has the severity decision
+in a place where it can be removed and compared." Here it can, because the decision is a
+function (`validate()` in `tools/record-finding.js`), not a person.
+
+Set `CLAIM_LEDGER=<path>` (inert if unset — zero cost in normal use) and every call to
+`record()` appends one line to it: the claim exactly as submitted (`severity`,
+`verify_level`, `status`, whether it carried an oracle) next to what actually
+happened (`accepted` / `deduped` / `rejected`, and the rejection reason verbatim).
+`bench.env.sh` sets it to a per-seed path automatically; pass the same file to
+`gen-bench.js eval --claim-ledger <path>` and the summary (and the `bench-history.jsonl`
+row) carries an `overstatement` block: `attempts`, `rejected`, `rejectedPct`, a
+severity breakdown of what was rejected, and the top rejection reasons.
+
+**Measured once so far (row #8, seed 20261024):** 1 of 18 claims (6%) was rejected. The
+agent tried to register the `race` finding as `verify_level: exploited` / `status:
+verified` — a reality claim meaning "I re-fired this and it passed N/N" — with no
+re-fireable concurrency oracle behind it. `validate()` refused it (it is a hand-written
+claim of a level only a real re-fire may set), and the agent re-registered it honestly at
+`triggered`. That is one real, reproducible instance of the counterfactual the field does
+not report: the severity a model would have claimed, caught and measured instead of
+trusted.
 
 ### Why precision is the one that matters
 
@@ -65,12 +93,12 @@ there — recall looks the same, verification rate caps out low.
 
 ## Status of results
 
-**Measured rows exist (2026-10-02); no leaderboard is published yet.** Four agent runs
-have gone through the instrument end to end, so the numbers in
+**Measured rows exist (2026-10-02 through 2026-10-23); no leaderboard is published yet.**
+Six agent runs have gone through the instrument end to end, so the numbers in
 `reports/bench-history.jsonl` are measurements rather than projections. They are not a
-leaderboard: they come from one agent, one model and one operator, and rows #3-#5 were
-measured against a generator that could not prove one of its own classes (see `race`
-below).
+leaderboard: they come from one agent, one model (one on a later build, #7-#8) and one
+operator, and rows #3-#5 were measured against a generator that could not prove one of
+its own classes (see `race` below).
 
 To produce a real row:
 
@@ -85,21 +113,28 @@ Every eval appends to `reports/bench-history.jsonl` with seed, recall, precision
 verification rate and the missed classes — so regressions per class are measurable over
 time rather than asserted once.
 
-### What the first four rows say
+### What the six rows say
 
-| row | seed | recall | precision | verification | detected | missed |
-|---|---|---|---|---|---|---|
-| #3 | 20261002 | 88% | 100% | 100% | 14/16 | jwt, race |
-| #4 | 20261003 | 88% | 100% | 100% | 14/16 | jwt, race |
-| #5 | 20261004 | 94% | 100% | 100% | 15/16 | race |
-| #6 | 20261005 | **100%** | 100% | 100% | **16/16** | — |
+| row | seed | recall | precision | verification | overstatement | detected | missed |
+|---|---|---|---|---|---|---|---|
+| #3 | 20261002 | 88% | 100% | 100% | — | 14/16 | jwt, race |
+| #4 | 20261003 | 88% | 100% | 100% | — | 14/16 | jwt, race |
+| #5 | 20261004 | 94% | 100% | 100% | — | 15/16 | race |
+| #6 | 20261005 | **100%** | 100% | 100% | — | **16/16** | — |
+| #7 | 20261023 | 100% | 100% | 94% | not measured | 16/16 | — |
+| #8 | 20261024 | 100% | 100% | 94% | **1/18 (6%)** | 16/16 | — |
 
-All four: `freebuff` / `deepseek-v4.1-flash`, zero false positives, zero unattributed
-findings, zero contamination. Rows #3-#5 are pre-fix (16-classes-to-test ratio aside,
-their `race` MISSED is the instrument's fault); row #6 is the first post-fix seed and the
-only one where 16/16 means anything. Each row's `note` carries its own caveats — the
-harness set-up, the identity token, and the agent's own disclosure all differ between
-runs, and a row without them is not reproducible.
+All six: `freebuff`, zero false positives, zero unattributed findings, zero
+contamination; #3-#6 on `deepseek-v4.1-flash`, #7-#8 on the later
+`deepseek-v4.1-flash-1017` build. Rows #3-#5 are pre-fix (16-classes-to-test ratio aside,
+their `race` MISSED is the instrument's fault); from row #6 onward 16/16 means something.
+Rows #7-#8 both land on verification 94% rather than 100%: `race` is correctly left at
+`triggered` because the batch verifier re-fires single requests, not a concurrent burst —
+not a regression, the honest ceiling for that class on this verifier. Row #8 is the first
+with `--claim-ledger` wired in (see "the fourth metric" above): 1 of its 18 submitted
+claims was rejected by the evidence cap before it could reach disk. Each row's `note`
+carries its own caveats — the harness set-up, the identity token, and the agent's own
+disclosure all differ between runs, and a row without them is not reproducible.
 
 ### The `race` class was unprovable until 2026-10-02 (rows #3, #4, #5)
 

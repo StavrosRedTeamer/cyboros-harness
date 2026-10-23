@@ -420,7 +420,40 @@ function verifyHeadAnchor(opts) {
 //   { ok:true, chained, legacy } | { ok:false, index, reason }
 const verifyFindingsChain = chain.verifyChain;
 
+// Counterfactual-overstatement ledger (benchmark instrumentation, opt-in, additive).
+// Inert unless CLAIM_LEDGER is set — zero overhead/risk for real engagements. Logs every
+// record() ATTEMPT (severity/verify_level/status as submitted, BEFORE validate() runs)
+// next to its outcome, so a researcher can measure what the cap in validate() actually
+// prevented from reaching findings.jsonl. Never influences validate()/record() behavior.
+function logClaimAttempt(raw, opts, res) {
+  const file = process.env.CLAIM_LEDGER;
+  if (!file) return;
+  let f = null;
+  try { f = JSON.parse(raw); } catch { /* parse failure already in res.error */ }
+  try {
+    fs.mkdirSync(path.dirname(file), { recursive: true });
+    fs.appendFileSync(file, JSON.stringify({
+      ts: new Date().toISOString(),
+      promoted: !!(opts && opts.promoted),
+      claimed_severity: f && f.severity,
+      claimed_verify_level: f && f.verify_level,
+      claimed_status: f && f.status,
+      had_oracle: !!(f && f.oracle),
+      class: f && f.class,
+      key: f ? key(f) : null,
+      outcome: res.ok ? (res.deduped ? 'deduped' : 'accepted') : 'rejected',
+      reject_reason: res.ok ? null : res.error,
+    }) + '\n');
+  } catch { /* best-effort; never blocks the real record */ }
+}
+
 function record(raw, opts) {
+  const res = recordInner(raw, opts);
+  logClaimAttempt(raw, opts, res);
+  return res;
+}
+
+function recordInner(raw, opts) {
   let f;
   try {
     f = JSON.parse(raw);

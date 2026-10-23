@@ -830,6 +830,28 @@ function classHit(c, f, port) {
   const route = c.route ? blob.includes(c.route.toLowerCase()) : true;
   return (kw || idMatch) && route;
 }
+// Legge il claim ledger (CLAIM_LEDGER, scritto da record-finding.js's logClaimAttempt) e
+// riassume quanto l'evidence cap ha trattenuto: ogni riga e' un ATTEMPT con l'esito reale
+// (accepted/deduped/rejected). Report-only — non e' mai un gate, solo un numero da citare.
+function readOverstatement(file) {
+  if (!file || !fs.existsSync(file)) return null;
+  const lines = fs.readFileSync(file, 'utf8').split('\n').filter(Boolean).map((l) => { try { return JSON.parse(l); } catch { return null; } }).filter(Boolean);
+  const rejected = lines.filter((l) => l.outcome === 'rejected');
+  const rejectedBySeverity = {};
+  for (const l of rejected) rejectedBySeverity[l.claimed_severity || '(none)'] = (rejectedBySeverity[l.claimed_severity || '(none)'] || 0) + 1;
+  const reasonCounts = {};
+  for (const l of rejected) reasonCounts[l.reject_reason] = (reasonCounts[l.reject_reason] || 0) + 1;
+  const topReasons = Object.entries(reasonCounts).sort((a, b) => b[1] - a[1]).slice(0, 5).map(([reason, count]) => ({ reason, count }));
+  return {
+    attempts: lines.length,
+    accepted: lines.filter((l) => l.outcome === 'accepted').length,
+    deduped: lines.filter((l) => l.outcome === 'deduped').length,
+    rejected: rejected.length,
+    rejectedPct: lines.length ? Math.round(100 * rejected.length / lines.length) : 0,
+    rejectedBySeverity,
+    topReasons,
+  };
+}
 function cmdEval(dir, opts) {
   const manifest = JSON.parse(fs.readFileSync(path.join(dir, 'manifest.full.json'), 'utf8'));
   const port = manifest.bench.port;
@@ -927,6 +949,10 @@ function cmdEval(dir, opts) {
     // `--fail-on-contamination` la puo' rendere bloccante come qualsiasi altra soglia.
     contamination: { checked: attributed.length, suspect: contamination.slice(0, 20) },
     row: rows,
+    // Counterfactual overstatement: quanto l'evidence cap di record-finding.js's validate() ha
+    // effettivamente trattenuto. Richiede --claim-ledger <file>, prodotto da CLAIM_LEDGER durante
+    // la run (bench.env.sh la setta per seed). Senza il flag, null — mai una cifra inventata.
+    overstatement: readOverstatement(opts.claimLedger),
   };
   // ── CI gate: una soglia sotto cui il processo esce 1 ──────────────────────────
   // Il valore di questo strumento è che la precisione sia un numero che qualcuno
@@ -971,6 +997,7 @@ function cmdEval(dir, opts) {
       falsePositives: summary.falsePositives,
       precisionPct: summary.precisionPct,
       missed: rows.filter(r => r.status === 'MISSED').map(r => r.class),
+      overstatement: summary.overstatement,
     }) + '\n');
     historyNote = 'history appended: reports/bench-history.jsonl (#' + (prev + 1) + ')';
   }
@@ -1014,6 +1041,11 @@ function cmdEval(dir, opts) {
     md.push('');
     md.push('**gate:** ' + (summary.gate.passed ? 'PASS' : 'FAIL — ' + summary.gate.failures.join('; ')));
   }
+  if (summary.overstatement) {
+    const o2 = summary.overstatement;
+    md.push('**overstatement:** ' + o2.rejected + '/' + o2.attempts + ' claim respinte dall\'evidence cap ('
+      + o2.rejectedPct + '%) — per severity: ' + JSON.stringify(o2.rejectedBySeverity));
+  }
   const out = path.join(process.cwd(), 'reports', 'bench-' + manifest.bench.name + '-eval.md');
   fs.mkdirSync(path.dirname(out), { recursive: true });
   fs.writeFileSync(out, md.join('\n'));
@@ -1029,7 +1061,7 @@ function parseArgs(argv) {
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a === '--seed' || a === '--classes' || a === '--port' || a === '--out' || a === '--findings'
-      || a === '--agent' || a === '--model' || a === '--note') { o[a.slice(2)] = argv[++i]; }
+      || a === '--agent' || a === '--model' || a === '--note' || a === '--claim-ledger') { o[a.slice(2).replace(/-([a-z])/g, (_, c) => c.toUpperCase())] = argv[++i]; }
     else if (a === '--json') o.json = true;
     else if (a === '--no-history') o.noHistory = true;
     else if (a === '--fail-on-contamination') o.failOnContamination = true;

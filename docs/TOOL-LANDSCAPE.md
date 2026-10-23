@@ -79,6 +79,18 @@ That is the gap, and it is narrower than "nobody has measured precision."
    judgment, subtract — is not reported by anyone, because no widely-used tool
    has the severity decision in a place where it can be removed and compared.
 
+   Closing this for our own tool: `tools/record-finding.js` now has an opt-in
+   claim ledger (`CLAIM_LEDGER`, inert unless set) that logs every claim as
+   *submitted* — severity, verify_level, status — next to what the evidence
+   cap actually let through. `gen-bench.js eval --claim-ledger <path>` turns
+   that into a number: row #8 of `reports/bench-history.jsonl` measured 1 of
+   18 submitted claims (6%) rejected outright — the agent tried to register a
+   race-condition finding as `exploited`/`verified` with no re-fireable oracle
+   behind it. One run, one data point, not a claim that the gap is closed
+   generally — but it is the first number we know of on this axis, produced
+   the way point 5 below asks for: by removing the judgment and measuring the
+   delta, not by asserting it. See `BENCHMARK.md`, "the fourth metric."
+
 5. **The cost of the human in the loop is not published.** Everyone knows a
    reviewer is in there. Nobody reports the delta between what the tool said and
    what the reviewer said. That delta is the actual cost of the current design,

@@ -122,6 +122,11 @@ tool reports is downstream of a judgment that nobody has automated yet.
 4. Publish what was withheld, not just what was reported.
 5. Re-severitize by hand as a separate step and report the delta. That delta is
    the real cost of the human in the loop, and it is the number nobody publishes.
+   A related delta, measurable only if severity enforcement is a function rather
+   than a person: log every claim as submitted next to what the enforcement
+   actually let through, and report the rejection rate. `BENCHMARK.md`'s "fourth
+   metric" is one measured instance of this on our own harness (row #8:
+   1/18 claims, 6%, rejected).
 
 ## Sources
 
