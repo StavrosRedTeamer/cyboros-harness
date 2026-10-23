@@ -23,7 +23,7 @@
 ## `docs/` — riferimento
 
 - [**Adopting Cyboros in an organization**](ADOPTION.md) — A due-diligence page for the security lead, the legal reviewer and the procurement · 12,0 KB
-- [**Architecture**](ARCHITECTURE.md) — The whole design follows from one decision: the model decides what to try; the · 27,4 KB
+- [**Architecture**](ARCHITECTURE.md) — The whole design follows from one decision: the model decides what to try; the · 28,7 KB
 - [**Deploying the console**](DEPLOY.md) — A deployment is two things: code (this repository, or the container image) and a · 6,5 KB
 - [**Glossary**](GLOSSARY.md) — The harness uses a small set of terms with exact meanings. They are load-bearing: · 3,3 KB
 - [**Identity and access control**](IDENTITY.md) — The Command Center has accounts. Every `/api` request — read or write — is · 7,0 KB

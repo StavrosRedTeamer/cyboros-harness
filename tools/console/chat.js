@@ -533,6 +533,11 @@ function createChat(opts = {}) {
         reserved_output_tokens: prof.p.reserved_output_tokens,
         context_safety_tokens: prof.p.context_safety_tokens,
         tool_output_clip_chars: prof.p.tool_output_clip_chars ?? 4000,
+        // Same end-of-turn contract as the CLI: an operate turn that ran traffic cannot
+        // close on a claim with no artefact behind it.
+        evidence_gate: prof.p.evidence_gate !== false,
+        max_evidence_retries: prof.p.max_evidence_retries ?? 1,
+        max_continuations: prof.p.max_continuations ?? 1,
         request_timeout_ms: prof.p.request_timeout_ms ?? 180000,
         retries: prof.p.retries ?? 1,
         retry_backoff_ms: prof.p.retry_backoff_ms ?? 1500,

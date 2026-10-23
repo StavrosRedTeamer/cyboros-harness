@@ -24,6 +24,50 @@ function clip(s, n) {
 // shape) and retrying it only triples the latency before the same error surfaces.
 const RETRYABLE_STATUS = new Set([408, 409, 425, 429, 500, 502, 503, 504]);
 
+// ── end of turn: truncation, and what a claim is allowed to cite ────────────
+// `finish_reason` used to be parsed and thrown away: a response cut by max_tokens was
+// returned as the answer, half a sentence and all. And a turn that ran traffic could
+// close with any prose it liked — the ledger gates a FINDING, but nothing gated the
+// turn's own conclusion. These two helpers make the end of a turn explicit.
+const ACTION_TOOLS = new Set(['run_tool', 'pipeline']);
+const UNPROVEN_RE = /\b(?:non\s+(?:provat|verificat|confermat)\w*|inconclusiv\w*|unproven|not\s+proven|nessuna\s+prova|no\s+evidence)\b/i;
+
+function looksUnproven(text) {
+  return UNPROVEN_RE.test(String(text == null ? '' : text));
+}
+
+// Which artefact or finding the answer points at. This is a citation check, not a truth
+// check: the proof itself lives in the ledger (record-finding + oracle) and in the file
+// the operator can open. What it prevents is the silent version — a turn that ran
+// traffic and then claims a result without naming anything verifiable.
+function citationIn(text, evidence) {
+  const t = String(text == null ? '' : text).toLowerCase();
+  if (!t) return null;
+  for (const raw of evidence.paths) {
+    const p = String(raw || '').replace(/^\.\//, '').toLowerCase().trim();
+    if (!p) continue;
+    if (t.includes(p)) return p;
+    // A basename is how a model usually cites a file; short ones are too easy to hit
+    // by accident ("a.txt"), so only names with some substance count.
+    const base = p.split('/').pop();
+    if (base && base.length >= 8 && t.includes(base)) return p;
+  }
+  for (const raw of evidence.titles) {
+    const title = String(raw || '').toLowerCase().replace(/\s+/g, ' ').trim();
+    if (title.length >= 6 && t.includes(title)) return title;
+  }
+  return null;
+}
+
+function evidenceNote(evidence, actions) {
+  const items = [...evidence.paths, ...evidence.titles].slice(0, 8);
+  return `FINAL rifiutato: questo turno ha eseguito ${actions} azione/i sul target, ma la conclusione non cita un artefatto né un finding registrato.\n`
+    + (items.length
+      ? `Puoi citare: ${items.join(' · ')}.\n`
+      : 'Non hai ancora scritto né registrato nulla che provi la conclusione: salva la risposta grezza in reports/ con write_file, oppure registra il finding.\n')
+    + 'Ripeti FINAL citando il path dell\'artefatto (es. reports/…) o il titolo esatto del finding, oppure dichiara esplicitamente che il risultato è non provato/inconclusive.';
+}
+
 class LocalLLM {
   constructor(cfg) {
     this.cfg = cfg;
@@ -299,12 +343,53 @@ class LocalLLM {
       + 'If the evidence is incomplete, say in one sentence what is missing.';
     let callsMade = 0;
     let closingIdx = -1;   // where the directive sits, so it never enters the stored history
+    // End-of-turn state: what the evidence gate may cite, how many actions actually ran,
+    // and the accumulator for an answer the provider truncated. `gateIdx` is spliced out
+    // on finish for the same reason as `closingIdx`: a harness correction is not something
+    // the operator said.
+    const evidenceCfg = {
+      enabled: this.rt.evidence_gate === true,
+      maxRetries: Math.max(0, Number(this.rt.max_evidence_retries ?? 1)),
+    };
+    const evidence = { paths: new Set(), titles: [] };
+    const maxContinuations = Math.max(0, Number(this.rt.max_continuations ?? 1));
+    let actionsRun = 0;
+    let evidenceRetries = 0;
+    let gateIdx = -1;
+    let unproven = false;
+    let continuations = 0;
+    let answerParts = [];
+    let lastFinishReason = null;
+
+    // What the model actually produced this turn. A blocked or failed call is not
+    // evidence: counting it would let a refused tool satisfy the gate.
+    const noteEvidence = (name, args, out) => {
+      const text = String(out == null ? '' : out);
+      if (/^\s*(?:ERRORE|BLOCCATO|ANNULLATO)\b/.test(text) || /LOOP-GUARD/.test(text)) return;
+      if ((name === 'write_file' || name === 'read_file') && args && args.path) {
+        evidence.paths.add(String(args.path));
+      }
+      if (name === 'record_finding' && args && args.title && /exit 0\b/.test(text)) {
+        evidence.titles.push(String(args.title));
+      }
+      if (ACTION_TOOLS.has(name)) actionsRun += 1;
+    };
     // Il messaggio di chiusura serve al contesto di QUESTA richiesta, non alla
     // conversazione: se restasse in `messages` verrebbe salvato e ripresentato come se
     // l'operatore l'avesse scritto nel turno successivo.
     const finish = (finalText) => {
-      if (closingIdx >= 0) messages.splice(closingIdx, 1);
-      return { text: finalText, messages, reasoning: reasoningAll };
+      // Highest index first: removing the earlier note would shift the later one.
+      for (const idx of [gateIdx, closingIdx].filter((i) => i >= 0).sort((a, b) => b - a)) {
+        messages.splice(idx, 1);
+      }
+      return {
+        text: finalText,
+        messages,
+        reasoning: reasoningAll,
+        unproven,
+        actions: actionsRun,
+        finish_reason: lastFinishReason,
+      };
     };
     // The provider's own count is the only ground truth for token accounting. Feeding it
     // back is what turns the estimator into a measurement: without it the budget is a
@@ -346,11 +431,13 @@ class LocalLLM {
           // fallback: una singola chiamata non-stream (nessun token era ancora uscito).
           const resp = await this._post(this._completionBody(messages, offeredTools, null));
           msg = resp && resp.choices && resp.choices[0] && resp.choices[0].message;
+          lastFinishReason = (resp && resp.choices && resp.choices[0] && resp.choices[0].finish_reason) || null;
           if (resp && resp.timings && onTimings) onTimings(normTimings(resp.timings));
           if (resp && resp.usage) reportUsage(resp.usage);
         }
         if (sres) {
           msg = sres.message;
+          lastFinishReason = sres.finishReason || null;
           if (sres.usage) reportUsage(sres.usage);
         }
       } else {
@@ -372,6 +459,7 @@ class LocalLLM {
           throw e;
         }
         msg = resp && resp.choices && resp.choices[0] && resp.choices[0].message;
+        lastFinishReason = (resp && resp.choices && resp.choices[0] && resp.choices[0].finish_reason) || null;
         if (resp && resp.timings && onTimings) onTimings(normTimings(resp.timings));
         if (resp && resp.usage) reportUsage(resp.usage);
       }
@@ -394,6 +482,9 @@ class LocalLLM {
 
       // 1) tool_calls nativi
       if (msg.tool_calls && msg.tool_calls.length) {
+        // The turn is continuing, so any prose accumulated for a truncated answer is
+        // history, not the beginning of the final text.
+        answerParts = [];
         if (mustConclude) {
           // Nessuno schema è stato offerto: una chiamata qui è il modello che ignora la
           // direttiva. NON si esegue (il budget è un limite, non un suggerimento) e la
@@ -444,6 +535,7 @@ class LocalLLM {
             catch (e) { out = `ERRORE tool: ${e.message}`; }
             seenActions.set(normKey(tc.function.name, args), { count: 0, lastOutput: out, args });
           }
+          noteEvidence(tc.function.name, args, out);
           messages.push({ role: 'tool', tool_call_id: tc.id, content: clip(out, clipN) });
           if (onTrace) onTrace({ type: 'tool', iter, tool: tc.function.name, args, out });
         }
@@ -455,6 +547,7 @@ class LocalLLM {
       const text = msg.content || '';
       const act = (!mustConclude && this.rt.text_protocol_fallback) ? parseTextAction(text) : null;
       if (act) {
+        answerParts = [];
         messages.push({ role: 'assistant', content: text });
         callsMade += 1;
         if (onStep) onStep({ tool: act.tool, args: act.args, viaText: true });
@@ -472,16 +565,59 @@ class LocalLLM {
           catch (e) { out = `ERRORE tool: ${e.message}`; }
           seenActions.set(normKey(act.tool, act.args), { count: 0, lastOutput: out, args: act.args });
         }
+        noteEvidence(act.tool, act.args, out);
         messages.push({ role: 'user', content: `OBSERVATION (${act.tool}):\n${clip(out, clipN)}\nContinua, oppure concludi con FINAL: <riassunto>.` });
         if (onTrace) onTrace({ type: 'tool', iter, tool: act.tool, args: act.args, out, viaText: true });
         continue;
       }
 
-      // 3) nessun tool: e' la risposta finale. Va anche in `messages`: chi riusa
-      // l'array come history (REPL, chat della console) altrimenti riparte senza
-      // l'ultima risposta del modello — la conversazione sembra sospesa a meta'.
-      const finalText = stripFinal(text);
-      if (onTrace) onTrace({ type: 'final', iter, text: finalText });
+      // 3) nessun tool: e' la risposta finale — ma "nessun tool" non basta a farne una
+      // risposta completa. Il provider dice se l'ha CUT (finish_reason=length), e un turno
+      // che ha toccato il target deve dire su cosa si regge.
+      const chunk = stripFinalRaw(text);
+
+      // 3a) troncamento: chiedi la continuazione e incolla, oppure la frase mozzata
+      // diventa la risposta e nessuno se ne accorge.
+      if (lastFinishReason === 'length' && continuations < maxContinuations) {
+        continuations += 1;
+        if (chunk) {
+          answerParts.push(chunk);
+          messages.push(this.adapter.echoReasoning({ role: 'assistant', content: chunk }, rsn));
+        }
+        messages.push({
+          role: 'user',
+          content: chunk
+            ? 'La risposta è stata troncata dal limite di output (finish_reason=length). Continua esattamente da dove ti sei fermato, senza ripetere nulla; chiudi con FINAL: quando hai finito.'
+            : 'La generazione è stata troncata prima di produrre testo (finish_reason=length). Rispondi in modo più conciso.',
+        });
+        if (onStep) onStep({ tool: '(continuazione: output troncato)', args: {} });
+        if (onTrace) onTrace({ type: 'continuation', iter, reason: 'length' });
+        continue;
+      }
+
+      let finalText = (answerParts.join('') + chunk).trim();
+
+      // 3b) gate di evidenza: dopo azioni sul target, il turno non chiude con una prosa
+      // che non punta a niente. Una correzione, poi la risposta viene etichettata.
+      const cited = citationIn(finalText, evidence);
+      if (evidenceCfg.enabled && actionsRun > 0 && !cited && !looksUnproven(finalText)) {
+        if (evidenceRetries < evidenceCfg.maxRetries) {
+          evidenceRetries += 1;
+          answerParts = [];
+          if (finalText) messages.push(this.adapter.echoReasoning({ role: 'assistant', content: finalText }, rsn));
+          gateIdx = messages.length;
+          messages.push({ role: 'user', content: evidenceNote(evidence, actionsRun) });
+          if (onStep) onStep({ tool: '(FINAL rifiutato: nessuna evidenza citata)', args: {} });
+          if (onTrace) {
+            onTrace({ type: 'evidence_gate', iter, actions: actionsRun, evidence: [...evidence.paths, ...evidence.titles] });
+          }
+          continue;
+        }
+        unproven = true;
+        finalText = `[NON PROVATO — ${actionsRun} azione/i sul target, nessun artefatto o finding citato]\n\n${finalText}`;
+      }
+
+      if (onTrace) onTrace({ type: 'final', iter, text: finalText, unproven });
       if (finalText) messages.push(this.adapter.echoReasoning({ role: 'assistant', content: finalText }, rsn));
       return finish(finalText);
     }
@@ -589,9 +725,15 @@ function parseTextAction(text) {
   } catch { /* ignora json rotto */ }
   return null;
 }
+// Raw variant: a continuation is spliced onto the previous chunk, so trimming here
+// would delete the space at the boundary ("La risposta è" + " stata" -> "èstata").
+// The final answer is trimmed once, after the parts are joined.
+function stripFinalRaw(text) {
+  const m = String(text == null ? '' : text).match(/FINAL:\s*([\s\S]*)$/m);
+  return m ? m[1] : String(text == null ? '' : text);
+}
 function stripFinal(text) {
-  const m = text.match(/FINAL:\s*([\s\S]*)$/m);
-  return m ? m[1].trim() : text.trim();
+  return stripFinalRaw(text).trim();
 }
 // Normalizza l'oggetto `timings` di llama.cpp in una forma stabile per la TUI.
 // prompt_per_second = PREFILL tok/s ; predicted_per_second = GENERAZIONE tok/s.
@@ -637,4 +779,5 @@ function looksLikeGrammarError(e) {
 
 module.exports = {
   LocalLLM, clip, trimContext, RETRYABLE_STATUS, readToolArguments, repairToolArguments, closeJson,
+  citationIn, looksUnproven, ACTION_TOOLS,
 };

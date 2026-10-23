@@ -232,6 +232,26 @@ no capability payload in its HTTP frames: nothing rendered it, and an unread fie
 `tools/test-adapters.js` proves the matrix against a fake endpoint that rejects undeclared
 fields, and runs the shipped DeepSeek profile end-to-end through the live path.
 
+## The turn ends on evidence
+
+`finish_reason` used to be parsed and discarded, so a response cut by `max_tokens` was returned
+as the answer. `runAgent` now reads it: `length` asks for a continuation and splices it onto
+the partial text (bounded by `max_continuations`), and the result reports the reason that
+actually ended the turn.
+
+A `FINAL:` is not automatically the turn's conclusion. When the turn has run target traffic
+(`run_tool`, `pipeline`) and its closing text cites no artefact it touched (`read_file`,
+`write_file`) and no finding it registered, the loop rejects that FINAL once with a correction
+naming what it could cite. After `max_evidence_retries` the answer is still delivered, but
+with an explicit `[NON PROVATO — …]` label and `unproven: true` in the result, which
+`runtime/live.js` records as a `final_unproven` event. An explicit “non provato”/“inconclusive”
+passes on the first attempt: a negative result is an answer, not a failure. This is a citation
+check, not a truth check — the proof itself stays in the ledger and in the file the operator
+can open.
+
+It is on by default on the live surface (`evidence_gate` in `clientConfig`), can be turned off
+per profile, and stays off for a raw `LocalLLM` that never opted in.
+
 ## Continuity is a file, not a memory
 
 `events.jsonl` records what happened; it is not something you can resume from. The

@@ -411,6 +411,12 @@ function clientConfig(p = {}, key = '', measured = null) {
       stream_usage: p.stream_usage !== false,
       retries: p.retries ?? 2,
       retry_backoff_ms: p.retry_backoff_ms ?? 2000,
+      // The turn's own conclusion is gated like a finding: after target traffic, FINAL has
+      // to cite an artefact or a recorded finding, or say plainly that nothing is proven.
+      // A profile can turn it off; nothing else in the surface turns it off silently.
+      evidence_gate: p.evidence_gate !== false,
+      max_evidence_retries: p.max_evidence_retries ?? 1,
+      max_continuations: p.max_continuations ?? 1,
       // run_tool is a command line: two probes that differ in URL or identity header are new
       // evidence, not a variant-loop. Exact repeats are still deduplicated.
       loop_guard: p.loop_guard || { max_repeats: 1, fuzzy: true, fuzzy_threshold: 0.85, exempt_tools: ['run_tool'] },
@@ -674,6 +680,9 @@ function createLive(opts = {}) {
         onTrace: runOpts.onTrace,
       });
       session.event('assistant', { content: res.text });
+      // A conclusion the gate could not ground is recorded as such: the operator reading
+      // events.jsonl later must be able to tell it from one that cited evidence.
+      if (res.unproven) session.event('final_unproven', { actions: res.actions, finish_reason: res.finish_reason });
       if (Array.isArray(res.messages) && res.messages.length) {
         history = res.messages;
         turns += 1;
@@ -682,7 +691,17 @@ function createLive(opts = {}) {
         // `finish`, and the turn that just completed is exactly what must survive it.
         persist('open');
       }
-      return { text: res.text, messages: res.messages, usage: { ...rollup }, reasoning: res.reasoning || '' };
+      return {
+        text: res.text,
+        messages: res.messages,
+        usage: { ...rollup },
+        reasoning: res.reasoning || '',
+        // End-of-turn facts a surface or a test must be able to see: whether the answer
+        // was grounded, how many actions it took, and why the provider stopped.
+        unproven: res.unproven === true,
+        actions: res.actions,
+        finish_reason: res.finish_reason,
+      };
     } catch (e) {
       const message = String((e && e.message) || e).replace('llama.cpp non raggiungibile', 'provider unreachable');
       session.event('error', { class: 'provider_error', message });

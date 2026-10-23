@@ -274,7 +274,10 @@ async function main() {
       live.finish();
       assert.strictEqual(seen.length, 3, 'all three distinct probes reached dispatch');
       assert.deepStrictEqual(seen[1], bob);
-      assert.strictEqual(res.text, 'three probes.');
+      // The turn ran target traffic and its FINAL cites nothing: one correction, then the
+      // answer is labelled. That is the end-of-turn contract, not a loop-guard failure.
+      assert.strictEqual(res.unproven, true, 'an uncited summary after probes is labelled');
+      assert.ok(res.text.includes('three probes.'), 'the answer is still delivered');
     } finally { await close(server); }
   });
 
@@ -600,6 +603,111 @@ async function main() {
       assert.ok(res.messages.some((m) => m.role === 'tool' && /ARGOMENTI NON VALIDI/.test(String(m.content))), 'the refusal is an observation');
       assert.strictEqual(res.text, 're-emitted');
     } finally { await close(server); }
+  });
+
+  // ── end of turn: truncation and the evidence gate ─────────────────────────
+  await okAsync('finish_reason=length is continued and concatenated, not returned cut', async () => {
+    const { server, port, requests } = await startStatusProvider((n) => ({
+      body: {
+        choices: [{
+          message: { role: 'assistant', content: n === 0 ? 'La risposta è' : ' stata troncata' },
+          finish_reason: n === 0 ? 'length' : 'stop',
+        }],
+      },
+    }));
+    try {
+      const res = await loopFor(port).runAgent({ task: 'x', dispatch: async () => 'never' });
+      assert.strictEqual(requests.length, 2, 'one continuation request');
+      assert.strictEqual(res.text, 'La risposta è stata troncata', 'the two halves are one answer');
+      assert.strictEqual(res.finish_reason, 'stop', 'the final reason is the one that ended it');
+    } finally { await close(server); }
+  });
+
+  await okAsync('after target traffic, FINAL without a citation is corrected and then accepted', async () => {
+    const { server, port, requests } = await startStatusProvider((n) => ({ body: n === 0
+      ? chat({ role: 'assistant', content: '', tool_calls: [{ id: 'w1', type: 'function', function: { name: 'write_file', arguments: JSON.stringify({ path: 'reports/bola.txt', content: 'HTTP/1.1 200 OK alice/bob' }) } }] })
+      : n === 1
+        ? chat({ role: 'assistant', content: '', tool_calls: [{ id: 'r1', type: 'function', function: { name: 'run_tool', arguments: JSON.stringify({ bin: 'curl', args: ['-s', 'http://127.0.0.1/api/orders/42'] }) } }] })
+        : n === 2
+          ? chat({ role: 'assistant', content: 'Ho trovato BOLA su /api/orders/42.' })
+          : chat({ role: 'assistant', content: 'BOLA confermata; risposta grezza in reports/bola.txt.' }) }));
+    try {
+      const llm = loopFor(port, { evidence_gate: true });
+      const res = await llm.runAgent({
+        task: 'x',
+        dispatch: async (name, args) => (name === 'write_file' ? `scritto: ${args.path}` : 'HTTP/1.1 200 OK'),
+      });
+      assert.strictEqual(requests.length, 4, 'the uncited FINAL cost exactly one correction');
+      assert.ok(res.text.includes('reports/bola.txt'), 'the accepted answer cites the artefact');
+      assert.strictEqual(res.unproven, false);
+      assert.ok(!res.messages.some((m) => /FINAL rifiutato/.test(String(m.content))), 'the correction is not left in the history');
+    } finally { await close(server); }
+  });
+
+  await okAsync('a finding title is a citation too', async () => {
+    const { server, port } = await startStatusProvider((n) => ({ body: n === 0
+      ? chat({ role: 'assistant', content: '', tool_calls: [{ id: 'r1', type: 'function', function: { name: 'run_tool', arguments: JSON.stringify({ bin: 'curl', args: ['-s', 'http://127.0.0.1/api/orders/42'] }) } }] })
+      : n === 1
+        ? chat({ role: 'assistant', content: '', tool_calls: [{ id: 'f1', type: 'function', function: { name: 'record_finding', arguments: JSON.stringify({ severity: 'Medium', title: 'BOLA on order 42', host: '127.0.0.1', poc: 'alice 200, bob 200', status: 'inconclusive' }) } }] })
+        : chat({ role: 'assistant', content: 'Registrato: BOLA on order 42.' }) }));
+    try {
+      const llm = loopFor(port, { evidence_gate: true });
+      const res = await llm.runAgent({
+        task: 'x',
+        dispatch: async () => '[record-finding exit 0]\nscritto reports/findings.jsonl',
+      });
+      assert.strictEqual(res.unproven, false);
+      assert.ok(res.text.includes('order 42'));
+    } finally { await close(server); }
+  });
+
+  await okAsync('an explicitly unproven result passes the gate, and is not retried', async () => {
+    const { server, port, requests } = await startStatusProvider((n) => ({ body: n === 0
+      ? chat({ role: 'assistant', content: '', tool_calls: [{ id: 'r1', type: 'function', function: { name: 'run_tool', arguments: JSON.stringify({ bin: 'curl', args: ['-s', 'http://127.0.0.1/missing'] }) } }] })
+      : chat({ role: 'assistant', content: 'Nessuna prova: tutti i probe hanno risposto 404.' }) }));
+    try {
+      const llm = loopFor(port, { evidence_gate: true });
+      const res = await llm.runAgent({ task: 'x', dispatch: async () => 'HTTP/1.1 404 Not Found' });
+      assert.strictEqual(requests.length, 2, 'a negative result is an answer, not a failure');
+      assert.strictEqual(res.unproven, false);
+    } finally { await close(server); }
+  });
+
+  await okAsync('without the gate (raw loop), an uncited claim is returned as before', async () => {
+    const { server, port, requests } = await startStatusProvider((n) => ({ body: n === 0
+      ? chat({ role: 'assistant', content: '', tool_calls: [{ id: 'r1', type: 'function', function: { name: 'run_tool', arguments: JSON.stringify({ bin: 'curl', args: ['-s', 'http://127.0.0.1/x'] }) } }] })
+      : chat({ role: 'assistant', content: 'Ho trovato qualcosa.' }) }));
+    try {
+      const res = await loopFor(port).runAgent({ task: 'x', dispatch: async () => 'HTTP/1.1 200 OK' });
+      assert.strictEqual(requests.length, 2);
+      assert.strictEqual(res.unproven, false);
+      assert.ok(!res.text.startsWith('[NON PROVATO'), 'no label when the gate is off');
+    } finally { await close(server); }
+  });
+
+  await okAsync('a claim that stays uncited is labelled NON PROVATO', async () => {
+    const { server, port, requests } = await startStatusProvider((n) => ({ body: n === 0
+      ? chat({ role: 'assistant', content: '', tool_calls: [{ id: 'r1', type: 'function', function: { name: 'run_tool', arguments: JSON.stringify({ bin: 'curl', args: ['-s', 'http://127.0.0.1/x'] }) } }] })
+      : chat({ role: 'assistant', content: 'Ho trovato BOLA.' }) }));
+    try {
+      const llm = loopFor(port, { evidence_gate: true });
+      const res = await llm.runAgent({ task: 'x', dispatch: async () => 'HTTP/1.1 200 OK' });
+      assert.strictEqual(requests.length, 3, 'one action, one correction, one answer');
+      assert.strictEqual(res.unproven, true);
+      assert.ok(res.text.startsWith('[NON PROVATO'), 'the label is part of the answer');
+    } finally { await close(server); }
+  });
+
+  ok('citationIn: paths, basenames and finding titles, but not arbitrary prose', () => {
+    const { citationIn, looksUnproven } = require('../local/llm');
+    const ev = { paths: new Set(['reports/demo/bola-evidence.txt']), titles: ['BOLA on order 42'] };
+    assert.strictEqual(citationIn('prova in reports/demo/bola-evidence.txt', ev), 'reports/demo/bola-evidence.txt');
+    assert.strictEqual(citationIn('vedi bola-evidence.txt', ev), 'reports/demo/bola-evidence.txt');
+    assert.strictEqual(citationIn('registrato BOLA on order 42', ev), 'bola on order 42');
+    assert.strictEqual(citationIn('ho trovato una BOLA', ev), null);
+    assert.strictEqual(looksUnproven('il risultato è inconclusive'), true);
+    assert.strictEqual(looksUnproven('non provato: tutti 404'), true);
+    assert.strictEqual(looksUnproven('BOLA confermata'), false);
   });
 
   ok('repairToolArguments: fences, trailing commas and truncation, but never a guess', () => {
