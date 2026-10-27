@@ -502,7 +502,7 @@ async function main(argv) {
     }
     gate = e;
     try {
-      const { cfg } = live.loadConfig(opts.configPath);
+      const { cfg } = live.loadConfig(opts.config);
       const { profile, p, egress } = live.resolveProfile(cfg, opts.profile);
       auth = { cfg, profile, p, egress, key: null, keyEnv: p.api_key_env || null };
     } catch (inner) {
