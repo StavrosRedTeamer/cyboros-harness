@@ -111,6 +111,10 @@ function fakeLlm(replies) {
     });
     assert.strictEqual(res.kept.length, 0);
     assert.strictEqual(res.emitted, 0);
+    // Un guasto del modello non è una fonte che non parla: deve essere contato, altrimenti
+    // nel report un 0-claim da JSON rotto sembra "fonte non pertinente".
+    assert.strictEqual(res.dropped.length, 1);
+    assert.ok(/non in formato JSON/.test(res.dropped[0].reason), JSON.stringify(res.dropped));
   });
 
   await okAsync('extractClaims: la quote viene riscritta con i byte del file', async () => {

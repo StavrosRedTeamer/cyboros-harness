@@ -110,8 +110,15 @@ async function extractClaims({ llm, sourceRel, text, question, maxChunks = 2, on
       dropped.push({ reason: `estrazione fallita: ${e.message}`, claim: '', quote: '' });
       continue;
     }
+    // `{"claims":[]}` e "non sono riuscito a rispondere in JSON" sono due cose diverse, e
+    // senza questa riga il report le mostrava uguali (fonte a 0 claim). La prima è un fatto
+    // sulla fonte, la seconda è un guasto del modello: vanno contate separatamente.
+    if (!json) {
+      dropped.push({ reason: 'risposta del modello non in formato JSON (nessuna estrazione)', claim: '', quote: '' });
+      continue;
+    }
 
-    const claims = Array.isArray(json && json.claims) ? json.claims.slice(0, MAX_CLAIMS_PER_CHUNK) : [];
+    const claims = Array.isArray(json.claims) ? json.claims.slice(0, MAX_CLAIMS_PER_CHUNK) : [];
     emitted += claims.length;
 
     for (const c of claims) {

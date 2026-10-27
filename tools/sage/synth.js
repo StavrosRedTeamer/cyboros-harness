@@ -274,9 +274,13 @@ function renderReport({ st, sources, claims, notes, proposals, summary, dropped,
 
   L.push('## Fonti lette');
   L.push('');
-  L.push('| provider | titolo | artefatto congelato |');
-  L.push('|---|---|---|');
-  for (const s of sources) L.push(`| ${s.provider} | ${mdEscape(clip(s.title, 100))} | \`${s.rel}\` |`);
+  // `estratti`, non `claim`: la tabella conta quelli di QUESTA fonte, prima della deduplica
+  // globale. Chiamarli "claim" faceva sembrare sbagliato il totale in testa al report.
+  L.push('| provider | titolo | estratti | artefatto congelato |');
+  L.push('|---|---|---|---|');
+  for (const s of sources) {
+    L.push(`| ${s.provider} | ${mdEscape(clip(s.title, 100))} | ${s.claims == null ? '?' : s.claims} | \`${s.rel}\` |`);
+  }
   L.push('');
   L.push('## Riproducibilità');
   L.push('');
