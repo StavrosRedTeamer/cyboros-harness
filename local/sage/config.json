@@ -1,0 +1,41 @@
+{
+  "_comment": "Cyboros Sage — profilo del ricercatore locale. Stesso server (llama.cpp) e stesso client (local/llm.js) del pentest: cambia il modello, la porta e il budget di contesto. Sage-A1.5 è un MoE da 35B totali / ~3B attivi: risponde bene a domande singole e formati chiusi, non a contesti enormi. Da qui context_window_tokens=32768 (il valore vero di -c in serve.sh) e un char budget prudente.",
+  "endpoint": {
+    "base_url": "http://127.0.0.1:8092/v1",
+    "api_key": "sk-local-noauth",
+    "model": "sage-a1.5",
+    "_note": "base_url = local/sage/serve.sh (llama-server su 8092: 8080 è il Qwen del pentest, 8081/8082/8083 sono occupate da servizi locali). api_key ignorata da llama.cpp ma richiesta dal protocollo; model è una stringa qualsiasi: il server serve l'unico modello caricato."
+  },
+  "sampling": {
+    "temperature": 0.3,
+    "top_p": 0.9,
+    "top_k": 20,
+    "presence_penalty": 0.1,
+    "frequency_penalty": 0.0,
+    "max_tokens": 2000,
+    "_note": "Estrazione e sintesi vogliono determinismo: temperature bassa e NESSUNA frequency_penalty (penalizza le stringhe esatte — CVE, nomi di tool, citazioni — che qui sono il prodotto). presence 0.1 è solo la guardia anti-loop. max_tokens 2000: la sintesi (sintesi + note + 3-5 proposte) con 1200 usciva TRONCATA e il JSON diventava invalido → fallback senza proposte."
+  },
+  "capabilities": {
+    "tool_calls": "native",
+    "grammar": true,
+    "timings": true,
+    "stream_options": true,
+    "sampling_extras": true,
+    "context_window_tokens": 32768,
+    "reserved_output_tokens": 1500,
+    "context_safety_tokens": 1024,
+    "reasoning": { "param": "chat_template_kwargs", "off": { "enable_thinking": false } },
+    "_note": "Stesse estensioni llama.cpp del profilo pentest (local/config.local.json): chat_template_kwargs, GBNF, timings. context_window_tokens è il -c REALE del server: il ContextManager dimensiona il budget su questo, non su una stima. reasoning.off è il payload mandato quando allow_thinking è false; senza `on`, il thinking non viene mai forzato acceso."
+  },
+  "runtime": {
+    "max_tool_iters": 4,
+    "request_timeout_ms": 300000,
+    "retries": 2,
+    "retry_backoff_ms": 3000,
+    "context_char_budget": 60000,
+    "tool_output_clip_chars": 4000,
+    "text_protocol_fallback": true,
+    "allow_thinking": false,
+    "_note": "La pipeline Sage non usa tool: ogni stadio è una domanda con risposta JSON. max_tool_iters resta basso perché non c'è nulla da iterare. context_char_budget 60k caratteri (~24k token in italiano) lascia margine dentro i 32k del server per prompt di sistema e output."
+  }
+}

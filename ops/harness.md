@@ -201,6 +201,28 @@ non è la strada.
 - Ruolo C2: `sudo bash ~/f3bot/restore-c2.sh` (idempotente) / `--revert`. Mai due host che
   pubblicano lo stesso onion (rendezvous instabile); AnonSurf può riscrivere `/etc/tor/torrc`.
 
+## Sage — deep research locale (opt-in)
+
+`tools/sage/` è il ricercatore: pipeline a stadi brevi su un modello locale (Sage-A1.5 sulla
+porta 8092; `--model qwen` usa il 35B del pentest sulla 8080). Non è un agente che agisce sul
+target: legge fonti, produce claim **con citazione verificata byte-per-byte** e proposte `draft`.
+
+- Preflight: `node tools/sage/index.js check` — endpoint, round-trip JSON, quote-gate, redazione.
+- Run: `node tools/sage/index.js run --brief "..." --lane offensive|capability`
+  (`--max-sources`, `--budget-min`). È un job lungo con checkpoint: `resume <runId>` riprende
+  senza rifetch. Misurato su questa macchina: ~1 min per fonte a ~18 tok/s, quindi 12 fonti
+  ≈ 10-20 min.
+- Un claim la cui `quote` non è un frammento reale dell'artefatto congelato viene SCARTATO e
+  contato nel report: è `tools/evidence-quote.js`, non una preferenza. Sotto 3 claim verificati
+  non si generano proposte.
+- Le proposte non entrano nei playbook da sole: `promote <id>` richiede `"status":"approved"`
+  nel `.proposals.json`.
+- Egress aperto ma redatto: host/IP di `scope.json`, bersagli di `campaign.json` e pattern di
+  credenziali non escono (`--no-redact` per disattivare). Audit in
+  `artifacts/sage/<run>/egress.jsonl`. **Non è traffico verso un target**: `scope-guard` non
+  c'entra, e i guard del pentest non si allargano per far passare la ricerca.
+- Icona desktop: `./scripts/install-sage-launcher.sh`. Dettaglio: `docs/sage-deep-research.md`.
+
 ## Spazio del workspace — cosa è archiviabile
 
 `temp/` è la voce più grande della cartella (268 MB su ~19.700 file: APK decompilati, HTML di

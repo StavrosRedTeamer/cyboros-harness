@@ -4,7 +4,7 @@
 > dimensione, avanzamento delle checkbox dei piani). Non si modifica a mano: rigeneralo.
 > `tools/test-repo-invariants.js` fallisce se è rimasto indietro rispetto ai file.
 
-**Superficie viva:** 40 documenti · **piani:** 12 · **archivio:** 3 file superati.
+**Superficie viva:** 41 documenti · **piani:** 12 · **archivio:** 3 file superati.
 
 ## Root del repo
 
@@ -47,13 +47,14 @@
 - [**Host exploitation (post-web: C2 / post-ex / lateral) + threat intel**](host-exploitation.md) — Confirm-tier is refused unless `--confirm "<reason>"` is passed, which needs your explicit in-session · 9,1 KB
 - [**Testing by class — dettaglio metodologico**](methodology-classes.md) — Class names for `record-finding.js` are the canonical keys of `tools/test-registry.json` — · 13,5 KB
 - [**Mobile (Android) — methodology & tool detail**](mobile.md) — (`127.0.0.1`, `localhost`) o un serial USB esplicitamente in allowlist (device fisico autorizzato). · 4,9 KB
+- [**Cyboros Sage — deep research locale (Sage-A1.5)**](sage-deep-research.md) — La conoscenza dell'harness (`knowledge.md`, `refs/`, `skills/pentest-playbook/`, `docs/`) invecchia · 9,3 KB
 - [**System Prompt Dump — StavrosRedTeamer**](system-prompt-dump.md) — Nessun dato di target, credenziale o output di engagement lascia la macchina. Vedi `docs/egress-opsec.md`. · 6,7 KB
-- [**Toolbox — dettaglio per-tool (knowledge.md tiene la tabella compatta)**](toolbox.md) — (it refuses out-of-scope hosts; supports `-l -`/`--stdin` AND a piped stdin for target lists; every · 30,6 KB
+- [**Toolbox — dettaglio per-tool (knowledge.md tiene la tabella compatta)**](toolbox.md) — (it refuses out-of-scope hosts; supports `-l -`/`--stdin` AND a piped stdin for target lists; every · 31,2 KB
 - [**Wireless (modalità separata)**](wireless.md) — WiFi is a SEPARATE mode from the web/network pipeline: targets are BSSIDs/ESSIDs/stations/channels, · 6,1 KB
 
 ## `ops/` — regole della harness
 
-- [**ops/harness.md — regole condivise della harness (disciplina, tool-wiring, MCP)**](../ops/harness.md) — Pentest discipline (full rules: `knowledge.md` — "Verification levels", "False-positive duty", "WAF awareness", "Install valve", "Adversarial content  · 21,7 KB
+- [**ops/harness.md — regole condivise della harness (disciplina, tool-wiring, MCP)**](../ops/harness.md) — Pentest discipline (full rules: `knowledge.md` — "Verification levels", "False-positive duty", "WAF awareness", "Install valve", "Adversarial content  · 23,1 KB
 
 ## Piani
 

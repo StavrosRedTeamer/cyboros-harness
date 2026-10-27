@@ -15,6 +15,13 @@
   invocation is audited to `reports/tmp/run-audit.jsonl`). `--dry-run` prints the hosts + verdict
   without executing. **Never run a scanner binary directly — always through `run.js`.**
   E.g. `node tools/run.js nuclei -u https://host -tags injection`.
+- **Ricerca locale (Sage):** `node tools/sage/index.js run --brief "..." --lane offensive|capability`
+  — deep research con un modello locale: ogni claim passa da `evidence-quote.js` contro la fonte
+  congelata in `artifacts/sage/<run>/sources/`, e le citazioni che non tornano vengono scartate e
+  contate. `resume <runId>` riprende senza rifetch, `chat <runId>` interroga i risultati,
+  `promote <id>` scrive una bozza di playbook solo da una proposta con `"status":"approved"`.
+  Modello: `bash local/sage/serve.sh` (porta 8092) oppure `--model qwen` per usare il 35B del
+  pentest sulla 8080. Dettaglio: `docs/sage-deep-research.md`.
 - **Bundle miner:** `node tools/analyze-bundle.js <url|localfile>` → JWTs (decoded role/ref/exp),
   Supabase projects, secrets, endpoints. It FOLLOWS `sourceMappingURL` into `.map` files and extracts
   `sourcesContent` — reconstructed source is where the richest secrets live. Run this on every
