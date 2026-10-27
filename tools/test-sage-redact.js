@@ -8,7 +8,7 @@
 'use strict';
 const assert = require('assert');
 const { ok, summary } = require('./testkit');
-const { collectHints, normalizeHost, scrubText, hostPattern, HOST_MARK, IP_MARK } = require('./sage/redact');
+const { collectHints, normalizeHost, scrubText, hostPattern, HOST_MARK, IP_MARK, ENGAGEMENT_MARK } = require('./sage/redact');
 
 ok('normalizeHost: schema, path, wildcard e maiuscole', () => {
   assert.strictEqual(normalizeHost('https://app.example.com/login?x=1'), 'app.example.com');
@@ -33,6 +33,33 @@ ok('collectHints: host da hosts/prefissi/targets, IP anche come base di un CIDR'
 ok('collectHints: accetta extra (campagne) e stringhe nude', () => {
   const h = collectHints({ allowed_hosts: ['a.example.com'] }, { targets: ['b.example.net'] }, 'c.example.org');
   assert.deepStrictEqual([...h.hosts].sort(), ['a.example.com', 'b.example.net', 'c.example.org']);
+});
+
+ok("collectHints: nome e cliente dell'engagement diventano termini da raschiare", () => {
+  const h = collectHints({}, { name: 'ACME Q4 Assessment', client: 'ACME S.p.A.' });
+  assert.ok(h.terms.includes('ACME Q4 Assessment'), JSON.stringify(h.terms));
+  assert.ok(h.terms.includes('ACME'), 'un brief scrive ACME, non il nome intero');
+  assert.ok(!h.terms.includes('Q4'), 'i token troppo corti non sono identità utili');
+  assert.ok(!h.terms.includes('Assessment'), 'le parole generiche non vanno raschiate');
+});
+
+ok('collectHints: SSID, BSSID e seriali sono termini da raschiare', () => {
+  const h = collectHints({}, { essids: ['CasaDiMario'], bssids: ['AA:BB:CC:DD:EE:FF'], allowed_serials: ['R58M12345AB'] });
+  assert.ok(h.terms.includes('CasaDiMario'), JSON.stringify(h.terms));
+  assert.ok(h.terms.includes('AA:BB:CC:DD:EE:FF'), JSON.stringify(h.terms));
+  assert.ok(h.terms.includes('R58M12345AB'), JSON.stringify(h.terms));
+});
+
+ok('scrubText: il nome del cliente non esce, le parole simili restano', () => {
+  const r = scrubText('tecniche per ACME e per NOAH, non per ACMEBANK', {
+    hosts: [], ips: [], terms: ['ACME'],
+  });
+  // Resta UNA sola occorrenza di ACME: quella dentro ACMEBANK, che non è il cliente.
+  assert.strictEqual((r.text.match(/ACME/g) || []).length, 1, r.text);
+  assert.ok(r.text.includes(ENGAGEMENT_MARK), r.text);
+  assert.ok(r.text.includes('NOAH'), 'un nome che somiglia non deve essere toccato');
+  assert.ok(r.text.includes('ACMEBANK'), r.text);
+  assert.ok(r.hits.some((h) => h.kind === 'engagement-name'));
 });
 
 ok('hostPattern: copre i sottodomini, non i nomi che somigliano', () => {

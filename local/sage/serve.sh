@@ -15,8 +15,9 @@
 #          LLAMA_SERVER=<binario>  LLAMA_ALLOW_CPU=1
 #
 # NOTA sul tuning: --n-cpu-moe decide quanti esperti restano in RAM. Troppo basso = OOM di
-# VRAM; troppo alto = lento. 32 è il punto di partenza per 32k di contesto su 6 GB; se il
-# server non parte per VRAM scendi a 36-40, se avanza sali.
+# VRAM; troppo alto = lento. MISURATO su Sage-A1.5 Q4_K_M a 32k: 32 esperti → OOM su
+# cudaMalloc (492 MiB di compute buffer), 36 → carica con 4,3 GB di VRAM, 40 → 2,3 GB.
+# Il default è 36; se cambi modello o contesto, riparti da qui.
 set -uo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -24,7 +25,7 @@ WS="$(cd "$SCRIPT_DIR/../.." && pwd)"
 
 PORT="${SAGE_PORT:-8092}"
 CTX="${SAGE_CTX:-32768}"
-N_CPU_MOE="${SAGE_N_CPU_MOE:-32}"
+N_CPU_MOE="${SAGE_N_CPU_MOE:-36}"
 MODEL_DIR="${SAGE_MODEL_DIR:-$HOME/models/sage-a15}"
 BIN="${LLAMA_SERVER:-$HOME/llama.cpp/build/bin/llama-server}"
 LOG="${SAGE_LOG:-/tmp/sage-serve.log}"

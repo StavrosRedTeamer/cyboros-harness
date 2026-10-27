@@ -18,6 +18,17 @@ const ROOT = path.join(__dirname, '..', '..');
 
 const HOST_MARK = '[host-in-scope]';
 const IP_MARK = '[ip-in-scope]';
+const ENGAGEMENT_MARK = '[engagement]';
+
+// Nomi di campagna e cliente sono identità dell'engagement quanto un host: in una query verso
+// un motore di ricerca non hanno niente da fare. Sono termini LETTERALI (non pattern), ma
+// alcune parole sono troppo comuni per essere raschiate senza distruggere la query.
+const GENERIC_TERMS = new Set([
+  'pentest', 'engagement', 'security', 'sicurezza', 'research', 'ricerca', 'harness',
+  'mobile', 'wireless', 'web', 'host', 'test', 'audit', 'project', 'progetto', 'platform',
+  'full', 'internal', 'external', 'cliente', 'client', 'default', 'copy', 'template',
+  'assessment', 'trading', 'group', 'systems', 'server', 'cloud', 'network', 'retest',
+]);
 
 // Un valore che sembra un host può arrivare come URL completa, `host:porta`, wildcard o
 // nome nudo (`scope.json` ammette tutte le forme): normalizziamo alla forma confrontabile.
@@ -71,6 +82,8 @@ const SECRET_PATTERNS = [
 function collectHints(scope, ...extra) {
   const hosts = new Set();
   const ips = new Set();
+  const terms = new Set();
+  const seenTerm = new Set();   // dedupe case-insensitive: "NOA" e "noa" sono lo stesso termine
 
   const addHost = (v) => { const h = normalizeHost(v); if (h) hosts.add(h); };
   const addIp = (v) => {
@@ -80,10 +93,38 @@ function collectHints(scope, ...extra) {
     const base = s.split('/')[0];      // un CIDR: si ripulisce la forma scritta e la base
     if (base && base !== s) ips.add(base);
   };
+  // Solo le chiavi che NOMINANO l'engagement: `description` e `objectives` sono testo lungo e
+  // raschiarli renderebbe illeggibile ogni query senza togliere identità.
+  const addTerm = (raw) => {
+    const s = String(raw == null ? '' : raw).replace(/\s+/g, ' ').trim();
+    if (s.length < 3) return;
+    const add = (t) => {
+      const k = t.toLowerCase();
+      if (seenTerm.has(k)) return;
+      seenTerm.add(k);
+      terms.add(t);
+    };
+    if (s.length >= 4 && !GENERIC_TERMS.has(s.toLowerCase())) add(s);
+    // Anche le parole distintive del nome: un brief scrive "noa", non "noa full platform".
+    // Si spezza su tutto ciò che non è lettera/numero, così "S.p.A." non produce sigle.
+    for (const w of s.split(/[^\p{L}\p{N}]+/u)) {
+      if (w.length >= 3 && !GENERIC_TERMS.has(w.toLowerCase())) add(w);
+    }
+  };
+
   const addFrom = (o) => {
     if (!o) return;
     if (typeof o === 'string') { addHost(o); return; }
     if (typeof o !== 'object') return;
+    for (const k of ['name', 'client', 'engagement', 'engagement_name', 'campaign']) {
+      if (typeof o[k] === 'string') addTerm(o[k]);
+    }
+    // Superfici wireless/mobile: un SSID o un seriale identificano il bersaglio quanto un host.
+    for (const k of ['essids', 'bssids', 'stations', 'allowed_serials']) {
+      const v = o[k];
+      if (Array.isArray(v)) v.forEach(addTerm);
+      else if (typeof v === 'string') addTerm(v);
+    }
     for (const k of ['allowed_hosts', 'hosts', 'targets', 'allowed_url_prefixes', 'url_prefixes']) {
       const v = o[k];
       if (Array.isArray(v)) v.forEach(addHost);
@@ -102,6 +143,7 @@ function collectHints(scope, ...extra) {
   return {
     hosts: [...hosts].sort((a, b) => b.length - a.length),
     ips: [...ips].sort((a, b) => b.length - a.length),
+    terms: [...terms].sort((a, b) => b.length - a.length),
   };
 }
 
@@ -150,10 +192,17 @@ function scrubText(text, hints = {}) {
     const found = out.match(ipPattern(ip));
     if (found) { note('ip', found.length); out = out.replace(ipPattern(ip), IP_MARK); }
   }
+  for (const term of hints.terms || []) {
+    if (!term) continue;
+    // Confini di parola: "NOA" non deve toccare "NOAH" né finire dentro un'altra parola.
+    const re = new RegExp(`(?<![\\w-])${escapeRe(term)}(?![\\w-])`, 'gi');
+    const found = out.match(re);
+    if (found) { note('engagement-name', found.length); out = out.replace(re, ENGAGEMENT_MARK); }
+  }
   return { text: out, hits, redacted: hits.length > 0 };
 }
 
 module.exports = {
-  ROOT, HOST_MARK, IP_MARK,
+  ROOT, HOST_MARK, IP_MARK, ENGAGEMENT_MARK, GENERIC_TERMS,
   normalizeHost, collectHints, loadHints, scrubText, hostPattern, ipPattern,
 };

@@ -98,7 +98,9 @@ modello del pentest già installato, senza scaricare Sage.
 | Sage-A1.5 | 8092 | `local/sage/config.json` | default del ricercatore |
 | Qwen3.6-35B abliterato | 8080 | `local/config.local.json` | default del pentest |
 
-`local/sage/serve.sh` avvia llama.cpp con `-c 32768`, KV q8_0 e `--n-cpu-moe 32` (esperti in RAM).
+`local/sage/serve.sh` avvia llama.cpp con `-c 32768`, KV q8_0 e `--n-cpu-moe 36` (esperti in RAM).
+Il valore è **misurato**, non scelto: su questa macchina 32 esperti mandavano in OOM `cudaMalloc`
+(buffer di calcolo da 492 MiB), 36 carica con 4,3 GB di VRAM.
 Su una RTX 4050 da 6 GB **un solo modello alla volta**: se la 8080 è occupata lo script si ferma e
 chiede `--takeover`, che ferma l'altro server **per PID** (mai `pkill` per pattern). Se CUDA non si
 inizializza, llama.cpp ripiegherebbe in silenzio sulla CPU: lo script lo intercetta e si ferma.
@@ -114,17 +116,29 @@ invece di un timeout.
 La ricerca ha **egress aperto** (nessuna allowlist): è una decisione dell'operatore, e non è la
 stessa cosa del traffico verso un target. Restano due protezioni che non limitano la ricerca:
 
-- `tools/sage/redact.js` toglie host/IP di `scope.json`, bersagli di `campaign.json` e pattern di
-  credenziali (email, Bearer, JWT, `sk-`, `gh[pousr]_`, AKIA) da **ogni** query prima dell'uscita.
-  Sottodomini inclusi; i nomi che somigliano non vengono toccati. I log riportano solo
-  categoria e numero dei colpi, **mai il valore rimosso**.
+- `tools/sage/redact.js` toglie host/IP di `scope.json`, **nome e cliente dell'engagement**
+  (`campaign.json`), SSID/BSSID/seriali di `wifi-scope.json` e `mobile-scope.json`, e pattern di
+  credenziali (email, Bearer, JWT, `sk-`, `gh[pousr]_`, AKIA) da **ogni** query prima dell'uscita. Sottodomini inclusi; i nomi che somigliano non vengono toccati;
+  le parole troppo comuni ("pentest", "platform") sono escluse per non distruggere la query.
+  I log riportano solo categoria e numero dei colpi, **mai il valore rimosso**.
 - `artifacts/sage/<run>/egress.jsonl` registra ogni query (già ripulita), ogni URL fetchato,
   il numero di candidati e il path dell'artefatto congelato. `--no-redact` disattiva la pulizia:
   da usare solo se sai perché.
 
-Il fetch rifiuta IP privati/link-local a **ogni hop** di redirect (`tools/ssrf-guard.js`), limita il
-corpo a 4 MB, e va a 1 req/s per dominio. Le fonti sono dati non fiduciosi: lo stadio di estrazione
-non ha tool, e le istruzioni contenute in una pagina sono trattate come testo.
+Il fetch rifiuta IP privati/link-local a **ogni hop** di redirect (`tools/ssrf-guard.js`), tronca il
+corpo a 4 MB **mentre legge** (non dopo averlo materializzato) e va a 1 req/s per dominio. Scarta i
+contenuti non testuali: un PDF non diventa testo passando da un `htmlToText`. Le fonti sono dati non
+fiduciosi: lo stadio di estrazione non ha tool, e le istruzioni contenute in una pagina sono trattate
+come testo.
+
+## Quanto di una fonte viene davvero letto
+
+Il modello non legge una fonte intera: legge i primi `--chunks-per-source` blocchi (default 2) di
+~6k caratteri. È un limite di contesto, non un dettaglio: il report lo dichiara nella colonna
+`blocchi` della tabella fonti (`2/6` = due blocchi su sei), perché "fonte letta" senza quel dato
+sarebbe un'affermazione più larga del vero. Nel conteggio degli **scarti** finiscono sia le
+citazioni che non tornano, sia le estrazioni che non hanno prodotto JSON: sono due guasti diversi
+e il report li elenca per ragione.
 
 ## Output su disco
 
@@ -132,7 +146,7 @@ non ha tool, e le istruzioni contenute in una pagina sono trattate come testo.
 artifacts/sage/<run>/state.json            checkpoint (resume), budget, contatori
 artifacts/sage/<run>/sources/<sha>.txt     fonte congelata = oggetto della citazione
 artifacts/sage/<run>/claims.jsonl          claim tenuti (+ id C-0001…)
-artifacts/sage/<run>/dropped.jsonl         citazioni scartate, con la ragione esatta
+artifacts/sage/<run>/dropped.jsonl         scarti (citazione non valida o estrazione fallita) + ragione
 artifacts/sage/<run>/egress.jsonl          audit delle uscite
 reports/sage/<data>-<slug>.md              report leggibile
 reports/sage/<data>-<slug>.proposals.json  proposte (schema compatibile con radar)

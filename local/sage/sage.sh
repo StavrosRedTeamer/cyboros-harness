@@ -33,6 +33,15 @@ ensure_server() {
   setsid bash "$SCRIPT_DIR/serve.sh" >"$SRVLOG" 2>&1 < /dev/null &
   for _ in $(seq 1 120); do
     if up; then say "pronto"; return 0; fi
+    # Un OOM o un'architettura non supportata non si "risolvono" aspettando: fermarsi qui
+    # evita 4 minuti di puntini davanti a un processo già morto.
+    if grep -qiE 'cudaMalloc failed|failed to load model|out of memory|unknown model architecture|address already in use' "$SRVLOG" 2>/dev/null; then
+      echo
+      warn "avvio fallito (non aspetto il timeout). Ultime righe di $SRVLOG:"
+      tail -n 20 "$SRVLOG" 2>/dev/null | sed 's/^/    /'
+      warn "se è VRAM: SAGE_N_CPU_MOE=40 bash local/sage/serve.sh (più esperti su CPU)"
+      return 1
+    fi
     sleep 2; printf '.'
   done
   echo; warn "non è diventato pronto. Ultime righe di $SRVLOG:"

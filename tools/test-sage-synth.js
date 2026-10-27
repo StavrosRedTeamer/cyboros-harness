@@ -69,15 +69,18 @@ ok('validateProposals: id progressivi e unici per run', () => {
     assert.ok(/almeno 3 claim/.test(res.proposalsSkipped), res.proposalsSkipped);
     const md = synth.renderReport({
       st: { runId: 'r', lane: 'capability', model: 'sage', brief: 'x', startedAt: '2026-10-27T00:00:00Z' },
-      sources: [{ provider: 'local', title: 'refs/x.md', rel: 'artifacts/sage/r/sources/aa.txt', claims: 2 }],
+      sources: [{ provider: 'local', title: 'refs/x.md', rel: 'artifacts/sage/r/sources/aa.txt', claims: 2, chunksRead: 2, chunksTotal: 5 }],
       claims, notes: res.notes, proposals: [], summary: res.summary,
       dropped: [{ reason: 'quote non trovata nel testo', claim: 'c', quote: 'q' }],
       metrics: { sources: 0, kept: 2, dropped: 1, minutes: 1, tokPerSec: 10 }, proposalsSkipped: res.proposalsSkipped,
     });
     assert.ok(md.includes('Non generate:'), md.slice(0, 600));
-    assert.ok(md.includes('Citazioni scartate'));
+    // Gli scarti includono anche le estrazioni fallite, quindi il titolo non parla più
+    // solo di citazioni: dirlo "citazioni scartate" era una contabilità falsa.
+    assert.ok(md.includes('## Scarti'));
+    assert.ok(!md.includes('citazioni scartate'));
     // La resa per fonte è visibile: è ciò che distingue "non pertinente" da "estrazione rotta".
-    assert.ok(/\| local \| refs\/x\.md \| 2 \|/.test(md), md.slice(-900));
+    assert.ok(/\| local \| refs\/x\.md \| 2 \| 2\/5 \|/.test(md), md.slice(-900));
   });
 
   await okAsync('synthesize: con 4 claim tiene solo la proposta che cita un claim reale', async () => {

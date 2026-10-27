@@ -85,7 +85,23 @@ async function fetchRaw(url) {
     if (Number.isFinite(declared) && declared > 8 * 1024 * 1024) {
       throw new Error(`risposta troppo grande (${declared} byte dichiarati)`);
     }
-    const buf = Buffer.from(await res.arrayBuffer());
+    // Il tetto va applicato MENTRE si legge: `arrayBuffer()` materializza tutta la risposta
+    // e solo dopo la tagliavamo, quindi un server chunked senza content-length poteva
+    // occupare più RAM di quanta il budget di contesto ne avrebbe mai usata.
+    const parts = [];
+    let total = 0;
+    if (res.body) {
+      const reader = res.body.getReader();
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        if (!value) continue;
+        parts.push(value);
+        total += value.length;
+        if (total >= MAX_BODY_BYTES) { try { await reader.cancel(); } catch { /* già chiuso */ } break; }
+      }
+    }
+    const buf = Buffer.concat(parts.map((p) => Buffer.from(p)));
     return {
       url: current,
       status: res.status,
@@ -120,6 +136,11 @@ async function fetchSource(runId, url, meta = {}) {
   const r = await fetchRaw(url);
   if (r.status >= 400) throw new Error(`HTTP ${r.status}`);
   const isJson = /json/i.test(r.contentType);
+  // Un PDF o un'immagine non diventano testo passando da htmlToText: diventano spazzatura
+  // di 200+ caratteri che il modello proverebbe comunque a citare. Meglio scartarli qui.
+  if (!isJson && r.contentType && !/^(text\/|application\/(xml|xhtml\+xml|atom\+xml))/i.test(r.contentType)) {
+    throw new Error(`contenuto non testuale: ${r.contentType.split(';')[0]}`);
+  }
   let text;
   if (isJson) {
     try { text = JSON.stringify(JSON.parse(r.body), null, 2); } catch { text = r.body; }
@@ -175,7 +196,7 @@ async function searchNvd(query, limit = 4) {
 }
 
 async function searchArxiv(query, limit = 4) {
-  const url = `http://export.arxiv.org/api/query?search_query=all:${encodeURIComponent(query)}&max_results=${limit}`;
+  const url = `https://export.arxiv.org/api/query?search_query=all:${encodeURIComponent(query)}&max_results=${limit}`;
   const r = await fetchRaw(url);
   const entries = r.body.split(/<entry>/i).slice(1);
   return entries.map((e) => {

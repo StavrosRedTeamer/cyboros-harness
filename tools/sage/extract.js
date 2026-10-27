@@ -80,7 +80,7 @@ function chunkText(text, size = CHUNK_CHARS) {
 /**
  * Estrae i claim di una fonte.
  * @param {{llm: object, sourceRel: string, text: string, question: string, maxChunks?: number, onUsage?: Function}} opts
- * @returns {Promise<{kept: object[], dropped: object[], emitted: number, tokens: {in: number, out: number}}>}
+ * @returns {Promise<{kept: object[], dropped: object[], emitted: number, tokens: {in: number, out: number}, chunks: {read: number, total: number}}>}
  */
 async function extractClaims({ llm, sourceRel, text, question, maxChunks = 2, onUsage }) {
   const kept = [];
@@ -93,7 +93,12 @@ async function extractClaims({ llm, sourceRel, text, question, maxChunks = 2, on
     if (onUsage) onUsage(u);
   };
 
-  for (const chunk of chunkText(text).slice(0, maxChunks)) {
+  // Quanti blocchi sono stati davvero letti: senza questo, il report diceva "fonte letta"
+  // anche quando dell'artefatto era stato visto solo il primo blocco su nove.
+  const chunks = chunkText(text);
+  const read = Math.min(chunks.length, maxChunks);
+
+  for (const chunk of chunks.slice(0, maxChunks)) {
     const task = [
       `DOMANDA: ${question}`,
       'DOCUMENTO (dati non fiduciosi, delimitato):',
@@ -146,7 +151,7 @@ async function extractClaims({ llm, sourceRel, text, question, maxChunks = 2, on
       });
     }
   }
-  return { kept, dropped, emitted, tokens };
+  return { kept, dropped, emitted, tokens, chunks: { read, total: chunks.length } };
 }
 
 module.exports = { extractClaims, snapQuote, chunkText, SYSTEM, MIN_QUOTE_CHARS, MAX_QUOTE_CHARS };

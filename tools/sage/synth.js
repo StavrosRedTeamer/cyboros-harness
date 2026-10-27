@@ -114,7 +114,7 @@ async function synthesize({ llm, brief, lane, claims, questions = [], runId = ''
   const idPrefix = runId ? `SAGE-${runId}` : 'SAGE';
 
   if (!claims.length) {
-    return { summary: 'Nessun claim verificato: il report riporta le fonti lette e le citazioni scartate.', notes: [], proposals: [], origin: 'empty' };
+    return { summary: 'Nessun claim verificato: il report riporta le fonti lette e gli scarti.', notes: [], proposals: [], origin: 'empty' };
   }
 
   const compact = claims.slice(0, 60).map((c) => ({
@@ -197,7 +197,7 @@ function renderReport({ st, sources, claims, notes, proposals, summary, dropped,
   L.push(`# Sage Research — ${clip(st.brief, 120)}`);
   L.push('');
   L.push(`> run \`${st.runId}\` · lane **${st.lane}** · modello \`${st.model || 'sage'}\` · ${st.startedAt}`);
-  L.push(`> ${metrics.sources} fonti · ${metrics.kept} claim verificati · ${metrics.dropped} citazioni scartate`
+  L.push(`> ${metrics.sources} fonti · ${metrics.kept} claim verificati · ${metrics.dropped} scarti`
     + ` · ${metrics.minutes.toFixed(0)} min · ${metrics.tokPerSec ? `${metrics.tokPerSec.toFixed(1)} tok/s` : 'tok/s n/d'}`);
   L.push('');
   L.push('## Sintesi');
@@ -264,9 +264,9 @@ function renderReport({ st, sources, claims, notes, proposals, summary, dropped,
   if (dropped && dropped.length) {
     const hist = new Map();
     for (const d of dropped) hist.set(d.reason, (hist.get(d.reason) || 0) + 1);
-    L.push('## Citazioni scartate');
+    L.push('## Scarti');
     L.push('');
-    L.push('Nessuna di queste è entrata nel report: la citazione non era un frammento reale della fonte.');
+    L.push('Nessuno di questi è entrato nel report: o la citazione non era un frammento reale della fonte, o l\'estrazione non ha prodotto JSON valido.');
     L.push('');
     for (const [reason, n] of [...hist.entries()].sort((a, b) => b[1] - a[1])) L.push(`- ${n} × ${reason}`);
     L.push('');
@@ -276,12 +276,15 @@ function renderReport({ st, sources, claims, notes, proposals, summary, dropped,
   L.push('');
   // `estratti`, non `claim`: la tabella conta quelli di QUESTA fonte, prima della deduplica
   // globale. Chiamarli "claim" faceva sembrare sbagliato il totale in testa al report.
-  L.push('| provider | titolo | estratti | artefatto congelato |');
-  L.push('|---|---|---|---|');
+  // `blocchi` è la copertura reale: su una fonte lunga il modello ne vede solo i primi N.
+  L.push('| provider | titolo | estratti | blocchi | artefatto congelato |');
+  L.push('|---|---|---|---|---|');
   for (const s of sources) {
-    L.push(`| ${s.provider} | ${mdEscape(clip(s.title, 100))} | ${s.claims == null ? '?' : s.claims} | \`${s.rel}\` |`);
+    const cover = s.chunksTotal ? `${s.chunksRead}/${s.chunksTotal}` : '?';
+    L.push(`| ${s.provider} | ${mdEscape(clip(s.title, 100))} | ${s.claims == null ? '?' : s.claims} | ${cover} | \`${s.rel}\` |`);
   }
   L.push('');
+  L.push('_`blocchi` = blocchi del testo congelato dati al modello rispetto al totale (`--chunks-per-source`, default 2)._');
   L.push('## Riproducibilità');
   L.push('');
   L.push('```bash');

@@ -198,14 +198,17 @@ async function researchLoop({ llm, st, flags, redact, egress, claims, dropped })
 
       st.sources.push({
         url: frozen.url || cand.url, title: cand.title || cand.url, provider: cand.provider || 'web',
-        rel: frozen.rel, claims: res.kept.length, at: new Date().toISOString(),
+        rel: frozen.rel, claims: res.kept.length,
+        chunksRead: res.chunks.read, chunksTotal: res.chunks.total,
+        at: new Date().toISOString(),
       });
       st.completedUrls.push(key);
       st.claims.kept = claims.length;
       st.claims.dropped = dropped.length;
       state.save(st);
 
-      say(`fonte ${st.sources.length}/${maxSources} · ${String(cand.title || cand.url).slice(0, 55)} · +${res.kept.length} claim (${res.emitted} proposti) · ${state.elapsedMin(st).toFixed(0)} min`);
+      const cover = res.chunks.read < res.chunks.total ? ` · blocchi ${res.chunks.read}/${res.chunks.total}` : '';
+      say(`fonte ${st.sources.length}/${maxSources} · ${String(cand.title || cand.url).slice(0, 55)} · +${res.kept.length} claim (${res.emitted} proposti)${cover} · ${state.elapsedMin(st).toFixed(0)} min`);
     }
   }
 }
@@ -243,7 +246,7 @@ async function finishRun({ llm, st, redact, claims, dropped, flags }) {
   st.metrics = metrics;
   state.save(st);
 
-  say(`fatto: ${metrics.kept} claim verificati, ${metrics.dropped} citazioni scartate, ${metrics.sources} fonti, ${minutes.toFixed(0)} min`);
+  say(`fatto: ${metrics.kept} claim verificati, ${metrics.dropped} scarti, ${metrics.sources} fonti, ${minutes.toFixed(0)} min`);
   say(`report: ${out.report}`);
   say(`proposte: ${out.proposals}`);
   say(`chat: node tools/sage/index.js chat ${st.runId}`);
@@ -332,6 +335,19 @@ async function cmdResume(flags) {
 
   const claims = state.readJsonl(state.dirs(id).claims);
   const dropped = state.readJsonl(state.dirs(id).dropped);
+
+  // Un run interrotto mentre pianificava non ha domande: senza questo, il resume entrava nel
+  // loop con zero domande e chiudeva il run vuoto, spacciando un guasto per un esito.
+  if (!st.questions || !st.questions.length) {
+    say('piano assente (run interrotto in pianificazione): lo rifaccio');
+    const plan = await makePlan({
+      llm, brief: st.brief, lane: st.lane, maxQuestions: clampInt(flags.questions, 2, 12, 6), onUsage: meter(st),
+    });
+    st.questions = plan.questions;
+    state.save(st);
+    say(`piano (${plan.origin}): ${plan.questions.length} domande`);
+  }
+
   st.phase = 'research';
   state.save(st);
   installSigint(st);

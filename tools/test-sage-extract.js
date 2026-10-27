@@ -133,6 +133,22 @@ function fakeLlm(replies) {
     assert.ok(TEXT.includes(res.kept[0].quote));
   });
 
+  await okAsync('extractClaims: dichiara la copertura reale (blocchi letti / totali)', async () => {
+    const long = Array.from({ length: 6 }, (_, i) => `Paragrafo ${i}. `
+      + 'contenuto tecnico ripetuto per riempire il blocco e superare la soglia minima. '.repeat(30)).join('\n\n');
+    const res = await extractClaims({
+      llm: fakeLlm(['{"claims":[]}']), sourceRel: REL, text: long, question: 'x', maxChunks: 2,
+    });
+    assert.ok(res.chunks.total > 2, `attesi più di 2 blocchi, trovati ${res.chunks.total}`);
+    assert.strictEqual(res.chunks.read, 2, 'con maxChunks 2 non si può leggere di più');
+
+    // Fonte corta: copertura completa, e il report non deve suggerire un taglio che non c'è.
+    const short = await extractClaims({
+      llm: fakeLlm(['{"claims":[]}']), sourceRel: REL, text: TEXT, question: 'x', maxChunks: 2,
+    });
+    assert.deepStrictEqual(short.chunks, { read: 1, total: 1 });
+  });
+
   fs.rmSync(path.dirname(ABS), { recursive: true, force: true });
   summary('sage-extract');
 })();
