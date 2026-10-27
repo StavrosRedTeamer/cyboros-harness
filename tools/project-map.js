@@ -82,6 +82,15 @@ const AREAS = [
     files: ['workflows/recon-baseline.yaml', 'docs/toolbox.md'],
   },
   {
+    id: 'sage', name: 'Ricerca locale (Sage)', accent: '#7cc6ff',
+    blurb: 'La letteratura prima della tecnica: un modello locale legge fonti e il codice verifica ogni citazione. Produce report e proposte draft, mai conoscenza attiva.',
+    modules: [
+      'sage/index', 'sage/plan', 'sage/sources', 'sage/extract',
+      'sage/synth', 'sage/redact', 'sage/state', 'sage/ask',
+    ],
+    files: ['docs/sage-deep-research.md', 'ops/harness.md', 'local/sage/config.json'],
+  },
+  {
     id: 'web', name: 'Attacchi web', accent: '#a97cff',
     blurb: 'Tutto ciò che parla HTTP: richieste ripetibili, token, header, desync, GraphQL, la superficie client-side, i credential attack.',
     modules: [
