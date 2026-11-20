@@ -85,7 +85,9 @@ async function askJson(llm, { system, task, onUsage, onTimings, retries = 1 }) {
     res = await askTurn(llm, {
       system: sys,
       task: (cut
-        ? 'La risposta precedente è stata TRONCATA dal limite di output. Rispondi con lo stesso formato ma molto più conciso: al massimo 3 note e 3 proposte, frasi brevi.\n\n'
+        // Schema-agnostico: questo hint lo ricevono anche piano ed estrazione, non solo la
+        // sintesi. Dire "3 note e 3 proposte" a un estrattore lo spinge fuori formato.
+        ? 'La risposta precedente è stata TRONCATA dal limite di output. Rispondi con lo STESSO formato ma molto più conciso: meno elementi, frasi brevi.\n\n'
         : 'La risposta precedente non era un oggetto JSON valido. Rispondi di nuovo con UN oggetto JSON valido e nient\'altro.\n\n')
         + 'Richiesta originale:\n' + task,
       onUsage,

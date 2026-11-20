@@ -84,8 +84,16 @@ while IFS=$'\t' read -r rel size; do
   [[ -z "$rel" ]] && continue
   out="$DIR/$rel"
   mkdir -p "$(dirname "$out")"
-  if [[ -f "$out" && "$size" -gt 0 && "$(stat -c%s "$out")" -eq "$size" ]]; then
+  have="$(stat -c%s "$out" 2>/dev/null || echo 0)"
+  if [[ -f "$out" && "$size" -gt 0 && "$have" -eq "$size" ]]; then
     say "✓ già completo  $rel"; continue
+  fi
+  # Un file PIÙ GRANDE dell'atteso (revisione del repo cambiata, download corrotto) non si
+  # riprende: `-C -` chiede un offset oltre la fine, il server risponde 416 e curl 8.x lo
+  # tratta come "già completo" → resterebbe su disco un GGUF rotto dichiarando successo.
+  if [[ -f "$out" && "$size" -gt 0 && "$have" -gt "$size" ]]; then
+    warn "file più grande dell'atteso ($have > $size byte): riparto da zero — $rel"
+    rm -f "$out"
   fi
   say "↓ $rel"
   # -C - riprende un download interrotto invece di ripartire da zero.

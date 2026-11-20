@@ -91,10 +91,39 @@ function elapsedMin(st, now = Date.now()) {
   return Number.isFinite(t0) ? (now - t0) / 60000 : 0;
 }
 
+// Il budget è TEMPO ATTIVO, non tempo di calendario: un run interrotto alle 23 e ripreso la
+// mattina dopo si chiudeva al primo giro con "budget esaurito" e un report vuoto marcato
+// `done` (lo stesso difetto di classe del resume senza piano). Il cronometro vive su due
+// campi: `budgetSpentMin` (minuti già consumati) e `activeSince` (istante in cui il conto è
+// ripartito). `pauseClock` lo ferma (SIGINT, fine run), `resumeClock` lo riavvia.
+function spentMin(st, now = Date.now()) {
+  const base = Number(st && st.budgetSpentMin);
+  const since = Number(st && st.activeSince);
+  const running = Number.isFinite(since) && since > 0 ? Math.max(0, now - since) / 60000 : 0;
+  return (Number.isFinite(base) ? base : 0) + running;
+}
+
+function pauseClock(st, now = Date.now()) {
+  st.budgetSpentMin = spentMin(st, now);
+  delete st.activeSince;
+  return st;
+}
+
+function resumeClock(st, now = Date.now()) {
+  st.activeSince = now;
+  return st;
+}
+
+/** Minuti contati da budget e report: tempo attivo se il run lo traccia, wall clock se è vecchio. */
+function activeMin(st, now = Date.now()) {
+  const tracked = (st && st.budgetSpentMin != null) || (st && st.activeSince != null);
+  return tracked ? spentMin(st, now) : elapsedMin(st, now);
+}
+
 function budgetLeft(st, now = Date.now()) {
   const budget = Number(st.budgetMin);
   if (!Number.isFinite(budget) || budget <= 0) return Infinity;
-  return budget - elapsedMin(st, now);
+  return budget - activeMin(st, now);
 }
 
 /** Report e proposte di un run: stesso stem, due estensioni. Puro: nessun I/O. */
@@ -120,5 +149,6 @@ function slugify(s) {
 module.exports = {
   ROOT, ARTIFACTS, REPORTS,
   stamp, runId, dirs, ensure, load, save, appendJsonl, readJsonl,
-  list, elapsedMin, budgetLeft, reportStem, stemFor, slugify, atomicWriteJson,
+  list, elapsedMin, activeMin, spentMin, pauseClock, resumeClock, budgetLeft,
+  reportStem, stemFor, slugify, atomicWriteJson,
 };

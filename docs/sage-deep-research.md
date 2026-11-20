@@ -1,7 +1,7 @@
 # Cyboros Sage — deep research locale (Sage-A1.5)
 
 > Un run di ricerca che parte da un'icona sul desktop, legge fonti locali e web, e produce un
-> report in cui **ogni affermazione ha una citazione verificata byte-per-byte**. Non è un chat
+> report in cui **ogni claim ha una citazione verificata byte-per-byte**. Non è un chat
 > con un modello: è una pipeline che usa un modello da ~3B attivi per proporre, e il codice per
 > verificare. Le proposte che ne escono restano `draft` finché un umano non le approva.
 
@@ -87,6 +87,10 @@ node tools/sage/index.js status
 
 Flag: `--max-sources N` (12) · `--budget-min N` (90) · `--questions N` (6) ·
 `--chunks-per-source N` (2) · `--model sage|qwen` · `--endpoint URL` · `--open` · `--no-redact`.
+
+`--budget-min` misura il tempo **attivo** di ricerca: una pausa (Ctrl-C, sospensione, resume il
+giorno dopo) non lo consuma, e `resume --budget-min N` estende un run fermato dal budget senza
+rifare il fetch delle fonti.
 
 `--model qwen` punta `local/config.local.json` (porta 8080): serve a validare la pipeline contro il
 modello del pentest già installato, senza scaricare Sage.
@@ -175,7 +179,10 @@ Nessuna scrittura automatica in `knowledge.md`: la conoscenza che gli agenti leg
 - **Architettura GGUF**: se il tuo build di llama.cpp non conosce `qwen35moe`, `serve.sh --check`
   fallisce con l'istruzione di rebuild. Nel frattempo la pipeline funziona con `--model qwen`.
 - **Rate limit dei motori**: DDG/NVD possono rispondere 429; il singolo provider viene saltato, il
-  run prosegue.
+  run prosegue (e il fallimento non lascia traccia nel report: si vede solo dal numero di fonti).
+- **Prosa non verificata**: il gate byte-per-byte copre i claim e le quote delle proposte, non la
+  sintesi né le note, che sono testo del modello e possono affermare cose che nessun claim
+  sostiene. Il report lo dichiara sotto la sintesi.
 
 ## Verifica
 

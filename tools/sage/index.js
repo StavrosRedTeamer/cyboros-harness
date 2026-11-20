@@ -105,7 +105,7 @@ function installSigint(st) {
   process.on('SIGINT', () => {
     if (done) return;
     done = true;
-    try { st.phase = 'paused'; state.save(st); } catch { /* niente da salvare */ }
+    try { state.pauseClock(st); st.phase = 'paused'; state.save(st); } catch { /* niente da salvare */ }
     console.log('');
     say(`interrotto. Stato salvato. Riprendi con: node tools/sage/index.js resume ${st.runId}`);
     process.exit(130);
@@ -208,7 +208,7 @@ async function researchLoop({ llm, st, flags, redact, egress, claims, dropped })
       state.save(st);
 
       const cover = res.chunks.read < res.chunks.total ? ` · blocchi ${res.chunks.read}/${res.chunks.total}` : '';
-      say(`fonte ${st.sources.length}/${maxSources} · ${String(cand.title || cand.url).slice(0, 55)} · +${res.kept.length} claim (${res.emitted} proposti)${cover} · ${state.elapsedMin(st).toFixed(0)} min`);
+      say(`fonte ${st.sources.length}/${maxSources} · ${String(cand.title || cand.url).slice(0, 55)} · +${res.kept.length} claim (${res.emitted} proposti)${cover} · ${state.activeMin(st).toFixed(0)} min`);
     }
   }
 }
@@ -226,7 +226,8 @@ async function finishRun({ llm, st, redact, claims, dropped, flags }) {
     warn(`sintesi in fallback: la risposta del modello non era JSON valido. Inizio risposta: ${String(syn.raw || '').replace(/\s+/g, ' ').slice(0, 240)}`);
   }
 
-  const minutes = state.elapsedMin(st);
+  // Tempo ATTIVO (pause escluse): è ciò che il budget misura e ciò che il report dichiara.
+  const minutes = state.activeMin(st);
   const metrics = {
     sources: st.sources.length,
     kept: unique.length,
@@ -240,6 +241,7 @@ async function finishRun({ llm, st, redact, claims, dropped, flags }) {
     summary: syn.summary, dropped, metrics, proposalsSkipped: syn.proposalsSkipped,
   });
 
+  state.pauseClock(st);   // chiude il cronometro: il tempo attivo resta in budgetSpentMin
   st.phase = 'done';
   st.finishedAt = new Date().toISOString();
   st.outputs = out;
@@ -277,10 +279,13 @@ async function cmdRun(flags) {
     maxSources: clampInt(flags['max-sources'], 1, 200, 12),
     budgetMin: clampInt(flags['budget-min'], 1, 24 * 60, 90),
     startedAt: new Date().toISOString(),
+    // Budget = tempo attivo: parte il cronometro, e una pausa lo ferma invece di consumarlo.
+    budgetSpentMin: 0,
     phase: 'plan', questions: [], sources: [], completedUrls: [],
     claims: { kept: 0, dropped: 0 }, tokens: { in: 0, out: 0 },
     errors: [], warnings: [],
   };
+  state.resumeClock(st);
   state.save(st);
   installSigint(st);
 
@@ -323,6 +328,15 @@ async function cmdResume(flags) {
   const st = state.load(id);
   if (!st) die(`run non trovato: ${id}`);
   if (st.phase === 'done') { say(`run ${id} già completo: ${st.outputs ? st.outputs.report : '(report non registrato)'}`); return; }
+
+  // Il cronometro del budget riparte da qui: il tempo passato in pausa non conta.
+  state.resumeClock(st);
+  // `resume --budget-min N` estende un run fermato dal budget; senza, l'unica uscita era
+  // ricominciare da zero e rifare il fetch di tutte le fonti.
+  if (flags['budget-min'] !== undefined) {
+    st.budgetMin = clampInt(flags['budget-min'], 1, 24 * 60, st.budgetMin);
+    say(`budget esteso a ${st.budgetMin} min`);
+  }
 
   const { cfg } = loadConfig({ ...flags, model: flags.model || st.model });
   try { await endpointIds(cfg); } catch (e) { die(`endpoint non raggiungibile (${cfg.endpoint.base_url}): ${e.message}`); }
@@ -436,7 +450,7 @@ function cmdStatus() {
       String(r.phase).padEnd(10),
       String(r.sources ? r.sources.length : 0).padStart(5),
       String(r.claims ? r.claims.kept : 0).padStart(6),
-      String(state.elapsedMin(r).toFixed(0)).padStart(5),
+      String(state.activeMin(r).toFixed(0)).padStart(5),
       String(r.brief || '').slice(0, 50),
     ].join(' '));
   }

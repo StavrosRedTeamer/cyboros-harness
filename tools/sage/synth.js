@@ -204,6 +204,10 @@ function renderReport({ st, sources, claims, notes, proposals, summary, dropped,
   L.push('');
   L.push(summary || '(nessuna sintesi)');
   L.push('');
+  // Il gate byte-per-byte copre i claim e le quote: la prosa no. Dirlo qui evita che una
+  // frase del modello venga letta come un fatto verificato.
+  L.push('_Sintesi e note sono prosa del modello: la prova byte-per-byte sta nei claim e nelle quote delle proposte._');
+  L.push('');
 
   if (proposalsSkipped) {
     L.push('## Proposte');

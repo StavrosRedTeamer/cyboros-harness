@@ -15,6 +15,7 @@ const fs = require('fs');
 const path = require('path');
 const { ok, okAsync, summary } = require('./testkit');
 const { snapQuote, chunkText, extractClaims } = require('./sage/extract');
+const { askJson } = require('./sage/ask');
 const { validateQuote } = require('./evidence-quote');
 
 const ROOT = path.join(__dirname, '..');
@@ -147,6 +148,24 @@ function fakeLlm(replies) {
       llm: fakeLlm(['{"claims":[]}']), sourceRel: REL, text: TEXT, question: 'x', maxChunks: 2,
     });
     assert.deepStrictEqual(short.chunks, { read: 1, total: 1 });
+  });
+
+  await okAsync('askJson: il retry di un output troncato non parla di note e proposte', async () => {
+    // L'hint del retry è condiviso da piano, estrazione e sintesi: se nomina lo schema della
+    // sintesi, un estrattore riceve istruzioni su note/proposte e può uscire formato.
+    const tasks = [];
+    const llm = {
+      async runAgent({ task }) {
+        tasks.push(task);
+        return tasks.length === 1
+          ? { text: '{"claims":[{"claim":"x"', finish_reason: 'length', messages: [] }
+          : { text: '{"claims":[]}', finish_reason: 'stop', messages: [] };
+      },
+    };
+    await askJson(llm, { system: 'estrattore', task: 'DOMANDA: q' });
+    assert.strictEqual(tasks.length, 2);
+    assert.ok(/stesso formato/i.test(tasks[1]), tasks[1]);
+    assert.ok(!/propost/i.test(tasks[1]), 'un estrattore non deve ricevere l\'hint della sintesi');
   });
 
   fs.rmSync(path.dirname(ABS), { recursive: true, force: true });
