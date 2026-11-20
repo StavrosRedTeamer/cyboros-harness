@@ -24,6 +24,23 @@ const TIMEOUT_MS = 20000;
 
 const lastHit = new Map();
 
+// Un errore TRANSITORIO merita un altro tentativo (rete, timeout, 408/425/429, 5xx); uno
+// PERMANENTE no (404, contenuto non testuale, guardia SSRF). La distinzione vive qui, dove
+// l'errore nasce, non nel loop del chiamante che altrimenti dovrebbe leggere i messaggi.
+function statusIsTransient(status) {
+  const s = Number(status);
+  return s === 408 || s === 425 || s === 429 || (Number.isFinite(s) && s >= 500);
+}
+
+function isTransient(e) { return !!(e && e.transient === true); }
+
+/** Errore di scarto "meccanico": la fonte è stata vista e non è utilizzabile, non è un guasto. */
+function discardError(message) {
+  const e = new Error(message);
+  e.discard = true;
+  return e;
+}
+
 function sha256(s) {
   return crypto.createHash('sha256').update(String(s)).digest('hex');
 }
@@ -68,14 +85,22 @@ async function fetchRaw(url) {
     const u = new URL(current);
     if (!/^https?:$/.test(u.protocol)) throw new Error(`schema non ammesso: ${u.protocol}`);
     await pace(current);
-    const res = await fetch(current, {
-      redirect: 'manual',
-      headers: {
-        'user-agent': UA,
-        accept: 'text/html,application/xhtml+xml,application/json,application/atom+xml;q=0.9,*/*;q=0.5',
-      },
-      signal: AbortSignal.timeout(TIMEOUT_MS),
-    });
+    let res;
+    try {
+      res = await fetch(current, {
+        redirect: 'manual',
+        headers: {
+          'user-agent': UA,
+          accept: 'text/html,application/xhtml+xml,application/json,application/atom+xml;q=0.9,*/*;q=0.5',
+        },
+        signal: AbortSignal.timeout(TIMEOUT_MS),
+      });
+    } catch (e) {
+      // DNS, connessione rifiutata, timeout: domani può andare, quindi è ritentabile.
+      const err = new Error(`rete: ${e && e.message ? e.message : String(e)}`);
+      err.transient = true;
+      throw err;
+    }
     const loc = res.headers.get('location');
     if (res.status >= 300 && res.status < 400 && loc) {
       current = new URL(loc, current).toString();
@@ -131,15 +156,23 @@ function freeze(runId, key, text, meta = {}) {
   return { rel: path.relative(state.ROOT, file), hash, bytes: Buffer.byteLength(body) };
 }
 
-/** Scarica una URL e la congela. Restituisce null se il contenuto non è testo utile. */
+/**
+ * Scarica una URL e la congela. Lancia: errore con `transient`/`discard` per gli scarti
+ * ritentabili e per quelli meccanici — mai un `null` silenzioso, che nel report diventava
+ * indistinguibile da una fonte mai provata.
+ */
 async function fetchSource(runId, url, meta = {}) {
   const r = await fetchRaw(url);
-  if (r.status >= 400) throw new Error(`HTTP ${r.status}`);
+  if (r.status >= 400) {
+    const e = new Error(`HTTP ${r.status}`);
+    e.transient = statusIsTransient(r.status);
+    throw e;
+  }
   const isJson = /json/i.test(r.contentType);
   // Un PDF o un'immagine non diventano testo passando da htmlToText: diventano spazzatura
   // di 200+ caratteri che il modello proverebbe comunque a citare. Meglio scartarli qui.
   if (!isJson && r.contentType && !/^(text\/|application\/(xml|xhtml\+xml|atom\+xml))/i.test(r.contentType)) {
-    throw new Error(`contenuto non testuale: ${r.contentType.split(';')[0]}`);
+    throw discardError(`contenuto non testuale: ${r.contentType.split(';')[0]}`);
   }
   let text;
   if (isJson) {
@@ -147,7 +180,9 @@ async function fetchSource(runId, url, meta = {}) {
   } else {
     text = htmlToText(r.body);
   }
-  if (text.trim().length < 200) return null;   // pagina vuota/consenso cookie: non è una fonte
+  // Pagina vuota/consenso cookie: non è una fonte, e ora lo dice invece di sparire in silenzio.
+  const useful = text.trim().length;
+  if (useful < 200) throw discardError(`testo utile troppo corto (${useful} caratteri)`);
   const frozen = freeze(runId, r.url, text, { url: r.url, origin: 'web', contentType: r.contentType, ...meta });
   return { ...frozen, url: r.url, title: meta.title || r.url, provider: meta.provider || 'web' };
 }
@@ -314,6 +349,6 @@ async function gather({ runId, question, queries, lane, limit = 6 }) {
 
 module.exports = {
   UA, MAX_SOURCE_CHARS,
-  sha256, htmlToText, freeze, fetchRaw, fetchSource,
+  sha256, htmlToText, freeze, fetchRaw, fetchSource, isTransient, statusIsTransient, discardError,
   searchWeb, searchNvd, searchArxiv, searchGithub, searchLocal, gather,
 };

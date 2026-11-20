@@ -192,7 +192,7 @@ async function synthesize({ llm, brief, lane, claims, questions = [], runId = ''
 // ── report ─────────────────────────────────────────────────────────────────────
 function mdEscape(s) { return String(s == null ? '' : s).replace(/\|/g, '\\|'); }
 
-function renderReport({ st, sources, claims, notes, proposals, summary, dropped, metrics, proposalsSkipped }) {
+function renderReport({ st, sources, claims, notes, proposals, summary, dropped, metrics, proposalsSkipped, discarded = [], retryPending = [] }) {
   const L = [];
   L.push(`# Sage Research — ${clip(st.brief, 120)}`);
   L.push('');
@@ -289,6 +289,33 @@ function renderReport({ st, sources, claims, notes, proposals, summary, dropped,
   }
   L.push('');
   L.push('_`blocchi` = blocchi del testo congelato dati al modello rispetto al totale (`--chunks-per-source`, default 2)._');
+
+  if (discarded.length) {
+    L.push('## Fonti scartate');
+    L.push('');
+    L.push('_Candidate viste e non usate: il motivo è meccanico (HTTP, contenuto non testuale, testo troppo corto, tentativi esauriti), non un giudizio sul contenuto._');
+    L.push('');
+    L.push('| provider | url | motivo |');
+    L.push('|---|---|---|');
+    for (const d of discarded) {
+      L.push(`| ${mdEscape(d.provider || 'web')} | ${mdEscape(clip(d.url, 120))} | ${mdEscape(clip(d.reason, 160))} |`);
+    }
+    L.push('');
+  }
+
+  if (retryPending.length) {
+    L.push('## Fonti da riprovare');
+    L.push('');
+    L.push('_Errore transitorio (rete, timeout, 408/425/429 o 5xx): restano in coda e `resume` le riprova._');
+    L.push('');
+    L.push('| provider | url | tentativi | motivo |');
+    L.push('|---|---|---|---|');
+    for (const r of retryPending) {
+      L.push(`| ${mdEscape(r.provider || 'web')} | ${mdEscape(clip(r.url, 120))} | ${r.attempts || 1} | ${mdEscape(clip(r.reason, 140))} |`);
+    }
+    L.push('');
+  }
+
   L.push('## Riproducibilità');
   L.push('');
   L.push('```bash');
@@ -302,12 +329,12 @@ function renderReport({ st, sources, claims, notes, proposals, summary, dropped,
 }
 
 /** Scrive report + proposte + riga d'indice. Restituisce i path workspace-relative. */
-function writeOutputs({ st, sources, claims, notes, proposals, summary, dropped, metrics, proposalsSkipped }) {
+function writeOutputs({ st, sources, claims, notes, proposals, summary, dropped, metrics, proposalsSkipped, discarded = [], retryPending = [] }) {
   const stem = state.reportStem(st.runId);
   fs.mkdirSync(state.REPORTS, { recursive: true });
   const mdPath = `${stem}.md`;
   const propPath = `${stem}.proposals.json`;
-  fs.writeFileSync(mdPath, renderReport({ st, sources, claims, notes, proposals, summary, dropped, metrics, proposalsSkipped }), 'utf8');
+  fs.writeFileSync(mdPath, renderReport({ st, sources, claims, notes, proposals, summary, dropped, metrics, proposalsSkipped, discarded, retryPending }), 'utf8');
   fs.writeFileSync(propPath, JSON.stringify({
     run: st.runId, lane: st.lane, brief: st.brief, generatedAt: new Date().toISOString(), proposals,
   }, null, 2), 'utf8');

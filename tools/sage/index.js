@@ -112,6 +112,52 @@ function installSigint(st) {
   });
 }
 
+// ── fetch falliti: ritentabili o scartati ─────────────────────────────────────
+// Un 429 o un timeout non è un 404: il primo merita un altro tentativo (al resume, senza
+// dover ritrovare la fonte con una nuova ricerca), il secondo no. `st.retry` è la coda dei
+// ritentabili, `st.discarded` la traccia di ciò che è stato visto e buttato: senza,
+// "fonte assente" e "fonte mai provata" erano la stessa riga nel report.
+const MAX_FETCH_ATTEMPTS = 3;
+
+function clearRetry(st, url) {
+  const key = normUrl(url);
+  st.retry = (Array.isArray(st.retry) ? st.retry : []).filter((r) => normUrl(r.url) !== key);
+  return st;
+}
+
+/**
+ * Registra un fetch fallito. Ritentabile → coda `retry`; permanente, o tentativi esauriti →
+ * `discarded` + URL marcato completato. Nessun I/O: si testa senza rete.
+ * @returns {'retry'|'discard'}
+ */
+function recordFetchFailure({ st, cand, question, error, maxAttempts = MAX_FETCH_ATTEMPTS }) {
+  const reason = error && error.message ? error.message : String(error);
+  const key = normUrl(cand.url);
+  st.completedUrls = Array.isArray(st.completedUrls) ? st.completedUrls : [];
+  st.retry = Array.isArray(st.retry) ? st.retry : [];
+  st.discarded = Array.isArray(st.discarded) ? st.discarded : [];
+  const entry = {
+    url: cand.url, title: cand.title || cand.url, provider: cand.provider || 'web',
+    question, reason,
+  };
+  const discard = (why) => {
+    st.discarded.push({ ...entry, reason: why, at: new Date().toISOString() });
+    clearRetry(st, cand.url);
+    if (!st.completedUrls.includes(key)) st.completedUrls.push(key);
+    return 'discard';
+  };
+
+  // `discard` lo decide fetchSource (pagina vuota, contenuto non testuale): non è un guasto.
+  if ((error && error.discard) || !sources.isTransient(error)) return discard(reason);
+
+  const prev = st.retry.find((r) => normUrl(r.url) === key);
+  const attempts = (prev ? Number(prev.attempts) || 0 : 0) + 1;
+  if (attempts >= maxAttempts) return discard(`tentativi esauriti (${attempts}): ${reason}`);
+  if (prev) Object.assign(prev, { attempts, reason, at: new Date().toISOString() });
+  else st.retry.push({ ...entry, attempts, at: new Date().toISOString() });
+  return 'retry';
+}
+
 /**
  * Ciclo di ricerca condiviso da run e resume. Ogni fonte completata finisce in
  * `completedUrls` e su disco: al resume non si rifetcha nulla.
@@ -119,6 +165,9 @@ function installSigint(st) {
 async function researchLoop({ llm, st, flags, redact, egress, claims, dropped }) {
   const maxSources = st.maxSources;
   const maxChunks = clampInt(flags['chunks-per-source'], 1, 4, 2);
+  // Un URL si prova una volta per processo: un fallimento transitorio non si ritenta qui a
+  // ogni domanda, ma resta in coda per il prossimo resume.
+  const attempted = new Set();
 
   for (const question of st.questions) {
     if (st.sources.length >= maxSources) break;
@@ -128,21 +177,27 @@ async function researchLoop({ llm, st, flags, redact, egress, claims, dropped })
     for (const q of queries) {
       if (q.redacted) warn(`query ripulita: ${q.hits.map((h) => `${h.count}×${h.kind}`).join(', ')}`);
     }
-    let candidates = [];
+    // I ritentabili tornano in testa: un 429 di dieci minuti fa non deve perdere la fonte
+    // solo perché una nuova ricerca non la ripropone.
+    const pending = (st.retry || []).filter(
+      (r) => r.question === question && !st.completedUrls.includes(normUrl(r.url)),
+    );
+    let candidates = pending.slice();
     let searchError = null;
     try {
-      candidates = await sources.gather({
+      candidates = candidates.concat(await sources.gather({
         runId: st.runId, question, queries: queries.map((q) => q.text), lane: st.lane, limit: maxSources,
-      });
+      }));
     } catch (e) { searchError = e.message; }
     egress({
       kind: 'search', question: redact(question).text, queries: queries.map((q) => q.text),
-      candidates: candidates.length, ...(searchError ? { error: searchError } : {}),
+      candidates: candidates.length, ...(pending.length ? { retry: pending.length } : {}),
+      ...(searchError ? { error: searchError } : {}),
     });
     if (searchError) {
       st.errors.push(`ricerca "${question}": ${searchError}`);
       state.save(st);
-      continue;
+      if (!pending.length) continue;   // senza ritentabili non c'è nulla da fare per questa domanda
     }
     if (!candidates.length) warn(`nessuna fonte per: ${question}`);
 
@@ -151,6 +206,8 @@ async function researchLoop({ llm, st, flags, redact, egress, claims, dropped })
       if (state.budgetLeft(st) <= 0) break;
       const key = normUrl(cand.url);
       if (st.completedUrls.includes(key)) continue;
+      if (attempted.has(key)) continue;   // già provato in questo processo: niente doppioni
+      attempted.add(key);
 
       let frozen = null;
       try {
@@ -161,12 +218,19 @@ async function researchLoop({ llm, st, flags, redact, egress, claims, dropped })
           frozen = await sources.fetchSource(st.runId, cand.url, { title: cand.title, provider: cand.provider });
         }
       } catch (e) {
-        st.warnings.push(`fetch ${cand.url}: ${e.message}`);
-        st.completedUrls.push(key);   // un URL che fallisce non va ritentato a ogni resume
+        const reason = e && e.message ? e.message : String(e);
+        st.warnings.push(`fetch ${cand.url}: ${reason}`);
+        // Il tentativo è uscito dalla macchina anche se è fallito: l'audit lo registra.
+        egress({ kind: 'fetch', url: cand.url, provider: cand.provider, error: reason, transient: !(e && e.discard) && sources.isTransient(e) });
+        recordFetchFailure({ st, cand, question, error: e });
         state.save(st);
         continue;
       }
-      if (!frozen) { st.completedUrls.push(key); state.save(st); continue; }
+      if (!frozen) {
+        recordFetchFailure({ st, cand, question, error: sources.discardError('nessun contenuto testuale') });
+        state.save(st);
+        continue;
+      }
 
       egress({ kind: 'fetch', url: frozen.url || cand.url, provider: cand.provider, artifact: frozen.rel });
 
@@ -202,6 +266,7 @@ async function researchLoop({ llm, st, flags, redact, egress, claims, dropped })
         chunksRead: res.chunks.read, chunksTotal: res.chunks.total,
         at: new Date().toISOString(),
       });
+      clearRetry(st, cand.url);   // recuperata: esce dalla coda dei ritentabili
       st.completedUrls.push(key);
       st.claims.kept = claims.length;
       st.claims.dropped = dropped.length;
@@ -239,6 +304,7 @@ async function finishRun({ llm, st, redact, claims, dropped, flags }) {
   const out = synth.writeOutputs({
     st, sources: st.sources, claims: unique, notes: syn.notes, proposals: syn.proposals,
     summary: syn.summary, dropped, metrics, proposalsSkipped: syn.proposalsSkipped,
+    discarded: st.discarded || [], retryPending: st.retry || [],
   });
 
   state.pauseClock(st);   // chiude il cronometro: il tempo attivo resta in budgetSpentMin
@@ -283,6 +349,7 @@ async function cmdRun(flags) {
     budgetSpentMin: 0,
     phase: 'plan', questions: [], sources: [], completedUrls: [],
     claims: { kept: 0, dropped: 0 }, tokens: { in: 0, out: 0 },
+    retry: [], discarded: [],   // fetch ritentabili + candidate viste e scartate
     errors: [], warnings: [],
   };
   state.resumeClock(st);
@@ -602,4 +669,5 @@ if (require.main === module) {
 
 module.exports = {
   parseArgs, clampInt, normUrl, loadConfig, findProposal, chatMaterial, main,
+  recordFetchFailure, clearRetry, MAX_FETCH_ATTEMPTS,
 };

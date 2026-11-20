@@ -125,9 +125,9 @@ stessa cosa del traffico verso un target. Restano due protezioni che non limitan
   credenziali (email, Bearer, JWT, `sk-`, `gh[pousr]_`, AKIA) da **ogni** query prima dell'uscita. Sottodomini inclusi; i nomi che somigliano non vengono toccati;
   le parole troppo comuni ("pentest", "platform") sono escluse per non distruggere la query.
   I log riportano solo categoria e numero dei colpi, **mai il valore rimosso**.
-- `artifacts/sage/<run>/egress.jsonl` registra ogni query (già ripulita), ogni URL fetchato,
-  il numero di candidati e il path dell'artefatto congelato. `--no-redact` disattiva la pulizia:
-  da usare solo se sai perché.
+- `artifacts/sage/<run>/egress.jsonl` registra ogni query (già ripulita), ogni URL fetchato —
+  **anche quando il fetch fallisce**, con l'errore e se era ritentabile —, il numero di candidati e
+  il path dell'artefatto congelato. `--no-redact` disattiva la pulizia: da usare solo se sai perché.
 
 Il fetch rifiuta IP privati/link-local a **ogni hop** di redirect (`tools/ssrf-guard.js`), tronca il
 corpo a 4 MB **mentre legge** (non dopo averlo materializzato) e va a 1 req/s per dominio. Scarta i
@@ -143,6 +143,12 @@ Il modello non legge una fonte intera: legge i primi `--chunks-per-source` blocc
 sarebbe un'affermazione più larga del vero. Nel conteggio degli **scarti** finiscono sia le
 citazioni che non tornano, sia le estrazioni che non hanno prodotto JSON: sono due guasti diversi
 e il report li elenca per ragione.
+
+Un fetch che fallisce per un motivo **transitorio** (rete, timeout, 408/425/429, 5xx) non è dato per
+perso: la fonte resta in `state.retry` e `resume` la riprova — senza doverla ritrovare con una nuova
+ricerca — fino a 3 tentativi, poi diventa uno scarto. Quelle scartate per un motivo meccanico (HTTP
+4xx, contenuto non testuale, testo utile sotto i 200 caratteri) finiscono in `state.discarded` e nel
+report sotto «Fonti scartate»: un 404 non è una fonte che non parla, è una fonte che non c'è.
 
 ## Output su disco
 
@@ -178,8 +184,9 @@ Nessuna scrittura automatica in `knowledge.md`: la conoscenza che gli agenti leg
   alza il pavimento (niente affermazioni senza prova) ma non il soffitto (poca profondità).
 - **Architettura GGUF**: se il tuo build di llama.cpp non conosce `qwen35moe`, `serve.sh --check`
   fallisce con l'istruzione di rebuild. Nel frattempo la pipeline funziona con `--model qwen`.
-- **Rate limit dei motori**: DDG/NVD possono rispondere 429; il singolo provider viene saltato, il
-  run prosegue (e il fallimento non lascia traccia nel report: si vede solo dal numero di fonti).
+- **Rate limit dei motori**: DDG/NVD possono rispondere 429; il provider di ricerca viene saltato e
+  il run prosegue. Un 429 sul fetch di una fonte la lascia in coda per il resume; gli errori dei
+  motori di ricerca (non delle fonti) non sono ancora tracciati uno per uno.
 - **Prosa non verificata**: il gate byte-per-byte copre i claim e le quote delle proposte, non la
   sintesi né le note, che sono testo del modello e possono affermare cose che nessun claim
   sostiene. Il report lo dichiara sotto la sintesi.

@@ -8,7 +8,7 @@ and where the lesson of one engagement changes the next.**
 [![CI](https://github.com/stavrosredteamer/cyboros-harness/actions/workflows/ci.yml/badge.svg?branch=master)](https://github.com/stavrosredteamer/cyboros-harness/actions/workflows/ci.yml)
 [![License: Apache-2.0 + commercial-use restriction](docs/assets/license-apache-2.0.svg)](LICENSE)
 
-[Apache-2.0, with a commercial-use restriction](LICENSE) · zero dependencies · offline-capable · 133 tests, hermetic and parallel
+[Apache-2.0, with a commercial-use restriction](LICENSE) · zero dependencies · offline-capable · 134 tests, hermetic and parallel
 
 [Cyboros](docs/OUROBOROS.md): cyber + ouroboros. The loop is not marketing — every claim on
 that page names the file that proves it. The agent still cannot violate scope, because the
@@ -109,7 +109,7 @@ clean scan.
   On a client network, `npm install` does nothing.
 - **Runs air-gapped.** `local/` drives the same deterministic engine against a local
   model. No API key, no data leaving the engagement laptop.
-- **133 tests, hermetic and parallel by default, no network.** Offline and loopback tests,
+- **134 tests, hermetic and parallel by default, no network.** Offline and loopback tests,
   classified by the runner; `npm test` is the gate, `npm run test:all` includes the live e2e
   set. Tests keep the engine's shared state — the global rate limiter, the run audit, the
   findings head-anchor, the egress-proxy state — in a fixture (`hermetic()` in
@@ -137,7 +137,7 @@ clean scan.
 ```bash
 git clone https://github.com/stavrosredteamer/cyboros-harness.git
 cd cyboros-harness
-npm test                 # 133 tests, no install, no network, 2 workers (--jobs 1 to serialize)
+npm test                 # 134 tests, no install, no network, 2 workers (--jobs 1 to serialize)
 ```
 
 This is also how you verify the clone: a green suite means the guards, the oracle discipline
